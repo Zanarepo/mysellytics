@@ -57,7 +57,7 @@ const Navbar = () => {
           <div className="flex items-center">
       <RouterLink to="/" aria-label="Sellytics Home">
         <motion.img
-          src="/image.png"
+          src="/zeelogs.png"
           alt="Sellytics Logo"
           className="h-16 sm:h-20 md:h-28 w-auto min-h-[48px] max-h-[80%] max-w-[80%]"
           whileHover={{ scale: 1.05 }}
