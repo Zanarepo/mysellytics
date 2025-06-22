@@ -22,7 +22,7 @@ import ERetailStores from './ERetailStores';
 import Test from './Test';
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('Retail Suites');
+  const [activeTab, setActiveTab] = useState('Fix Scan');
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true); // Default open on desktop
   const [isTourOpen, setIsTourOpen] = useState(false);
@@ -49,7 +49,7 @@ const Dashboard = () => {
   // Render main content based on active tab
   const renderContent = () => {
     switch (activeTab) {
-      case 'Retail Suites':
+      case 'Flex Scan':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <Variex />
@@ -57,7 +57,7 @@ const Dashboard = () => {
         );
 
 
-         case 'Electronic Suites':
+         case 'Fix Scan':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <ERetailStores/>
@@ -153,28 +153,28 @@ const Dashboard = () => {
             <nav className="mt-4">
               <ul className="space-y-2">
                 <li
-                  data-tour="Retail Suites"
-                  onClick={() => handleNavClick('Retail Suites')}
+                  data-tour="Flex Scan"
+                  onClick={() => handleNavClick('Flex Scan')}
                   className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Retail Suites' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
+                    activeTab === 'Flex Scan' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
                   }`}
-                  aria-label="Retail Suites: Access your store management tools"
+                  aria-label="Flex Scan: Access your store management tools"
                 >
                   <FaConciergeBell className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Retail Tools</span>
+                  <span className="text-indigo-800 dark:text-indigo-200">Flex Scan</span>
                 </li>
 
 
                  <li
-                  data-tour="Electronic Suites"
-                  onClick={() => handleNavClick('Electronic Suites')}
+                  data-tour="Fix Scan"
+                  onClick={() => handleNavClick('Fix Scan')}
                   className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Electronic Suites' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
+                    activeTab === 'Fix Scan' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
                   }`}
-                  aria-label="Profile: View and edit your profile"
+                  aria-label="Fix Scan: View and edit your profile"
                 >
                   <FaUser className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Electronic Suites</span>
+                  <span className="text-indigo-800 dark:text-indigo-200">Fix Scan</span>
                 </li>
 
 
