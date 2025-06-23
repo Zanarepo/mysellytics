@@ -158,6 +158,8 @@ export default function DynamicProducts() {
             suppliers_name: '',
             device_id: '',
           }]);
+
+          
           setScannerTarget({ modal: 'add', productIndex: updatedForm.length });
           setScannerError(null);
           setScanSuccess(true);
@@ -168,6 +170,9 @@ export default function DynamicProducts() {
             manualInputRef.current.focus();
           }
         });
+
+
+
       } else if (modal === 'edit') {
         // Check for duplicates in database excluding current product
         const checkDuplicate = async () => {

@@ -70,9 +70,9 @@ export default function SalesTracker() {
       maximumFractionDigits: 2,
     });
 
- const playSuccessSound = () => {
-  const audio = new Audio('/sounds/success.mp3'); // Replace with local or CORS-compliant URL
-  audio.play().catch((err) => console.error('Audio playback failed:', err));
+const playSuccessSound = () => {
+  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+  audio.play().catch((err) => console.error('Audio play error:', err));
 };
 
   // Computed Values
