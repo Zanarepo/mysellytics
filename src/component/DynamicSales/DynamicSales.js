@@ -514,9 +514,9 @@ const playNotFoundSound = () => {
     Html5Qrcode.getCameras()
       .then((cameras) => {
         if (cameras.length === 0) {
-          setScannerError('No cameras detected. Please use manual input.');
+          setScannerError('No camera detected. Please use manual input.');
           setScannerLoading(false);
-          toast.error('No cameras detected. Please use manual input.');
+          toast.error('No camera detected. Please use manual input.');
           return;
         }
         startScanner();
@@ -524,7 +524,7 @@ const playNotFoundSound = () => {
       .catch((err) => {
         setScannerError(`Failed to access cameras: ${err.message}`);
         setScannerLoading(false);
-        toast.error('Failed to access cameras. Please use manual input.');
+        toast.error('Failed to access camera. Please use manual input.');
       });
 
     return () => {

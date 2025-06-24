@@ -19,6 +19,15 @@ const playSuccessSound = () => {
   audio.play().catch((err) => console.error('Audio play error:', err));
 };
 
+
+// New not found sound
+const playNotFoundSound = () => {
+  const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
+  audio.play().catch((err) => console.error('Audio play error:', err));
+};
+
+
+
 const tooltipVariants = {
   hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
@@ -307,18 +316,19 @@ export default function DynamicProducts() {
       }
     };
 
-    const onScanFailure = (error) => {
-      if (
-        error.includes('No MultiFormat Readers were able to detect the code') ||
-        error.includes('No QR code found') ||
-        error.includes('IndexSizeError')
-      ) {
-        console.debug('No barcode detected in frame');
-      } else {
-        console.error('Scan error:', error);
-        setScannerError(`Scan error: ${error}. Try adjusting lighting or distance.`);
-      }
-    };
+const onScanFailure = (error) => {
+  if (
+    error.includes('No MultiFormat Readers were able to detect the code') ||
+    error.includes('No QR code found') ||
+    error.includes('IndexSizeError')
+  ) {
+    console.debug('No barcode detected in frame');
+  } else {
+    console.error('Scan error:', error);
+   playNotFoundSound();
+    setScannerError(`Scan error: ${error}. Adjust lighting or distance.`);
+  }
+};
 
     const startScanner = async (attempt = 1, maxAttempts = 3) => {
       if (!videoElement || !scannerDivRef.current) {

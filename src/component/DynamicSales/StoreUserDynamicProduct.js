@@ -158,6 +158,8 @@ export default function DynamicProducts() {
             suppliers_name: '',
             device_id: '',
           }]);
+
+          
           setScannerTarget({ modal: 'add', productIndex: updatedForm.length });
           setScannerError(null);
           setScanSuccess(true);
@@ -168,6 +170,9 @@ export default function DynamicProducts() {
             manualInputRef.current.focus();
           }
         });
+
+
+
       } else if (modal === 'edit') {
         // Check for duplicates in database excluding current product
         const checkDuplicate = async () => {
@@ -935,7 +940,7 @@ export default function DynamicProducts() {
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-200 dark:bg-gray-700">
             <tr>
-              {['Name', 'Descr', 'Purchase', 'Qty', 'Sel. Price', 'Supplier', 'Product Barcode', 'Date', 'Edit/Restock'].map(h => (
+              {['Name', 'Descrip', 'Purchase', 'Qty', 'Sell. Price', 'Supplier', 'Product Barcode', 'Date', 'Edit/Restock'].map(h => (
                 <th key={h} className="px-4 py-2 text-left text-sm font-semibold dark:bg-gray-900 dark:text-indigo-600">{h}</th>
               ))}
             </tr>
@@ -965,7 +970,7 @@ export default function DynamicProducts() {
                   <button onClick={() => startEdit(p)} className={`text-indigo-600 hover:text-indigo-800 edit-button-${index}`}>
                     <FaEdit />
                   </button>
-                 
+                
                 </td>
               </tr>
             ))}
