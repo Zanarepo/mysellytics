@@ -66,10 +66,10 @@ export default function SalesTracker() {
       maximumFractionDigits: 2,
     });
 
- const playSuccessSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
-};
+  const playSuccessSound = () => {
+    const audio = new Audio('https://freesound.org/data/previews/321/321552_5265637-lq.mp3');
+    audio.play().catch((err) => console.error('Audio playback failed:', err));
+  };
 
   // Computed Values
   const paginatedSales = useMemo(() => {

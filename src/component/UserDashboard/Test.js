@@ -14,26 +14,10 @@ import 'react-toastify/dist/ReactToastify.css';
 import { motion } from 'framer-motion';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode';
 
-const debounceToast = (fn, delay = 1000) => {
-  let timeout;
-  return (...args) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => {
-      fn(...args);
-    }, delay);
-  };
-};
-
-const debouncedToastError = debounceToast(toast.error, null, 1000);
-const debouncedToastSuccess = debounceToast(toast.success, null, 1000);
-
-
 const tooltipVariants = {
   hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
-
-
 
 export default function SalesTracker() {
   const storeId = localStorage.getItem('store_id');
@@ -82,10 +66,10 @@ export default function SalesTracker() {
       maximumFractionDigits: 2,
     });
 
-const playSuccessSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
-};
+  const playSuccessSound = () => {
+    const audio = new Audio('https://freesound.org/data/previews/321/321552_5265637-lq.mp3');
+    audio.play().catch((err) => console.error('Audio playback failed:', err));
+  };
 
   // Computed Values
   const paginatedSales = useMemo(() => {
@@ -293,235 +277,228 @@ const playSuccessSound = () => {
       videoConstraints: { width: 640, height: 480, facingMode: 'environment' },
     };
 
- const onScanSuccess = async (scannedDeviceId) => {
-  setScannerError(null); // Clear any previous errors
-  if (!scannedDeviceId) {
-    debouncedToastError('Scanned Product ID cannot be empty', { toastId: 'empty-id' });
-    setScannerError('Scanned Product ID cannot be empty');
-    return false;
-  }
+    const onScanSuccess = async (scannedDeviceId) => {
+      playSuccessSound();
+      if (!scannedDeviceId) {
+        toast.error('Scanned Product ID cannot be empty');
+        setScannerError('Scanned Product ID cannot be empty');
+        return false;
+      }
 
-  console.log('Scanned Device ID:', scannedDeviceId);
+      console.log('Scanned Device ID:', scannedDeviceId);
 
-  // Check if device ID is already sold
-  const { data: soldData, error: soldError } = await supabase
-    .from('dynamic_sales')
-    .select('device_id')
-    .eq('device_id', scannedDeviceId)
-    .eq('store_id', storeId)
-    .single();
-  if (soldError && soldError.code !== 'PGRST116') {
-    console.error('Error checking sold status:', soldError);
-    debouncedToastError('Failed to validate Product ID', { toastId: 'validate-id' });
-    setScannerError('Failed to validate Product ID');
-    return false;
-  }
-  if (soldData) {
-    console.log('Device ID is sold:', scannedDeviceId);
-    debouncedToastError(`Product ID "${scannedDeviceId}" has already been sold`, { toastId: 'sold-id' });
-    setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
-    return false;
-  }
+      // Check if device ID is already sold
+      const { data: soldData, error: soldError } = await supabase
+        .from('dynamic_sales')
+        .select('device_id')
+        .eq('device_id', scannedDeviceId)
+        .eq('store_id', storeId)
+        .single();
+      if (soldError && soldError.code !== 'PGRST116') {
+        console.error('Error checking sold status:', soldError);
+        toast.error('Failed to validate Product ID');
+        setScannerError('Failed to validate Product ID');
+        return false;
+      }
+      if (soldData) {
+        console.log('Device ID is sold:', scannedDeviceId);
+        toast.error(`Product ID "${scannedDeviceId}" has already been sold`);
+        setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
+        return false;
+      }
 
-  // Query product details
-  const { data: productData, error } = await supabase
-    .from('dynamic_product')
-    .select('id, name, selling_price, dynamic_product_imeis')
-    .eq('store_id', storeId)
-    .ilike('dynamic_product_imeis', `%${scannedDeviceId}%`)
-    .single();
+      // Query product details
+      const { data: productData, error } = await supabase
+        .from('dynamic_product')
+        .select('id, name, selling_price, device_id')
+        .eq('store_id', storeId)
+        .ilike('device_id', `%${scannedDeviceId}%`)
+        .single();
 
-  if (error || !productData) {
-    console.error('Supabase Query Error:', error);
-    debouncedToastError(`Product ID "${scannedDeviceId}" not found`, { toastId: 'not-found-id' });
-    setScannerError(`Product ID "${scannedDeviceId}" not found`);
-    return false;
-  }
+      if (error || !productData) {
+        console.error('Supabase Query Error:', error);
+        toast.error(`Product ID "${scannedDeviceId}" not found`);
+        setScannerError(`Product ID "${scannedDeviceId}" not found`);
+        return false;
+      }
 
-  console.log('Found Product:', productData);
+      console.log('Found Product:', productData);
 
-  const deviceIds = productData.dynamic_product_imeis
-    ? productData.dynamic_product_imeis.split(',').map(id => id.trim()).filter(id => id)
-    : [];
+      const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
 
-  if (scannerTarget) {
-    const { modal, lineIdx, deviceIdx } = scannerTarget;
-    let newDeviceIdx;
+      if (scannerTarget) {
+        const { modal, lineIdx, deviceIdx } = scannerTarget;
+        let newDeviceIdx;
 
-    if (modal === 'add') {
-      const ls = [...lines];
-      const existingLineIdx = ls.findIndex(line => {
-        const product = products.find(p => p.id === line.dynamic_product_id);
-        return product && product.name === productData.name;
-      });
+        if (modal === 'add') {
+          const ls = [...lines];
+          const existingLineIdx = ls.findIndex(line => {
+            const product = products.find(p => p.id === line.dynamic_product_id);
+            return product && product.name === productData.name;
+          });
 
-      if (existingLineIdx !== -1) {
-        if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-          debouncedToastError(`Product ID "${scannedDeviceId}" already exists in this product`, { toastId: 'duplicate-id' });
-          setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-          return false;
-        }
-        ls[existingLineIdx].deviceIds.push(scannedDeviceId);
-        if (!ls[existingLineIdx].isQuantityManual) {
-          ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
-        }
-        setLines(ls);
-        newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
-        checkSoldDevices(deviceIds, productData.id, existingLineIdx);
-        setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
-      } else {
-        if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
-          if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-            debouncedToastError(`Product ID "${scannedDeviceId}" already exists in this line`, { toastId: 'duplicate-line-id' });
+          if (existingLineIdx !== -1) {
+            if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+              toast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
+              setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+              return false;
+            }
+            ls[existingLineIdx].deviceIds.push(scannedDeviceId);
+            if (!ls[existingLineIdx].isQuantityManual) {
+              ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
+            }
+            setLines(ls);
+            newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
+            checkSoldDevices(deviceIds, productData.id, existingLineIdx);
+            setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
+          } else {
+            if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
+              if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+                toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+                setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+                return false;
+              }
+              ls[lineIdx] = {
+                ...ls[lineIdx],
+                dynamic_product_id: Number(productData.id),
+                unit_price: Number(productData.selling_price),
+                deviceIds: [scannedDeviceId],
+                quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
+              };
+              setLines(ls);
+              newDeviceIdx = 0;
+              checkSoldDevices(deviceIds, productData.id, lineIdx);
+              setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+            } else {
+              const currentProduct = products.find(p => p.id === ls[lineIdx].dynamic_product_id);
+              if (currentProduct && currentProduct.name !== productData.name) {
+                // Barcode belongs to a different product, create new line
+                const newLine = {
+                  dynamic_product_id: Number(productData.id),
+                  quantity: 1,
+                  unit_price: Number(productData.selling_price),
+                  deviceIds: [scannedDeviceId],
+                  isQuantityManual: false,
+                };
+                ls.push(newLine);
+                setLines(ls);
+                newDeviceIdx = 0;
+                checkSoldDevices(deviceIds, productData.id, ls.length - 1);
+                setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
+              } else {
+                ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
+                ls[lineIdx].dynamic_product_id = Number(productData.id);
+                ls[lineIdx].unit_price = Number(productData.selling_price);
+                if (!ls[lineIdx].isQuantityManual) {
+                  ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
+                }
+                setLines(ls);
+                newDeviceIdx = deviceIdx;
+                checkSoldDevices(deviceIds, productData.id, lineIdx);
+                setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+              }
+            }
+          }
+        } else if (modal === 'edit') {
+          if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+            toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
             setScannerError(`Product ID "${scannedDeviceId}" already exists`);
             return false;
           }
-          ls[lineIdx] = {
-            ...ls[lineIdx],
+          const updatedForm = {
+            ...saleForm,
             dynamic_product_id: Number(productData.id),
             unit_price: Number(productData.selling_price),
-            deviceIds: [scannedDeviceId],
-            quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
+            deviceIds: [...saleForm.deviceIds.slice(0, deviceIdx), scannedDeviceId, ...saleForm.deviceIds.slice(deviceIdx + 1)],
+            quantity: saleForm.isQuantityManual ? saleForm.quantity : (saleForm.deviceIds.filter(id => id.trim()).length || 1),
           };
-          setLines(ls);
-          newDeviceIdx = 0;
-          checkSoldDevices(deviceIds, productData.id, lineIdx);
+          setSaleForm(updatedForm);
+          newDeviceIdx = deviceIdx;
+          await checkSoldDevices(deviceIds, productData.id, 0);
           setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+        }
+
+        setScannerError(null);
+        toast.success(`Scanned Product ID: ${scannedDeviceId}`);
+        return true;
+      }
+      console.error('No scanner target set');
+      toast.error('No scanner target set');
+      return false;
+    };
+
+    const onScanFailure = (error) => {
+      if (
+        error.includes('No MultiFormat Readers were able to detect the code') ||
+        error.includes('No QR code found') ||
+        error.includes('IndexSizeError')
+      ) {
+        console.debug('No barcode detected');
+      } else {
+        setScannerError(`Scan error: ${error}`);
+      }
+    };
+
+    const startScanner = async (attempt = 1, maxAttempts = 5) => {
+      if (!currentVideo || !scannerDivRef.current) {
+        setScannerError('Scanner elements not found');
+        setScannerLoading(false);
+        toast.error('Scanner elements not found. Please use manual input.');
+        return;
+      }
+
+      if (attempt > maxAttempts) {
+        setScannerError('Failed to initialize scanner after multiple attempts');
+        setScannerLoading(false);
+        toast.error('Failed to initialize scanner. Please use manual input.');
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: config.videoConstraints,
+        });
+        currentVideo.srcObject = stream;
+        await new Promise((resolve) => {
+          currentVideo.onloadedmetadata = () => resolve();
+        });
+
+        await html5QrCodeRef.current.start(
+          { facingMode: 'environment' },
+          config,
+          onScanSuccess,
+          onScanFailure
+        );
+
+        setScannerLoading(false);
+      } catch (err) {
+        setScannerError(`Failed to initialize scanner: ${err.message}`);
+        setScannerLoading(false);
+        if (err.name === 'NotAllowedError') {
+          toast.error('Camera access denied. Please allow camera permissions.');
+        } else if (err.name === 'NotFoundError') {
+          toast.error('No camera found. Please use manual input.');
         } else {
-          const currentProduct = products.find(p => p.id === ls[lineIdx].dynamic_product_id);
-          if (currentProduct && currentProduct.name !== productData.name) {
-            // Barcode belongs to a different product, create new line
-            const newLine = {
-              dynamic_product_id: Number(productData.id),
-              quantity: 1,
-              unit_price: Number(productData.selling_price),
-              deviceIds: [scannedDeviceId],
-              isQuantityManual: false,
-            };
-            ls.push(newLine);
-            setLines(ls);
-            newDeviceIdx = 0;
-            checkSoldDevices(deviceIds, productData.id, ls.length - 1);
-            setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
-          } else {
-            ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
-            ls[lineIdx].dynamic_product_id = Number(productData.id);
-            ls[lineIdx].unit_price = Number(productData.selling_price);
-            if (!ls[lineIdx].isQuantityManual) {
-              ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
-            }
-            setLines(ls);
-            newDeviceIdx = deviceIdx;
-            checkSoldDevices(deviceIds, productData.id, lineIdx);
-            setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
-          }
+          setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
         }
       }
-    } else if (modal === 'edit') {
-      if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-        debouncedToastError(`Product ID "${scannedDeviceId}" already exists in this sale`, { toastId: 'duplicate-sale-id' });
-        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-        return false;
-      }
-      const updatedForm = {
-        ...saleForm,
-        dynamic_product_id: Number(productData.id),
-        unit_price: Number(productData.selling_price),
-        deviceIds: [...saleForm.deviceIds.slice(0, deviceIdx), scannedDeviceId, ...saleForm.deviceIds.slice(deviceIdx + 1)],
-        quantity: saleForm.isQuantityManual ? saleForm.quantity : (saleForm.deviceIds.filter(id => id.trim()).length || 1),
-      };
-      setSaleForm(updatedForm);
-      newDeviceIdx = deviceIdx;
-      await checkSoldDevices(deviceIds, productData.id, 0);
-      setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
-    }
+    };
 
-    // Only play sound after all validations pass
-    playSuccessSound();
-    debouncedToastSuccess(`Scanned Product ID: ${scannedDeviceId}`, { toastId: 'success-scan' });
-    return true;
-  }
-  console.error('No scanner target set');
-  debouncedToastError('No scanner target set', { toastId: 'no-target' });
-  return false;
-};
-
-const onScanFailure = (error) => {
-  if (
-    error.includes('No MultiFormat Readers were able to detect the code') ||
-    error.includes('No QR code found') ||
-    error.includes('IndexSizeError')
-  ) {
-    // Suppress transient errors
-    console.debug('No barcode detected');
-  } else {
-    setScannerError(`Scan error: ${error}`);
-    toast.error(`Scan error: ${error}`, { toastId: 'scan-error' }); // Use toastId to prevent duplicates
-  }
-};
-
-  const startScanner = async (attempt = 1, maxAttempts = 3) => {
-  if (!currentVideo || !scannerDivRef.current) {
-    setScannerError('Scanner elements not found');
-    setScannerLoading(false);
-    toast.error('Scanner elements not found. Please use manual input.', { toastId: 'scanner-elements' });
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: config.videoConstraints,
-    });
-    currentVideo.srcObject = stream;
-    await new Promise((resolve) => {
-      currentVideo.onloadedmetadata = () => resolve();
-    });
-
-    await html5QrCodeRef.current.start(
-      { facingMode: 'environment' },
-      config,
-      onScanSuccess,
-      onScanFailure
-    );
-
-    setScannerError(null); // Clear any previous errors
-    setScannerLoading(false);
-  } catch (err) {
-    if (attempt >= maxAttempts) {
-      let errorMessage = 'Failed to initialize camera after multiple attempts';
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Camera access denied. Please allow camera permissions in your browser settings.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No camera found. Please connect a camera or use manual input.';
-      }
-      setScannerError(errorMessage);
-      setScannerLoading(false);
-      toast.error(errorMessage, { toastId: 'camera-init-error' });
-      return;
-    }
-    setTimeout(() => startScanner(attempt + 1, maxAttempts), 500); // Increased delay for stability
-  }
-};
-
-
-
-   Html5Qrcode.getCameras()
-  .then((cameras) => {
-    if (cameras.length === 0) {
-      setScannerError('No cameras detected. Please use manual input.');
-      setScannerLoading(false);
-      toast.error('No cameras detected. Please use manual input.', { toastId: 'no-cameras' });
-      return;
-    }
-    startScanner();
-  })
-  .catch((err) => {
-    setScannerError(`Failed to access cameras: ${err.message}`);
-    setScannerLoading(false);
-    toast.error(`Failed to access cameras: ${err.message}`, { toastId: 'camera-access' });
-  });
-
-
+    Html5Qrcode.getCameras()
+      .then((cameras) => {
+        if (cameras.length === 0) {
+          setScannerError('No cameras detected. Please use manual input.');
+          setScannerLoading(false);
+          toast.error('No cameras detected. Please use manual input.');
+          return;
+        }
+        startScanner();
+      })
+      .catch((err) => {
+        setScannerError(`Failed to access cameras: ${err.message}`);
+        setScannerLoading(false);
+        toast.error('Failed to access cameras. Please use manual input.');
+      });
 
     return () => {
       if (
@@ -541,12 +518,7 @@ const onScanFailure = (error) => {
       }
       html5QrCodeRef.current = null;
     };
-  }, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, products, storeId, checkSoldDevices]);
-
-
-
-
-
+  },[showScanner, scannerTarget, lines, saleForm, externalScannerMode, products, storeId, checkSoldDevices]);
 
   const stopScanner = useCallback(() => {
     if (
@@ -578,12 +550,10 @@ const onScanFailure = (error) => {
 const handleManualInput = async () => {
   const trimmedInput = manualInput.trim();
   if (!trimmedInput) {
-    toast.error('Product ID cannot be empty', { toastId: 'empty-manual-id' });
+    toast.error('Product ID cannot be empty');
     setScannerError('Product ID cannot be empty');
     return;
   }
-  setScannerError(null); // Clear any previous errors
-  // ... rest of the function remains unchanged ...
 
   console.log('Manual Input Device ID:', trimmedInput);
 
@@ -611,9 +581,9 @@ const handleManualInput = async () => {
   // Check if Device ID exists in dynamic_product
   const { data: productData, error } = await supabase
     .from('dynamic_product')
-    .select('id, name, selling_price, dynamic_product_imeis')
+    .select('id, name, selling_price, device_id')
     .eq('store_id', storeId)
-    .ilike('dynamic_product_imeis', `%${trimmedInput}%`)
+    .ilike('device_id', `%${trimmedInput}%`)
     .single();
 
   if (error || !productData) {
@@ -626,7 +596,7 @@ const handleManualInput = async () => {
 
   console.log('Found Product:', productData);
 
-  const deviceIds = productData.dynamic_product_imeis ? productData.dynamic_product_imeis.split(',').map(id => id.trim()).filter(id => id) : [];
+  const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
 
   if (scannerTarget) {
     const { modal, lineIdx, deviceIdx } = scannerTarget;
@@ -760,7 +730,7 @@ const handleManualInput = async () => {
     if (!storeId) return;
     const { data, error } = await supabase
       .from('dynamic_product')
-      .select('id, name, selling_price, dynamic_product_imeis')
+      .select('id, name, selling_price, device_id')
       .eq('store_id', storeId)
       .order('name');
     if (error) {
@@ -769,7 +739,7 @@ const handleManualInput = async () => {
     } else {
       const processedProducts = (data || []).map((p) => ({
         ...p,
-        deviceIds: p.dynamic_product_imeis ? p.dynamic_product_imeis.split(',').filter((id) => id.trim()) : [],
+        deviceIds: p.device_id ? p.device_id.split(',').filter((id) => id.trim()) : [],
       }));
       setProducts(processedProducts);
     }
@@ -866,9 +836,9 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       // Query product for matching barcode
       const { data: productData, error } = await supabase
         .from('dynamic_product')
-        .select('id, name, selling_price, dynamic_product_imeis')
+        .select('id, name, selling_price, device_id')
         .eq('store_id', storeId)
-        .eq('dynamic_product_imeis', trimmedInput) // Exact match for single barcode
+        .eq('device_id', trimmedInput) // Exact match for single barcode
         .limit(1)
         .single();
 
@@ -923,7 +893,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
           if (!next[lineIdx].isPriceManual) {
             next[lineIdx].unit_price = prod.selling_price;
           }
-          next[lineIdx].deviceIds = [prod.dynamic_product_imeis || ''];
+          next[lineIdx].deviceIds = [prod.device_id || ''];
           next[lineIdx].quantity = next[lineIdx].isQuantityManual ? next[lineIdx].quantity : 1;
         }
         const inv = inventory.find((i) => i.dynamic_product_id === +value);
@@ -1264,7 +1234,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
 
   // Render
  return (
-  <div className="p-0 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white p-0">
+  <div className="p-0 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white p-0 mt-48">
     {/* Header */}
     <div className="flex flex-col gap-3 mb-4 px-4 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
