@@ -282,7 +282,9 @@ useEffect(() => {
       disableFlip: true,
       videoConstraints: { width: 640, height: 480, facingMode: 'environment' },
     };
+
 const onScanSuccess = async (scannedDeviceId) => {
+  playSuccessSound();
   if (!scannedDeviceId) {
     playFailureSound();
     setScannerError('Scanned Product ID cannot be empty');
@@ -428,15 +430,17 @@ const onScanSuccess = async (scannedDeviceId) => {
 
     setScannerError(null);
     toast.success(`Scanned Product ID: ${scannedDeviceId}`);
-    playSuccessSound(); // Moved to after all validations pass
     return true;
   } else {  
     console.error('No scanner target set');
     playFailureSound();
-    setScannerError('No scanner target set');
+    toast.error('No scanner target set');
     return false; 
   }
-};
+  };
+
+
+
 
 
 
