@@ -72,7 +72,7 @@ const playSuccessSound = () => {
 };
 
 const playFailureSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/476/476112_5121236-lq.mp3');
+  const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-46.mp3');
   audio.play().catch((err) => console.error('Audio play error:', err));
 };
 
