@@ -75,7 +75,7 @@ const playSuccessSound = () => {
 
 
 const playDuplicateSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/476/476118_3949496-lq.mp3');
+  const audio = new Audio('https://soundjay.com/buttons/sounds/button-5.mp3');
   audio.play().catch((err) => console.error('Audio play error:', err));
 };
 
