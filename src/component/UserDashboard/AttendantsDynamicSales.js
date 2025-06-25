@@ -23,11 +23,12 @@ export default function SalesTracker() {
   const itemsPerPage = 20;
   const detailPageSize = 20;
 
-const playSuccessSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/321/321552_5265637-lq.mp3');
-  audio.play().catch((err) => console.error('Audio playback failed:', err));
-};
 
+// Success sound for scan feedback
+const playSuccessSound = () => {
+  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+  audio.play().catch((err) => console.error('Audio play error:', err));
+};
 
 
   // State Declarations
@@ -1418,10 +1419,9 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
 
   // Render
   return (
-    <div className="p-0 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white">
+    <div className="p-2 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white">
       <ToastContainer position="top-right" autoClose={3000} />
    
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
@@ -1945,7 +1945,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                </tr>
              </thead>
              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-               {paginatedSales.map((s) => (
+               {paginatedSales.map((s, idx) => (
                  <tr key={s.id}>
                    <td className="px-4 py-2 text-sm">{s.dynamic_product.name}</td>
                    <td className="px-4 py-2 text-sm">{s.quantity}</td>
@@ -1966,7 +1966,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                      )}
                    </td>
                    <td className="px-4 py-2 text-sm">{new Date(s.sold_at).toLocaleString()}</td>
-                   
+                  
                  </tr>
                ))}
              </tbody>
