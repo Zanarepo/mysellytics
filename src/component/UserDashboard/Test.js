@@ -995,11 +995,7 @@ const formatCurrency = (value) =>
               className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
-      
     
-
-
-
                 
       <div className="mt-4">
         <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -1138,7 +1134,7 @@ const formatCurrency = (value) =>
                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                 title="Delete"
               >
-                <FaTrashAlt />
+              
               </button>
             </div>
           </td>
@@ -1376,7 +1372,7 @@ const formatCurrency = (value) =>
             className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
             title="Remove ID"
           >
-            <FaTrashAlt />
+        
           </button>
         )}
       </div>

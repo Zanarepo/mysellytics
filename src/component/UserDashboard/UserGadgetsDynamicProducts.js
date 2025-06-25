@@ -104,7 +104,7 @@ const formatCurrency = (value) =>
 
       if (modal === 'add') {
         const form = [...addForm];
-        if (form[productIndex].deviceIds.some((id) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
+        if (form[productIndex].deviceIds.some((id, i) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
           toast.error(`Barcode "${trimmedCode}" already exists in this product`);
           setScannerError(`Barcode "${trimmedCode}" already exists`);
           return false;
@@ -116,7 +116,7 @@ const formatCurrency = (value) =>
         setAddForm(form);
         newDeviceIndex = form[productIndex].deviceIds.length - 1;
       } else if (modal === 'edit') {
-        if (editForm.deviceIds.some((id) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
+        if (editForm.deviceIds.some((id, i) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
           toast.error(`Barcode "${trimmedCode}" already exists in this product`);
           setScannerError(`Barcode "${trimmedCode}" already exists`);
           return false;
@@ -635,7 +635,7 @@ const formatCurrency = (value) =>
       const duplicates = allNewIds.filter((id) => existingIds
             .some((eId) => eId.toLowerCase() === id.toLowerCase()));
       if (duplicates.length > 0) {
-        toast.error(`Duplicate Product IDs already exist in other products: ${duplicates.join(', ')}`);
+        toast.error(`Duplicate Device IDs already exist in other products: ${duplicates.join(', ')}`);
         return;
       }
 
@@ -757,7 +757,7 @@ const formatCurrency = (value) =>
     }));
   };
 
-  const saveEdit = async () => {
+ const saveEdit = async () => {
   if (!editForm.name.trim()) {
     toast.error('Product name is required');
     return;
@@ -870,6 +870,22 @@ const formatCurrency = (value) =>
 };
 
   // Delete
+  const deleteProduct = async (p) => {
+    if (!window.confirm(`Delete ${p.name}?`)) return;
+    try {
+      await supabase.from('dynamic_product').delete().eq('id', p.id);
+      await supabase
+        .from('dynamic_inventory')
+        .delete()
+        .eq('dynamic_product_id', p.id)
+        .eq('store_id', storeId);
+      toast.success('Deleted');
+      fetchProducts();
+    } catch (error) {
+      console.error('Delete product error:', error);
+      toast.error('Failed to delete product');
+    }
+  };
 
   // Cancel add/edit
   const cancelAdd = () => {
@@ -914,74 +930,73 @@ const formatCurrency = (value) =>
         </button>
       </div>
 
-    
-         {showAdd && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <form
-          onSubmit={createProducts}
-         className="bg-white dark:bg-gray-900 w-full max-w-5xl sm:rounded-lg shadow-lg space-y-6 p-4 sm:p-6 max-h-[90vh] overflow-y-auto mt-28"
-    
+     {showAdd && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <form
+      onSubmit={createProducts}
+     className="bg-white dark:bg-gray-900 w-full max-w-5xl sm:rounded-lg shadow-lg space-y-6 p-4 sm:p-6 max-h-[90vh] overflow-y-auto mt-28"
+
+    >
+      <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Add Products</h2>
+
+      {addForm.map((p, pi) => (
+        <div
+          key={pi}
+          className="relative bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
         >
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Add Products</h2>
-    
-          {addForm.map((p, pi) => (
-            <div
-              key={pi}
-              className="relative bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+          {addForm.length > 1 && (
+            <button
+              type="button"
+              onClick={() => removeProductForm(pi)}
+              className="absolute top-4 right-4 text-red-500 hover:text-red-700 text-lg focus:outline-none"
+              title="Remove this product"
             >
-              {addForm.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeProductForm(pi)}
-                  className="absolute top-4 right-4 text-red-500 hover:text-red-700 text-lg focus:outline-none"
-                  title="Remove this product"
-                >
-                  <FaTrashAlt />
-                </button>
-              )}
+              <FaTrashAlt />
+            </button>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Product Name"
+              value={p.name}
+              onChange={(e) => handleAddChange(pi, 'name', e.target.value)}
+              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Supplier Name"
+              value={p.suppliers_name}
+              onChange={(e) => handleAddChange(pi, 'suppliers_name', e.target.value)}
+              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+            <textarea
+              placeholder="Description"
+              value={p.description}
+              onChange={(e) => handleAddChange(pi, 'description', e.target.value)}
+              className="p-2 border rounded w-full md:col-span-2 resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              rows={3}
+            />
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Purchase Price"
+              value={p.purchase_price}
+              onChange={(e) => handleAddChange(pi, 'purchase_price', e.target.value)}
+              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Selling Price"
+              value={p.selling_price}
+              onChange={(e) => handleAddChange(pi, 'selling_price', e.target.value)}
+              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+          </div>
     
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Product Name"
-                  value={p.name}
-                  onChange={(e) => handleAddChange(pi, 'name', e.target.value)}
-                  className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Supplier Name"
-                  value={p.suppliers_name}
-                  onChange={(e) => handleAddChange(pi, 'suppliers_name', e.target.value)}
-                  className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-                <textarea
-                  placeholder="Description"
-                  value={p.description}
-                  onChange={(e) => handleAddChange(pi, 'description', e.target.value)}
-                  className="p-2 border rounded w-full md:col-span-2 resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  rows={3}
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Purchase Price"
-                  value={p.purchase_price}
-                  onChange={(e) => handleAddChange(pi, 'purchase_price', e.target.value)}
-                  className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Selling Price"
-                  value={p.selling_price}
-                  onChange={(e) => handleAddChange(pi, 'selling_price', e.target.value)}
-                  className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-          
-        
+                
       <div className="mt-4">
         <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
           Product IDs and Sizes
@@ -991,7 +1006,7 @@ const formatCurrency = (value) =>
             <input
               value={id}
               onChange={(e) => handleAddId(pi, i, e.target.value)}
-              placeholder="Product ID"
+              placeholder="Product/Device/Goods ID"
               className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                 id.trim() &&
                 p.deviceIds.some((otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase())
@@ -1114,7 +1129,13 @@ const formatCurrency = (value) =>
               >
                 <FaEdit />
               </button>
-             
+              <button
+                onClick={() => deleteProduct(p)}
+                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                title="Delete"
+              >
+              
+              </button>
             </div>
           </td>
         </tr>
@@ -1147,12 +1168,12 @@ const formatCurrency = (value) =>
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 mt-16">
           <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-xl w-full max-h-[80vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
-              {showDetail.name} Product IDs
+              {showDetail.name} Products IDs
             </h2>
 
             {isLoadingSoldStatus ? (
               <div className="flex justify-center py-4">
-                <p className="text-gray-600 dark:text-gray-400">Loading device status...</p>
+                <p className="text-gray-600 dark:text-gray-400">Loading Products status...</p>
               </div>
             ) : (
               <div>
@@ -1184,7 +1205,7 @@ const formatCurrency = (value) =>
                           className="ml-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                           title="Remove this device ID"
                         >
-                         
+                          <FaTrashAlt size={14} />
                         </button>
                       </li>
                     );
@@ -1305,11 +1326,11 @@ const formatCurrency = (value) =>
               </div>
 
               <div className="space-y-3 pt-4 border-t dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Product IDs and Sizes</h3>
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Products IDs and Sizes</h3>
 
                 <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-    Product IDs and Sizes
+    Products IDs and Sizes
   </label>
   {editForm.deviceIds.map((id, i) => (
     <div
@@ -1319,7 +1340,7 @@ const formatCurrency = (value) =>
       <input
         value={id}
         onChange={(e) => handleDeviceIdChange(i, e.target.value)}
-        placeholder="Product ID"
+        placeholder="Product/Device/Goods ID"
         className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
           id.trim() &&
           editForm.deviceIds.some(
@@ -1351,7 +1372,7 @@ const formatCurrency = (value) =>
             className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
             title="Remove ID"
           >
-           
+        
           </button>
         )}
       </div>
@@ -1364,7 +1385,7 @@ const formatCurrency = (value) =>
                     onClick={addDeviceId}
                     className="mt-2 text-indigo-600 hover:underline text-sm dark:text-indigo-400"
                   >
-                    + Add Product ID
+                    + Add product ID
                   </button>
                 </div>
               </div>
@@ -1390,57 +1411,65 @@ const formatCurrency = (value) =>
         </div>
       )}
 
-      {showScanner && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-1 z-50">
-          <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
-            <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Barcode</h2>
-            <div className="mb-4">
-              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={externalScannerMode}
-                  onChange={() => {
-                    setExternalScannerMode((prev) => !prev);
-                    setScannerError(null);
-                    setScannerLoading(!externalScannerMode);
-                    if (manualInputRef.current) {
-                      manualInputRef.current.focus();
-                    }
-                  }}
-                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
-                />
-                <span>Use External Barcode Scanner</span>
-              </label>
+     {showScanner && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
+    <div className="bg-white dark:bg-gray-900 p-3 xs:p-4 rounded-lg shadow-lg w-full max-w-[90vw] xs:max-w-[350px] max-h-[80vh] overflow-y-auto">
+      <h2 className="text-base xs:text-lg font-bold mb-2 xs:mb-3 text-gray-800 dark:text-white">Scan Product ID</h2>
+      <div className="mb-2 xs:mb-3">
+        <label className="flex items-center space-x-2 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={externalScannerMode}
+            onChange={() => {
+              setExternalScannerMode((prev) => !prev);
+              setScannerError(null);
+              setScannerLoading(!externalScannerMode);
+              if (manualInputRef.current) {
+                manualInputRef.current.focus();
+              }
+            }}
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
+          />
+          <span>Use External Scanner</span>
+        </label>
+      </div>
+      {!externalScannerMode && (
+        <>
+          {scannerLoading && (
+            <div className="text-gray-600 dark:text-gray-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
+              Initializing webcam scanner...
             </div>
-            {!externalScannerMode && (
-              <>
-                {scannerLoading && (
-                  <div className="text-gray-600 dark:text-gray-400 mb-4">Initializing webcam scanner...</div>
-                )}
-                {scannerError && (
-                  <div className="text-red-600 dark:text-red-400 mb-4">{scannerError}</div>
-                )}
-                <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                  <p>Point the camera at the barcode (~10–15 cm away).</p>
-                  <p>Ensure good lighting and steady hands.</p>
-                </div>
-                <div
-                  id="scanner"
-                  ref={scannerDivRef}
-                  className={`relative w-full h-64 mb-4 bg-gray-100 dark:bg-gray-800 ${scanSuccess ? 'border-4 border-green-600' : ''}`}
-                >
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    playsInline
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[300px] h-[150px] border-2 border-red-500 bg-transparent rounded opacity-50"></div>
-                  </div>
-                </div>
-              </>
-            )}
+          )}
+          {scannerError && (
+            <div className="text-red-600 dark:text-red-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm" aria-live="polite">
+              {scannerError}
+            </div>
+          )}
+          <div className="mb-2 xs:mb-3 text-xs xs:text-sm text-gray-600 dark:text-gray-300 text-center">
+            <p className="mb-1">Point camera at barcode (~10–15 cm away).</p>
+            <p>Ensure good lighting and steady hands.</p>
+          </div>
+          <div
+            id="scanner"
+            ref={scannerDivRef}
+            className={`relative w-full h-[55vw] max-h-[280px] min-h-[160px] mb-2 xs:mb-3 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
+              scanSuccess ? 'border-4 border-green-500' : ''
+            }`}
+          >
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              autoPlay
+              playsInline
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-[80%] max-w-[240px] h-[70px] xs:h-[80px] border-2 border-red-500 bg-transparent rounded-lg opacity-60"></div>
+            </div>
+          </div>
+        </>
+      )}
+
+
             {externalScannerMode && (
               <>
                 <div className="text-gray-600 dark:text-gray-400 mb-4">
