@@ -4,6 +4,7 @@ import {
   FaTrashAlt,
   FaFileCsv,
   FaFilePdf,
+  
   FaCamera,
 } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
@@ -513,9 +514,9 @@ const playNotFoundSound = () => {
     Html5Qrcode.getCameras()
       .then((cameras) => {
         if (cameras.length === 0) {
-          setScannerError('No cameras detected. Please use manual input.');
+          setScannerError('No camera detected. Please use manual input.');
           setScannerLoading(false);
-          toast.error('No cameras detected. Please use manual input.');
+          toast.error('No camera detected. Please use manual input.');
           return;
         }
         startScanner();
@@ -523,7 +524,7 @@ const playNotFoundSound = () => {
       .catch((err) => {
         setScannerError(`Failed to access cameras: ${err.message}`);
         setScannerLoading(false);
-        toast.error('Failed to access cameras. Please use manual input.');
+        toast.error('Failed to access camera. Please use manual input.');
       });
 
     return () => {
@@ -1343,42 +1344,48 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                   </button>
                 </div>
               </div>
-              <div className="mt-2">
-                <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Scan or add Product Manually (Optional)</label>
-                {line.deviceIds.map((id, deviceIdx) => (
-                  <div key={deviceIdx} className="flex gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={id}
-                      onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
-                      onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
-                        }
-                      }}
-                      placeholder="Enter barcode manually to sale"
-                      className="flex-1 p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openScanner('add', lineIdx, deviceIdx)}
-                        className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                        title="Scan Barcode"
-                      >
-                        <FaCamera />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeDeviceId(lineIdx, deviceIdx)}
-                        className="p-2 text-red-600 hover:text-red-800"
-                      >
-                        <FaTrashAlt />
-                      </button>
-                    </div>
-                  </div>
+
+ <div className="mt-2">
+  <label className="block mb-1 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
+    Scan or Add Product ID Manually (Optional)
+  </label>
+  {line.deviceIds.map((id, deviceIdx) => (
+    <div key={deviceIdx} className="mb-3 sm:mb-2">
+       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+      <input
+        type="text"
+        value={id}
+        onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
+        onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
+          }
+        }}
+        placeholder="Enter Barcode ID"
+        className="w-full p-1.5 xs:p-2 text-xs xs:text-sm border rounded-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-600"
+      />
+     <div className="flex gap-1 justify-start mt-1 sm:mt-0 sm:justify-start">
+          <button
+         type="button"
+            onClick={() => openScanner('add', lineIdx, deviceIdx)}
+            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-indigo-600 hover:text-indigo-700 text-xs xs:text-sm"
+            title="Scan Barcode"
+          >
+           <FaCamera className="inline-block" />
+          </button>
+          <button
+            type="button"
+            onClick={() => removeDeviceId(lineIdx, deviceIdx)}
+            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-red-600 hover:text-red-700 text-xs xs:text-sm"
+            title="Delete Barcode"
+          >
+            <FaTrashAlt className="inline-block" />
+          </button>
+      </div>
+    </div>
+    </div>
                 ))}
                 
               </div>
@@ -1542,73 +1549,78 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
     )}
 
     {/* Scanner Modal */}
-    {showScanner && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
-          <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Product ID</h2>
-          <div className="mb-4">
-            <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={externalScannerMode}
-                onChange={() => setExternalScannerMode((prev) => !prev)}
-                className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
-              />
-              <span>Use External Barcode Scanner</span>
-            </label>
-          </div>
-          {!externalScannerMode && (
-            <>
-              {scannerLoading && (
-                <div className="text-gray-600 dark:text-gray-400 mb-4">Initializing webcam scanner...</div>
-              )}
-              {scannerError && (
-                <div className="text-red-600 dark:text-red-400 mb-4">{scannerError}</div>
-              )}
-              <div
-                id="scanner"
-                ref={scannerDivRef}
-                className="relative w-full h-64 mb-4 bg-gray-100 dark:bg-gray-800"
-              >
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  playsInline
-                />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-[250px] h-[100px] border-2 border-red-500 bg-transparent opacity-50"></div>
-                </div>
-              </div>
-            </>
-          )}
-          {externalScannerMode && (
-            <div className="text-gray-600 dark:text-gray-400 mb-4">
-              Waiting for external scanner input... Scan a barcode to proceed.
+   {showScanner && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
+    <div className="bg-white dark:bg-gray-900 p-3 xs:p-4 rounded-lg shadow-lg w-full max-w-[90vw] xs:max-w-[350px] max-h-[80vh] overflow-y-auto">
+      <h2 className="text-base xs:text-lg font-bold mb-2 xs:mb-3 text-gray-800 dark:text-white">Scan Product ID</h2>
+      <div className="mb-2 xs:mb-3">
+        <label className="flex items-center space-x-2 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={externalScannerMode}
+            onChange={() => setExternalScannerMode((prev) => !prev)}
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
+          />
+          <span>Use External Scanner</span>
+        </label>
+      </div>
+
+{!externalScannerMode && (
+        <>
+          {scannerLoading && (
+            <div className="text-gray-600 dark:text-gray-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
+              Initializing webcam scanner...
             </div>
           )}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Or Enter Product ID Manually
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
-                placeholder="Enter Product ID"
-                className="flex-1 p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-              />
-              <button
-                type="button"
-                onClick={handleManualInput}
-                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-              >
-                Submit
-              </button>
+          {scannerError && (
+            <div className="text-red-600 dark:text-red-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
+              {scannerError}
+            </div>
+          )}
+          <div
+            id="scanner"
+            ref={scannerDivRef}
+            className="relative w-full h-[55vw] max-h-[280px] min-h-[160px] mb-2 xs:mb-3 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
+          >
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              autoPlay
+              playsInline
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-[80%] max-w-[240px] h-[70px] xs:h-[80px] border-2 border-red-500 bg-transparent rounded-lg opacity-60"></div>
             </div>
           </div>
-          <div className="flex justify-end">
+        </>
+      )}
+
+
+         {externalScannerMode && (
+        <div className="text-gray-600 dark:text-gray-300 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
+          Waiting for external scanner input...
+        </div>
+      )}
+      <div className="mb-2 xs:mb-3">
+        <label className="block text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 text-center">
+          Or Enter Product ID Manually
+        </label>
+        <div className="flex flex-col gap-2">
+          <input
+            type="text"
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            placeholder="Enter Product ID"
+            className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600 text-xs xs:text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleManualInput}
+              className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs xs:text-sm"
+            >
+              Submit
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -1620,13 +1632,15 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                 setExternalScannerMode(false);
                 stopScanner();
               }}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+              className="flex-1 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs xs:text-sm"
             >
               Cancel
             </button>
           </div>
         </div>
       </div>
+    </div>
+  </div>
     )}
 
     {/* Sales Table */}
@@ -1654,7 +1668,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                 <td className="px-4 py-2 text-sm">{s.amount.toFixed(2)}</td>
                 <td className="px-4 py-2 text-sm">{s.payment_method}</td>
                 <td className="px-4 py-2 text-sm">{new Date(s.sold_at).toLocaleString()}</td>
-                
+               
               </tr>
             ))}
           </tbody>
