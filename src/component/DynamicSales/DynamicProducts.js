@@ -22,7 +22,7 @@ const playSuccessSound = () => {
 
 // New not found sound
 const playNotFoundSound = () => {
-  const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
+  const audio = new Audio('https://freesound.org/data/previews/171/17167_2437358-lq.mp3');
   audio.play().catch((err) => console.error('Audio play error:', err));
 };
 
