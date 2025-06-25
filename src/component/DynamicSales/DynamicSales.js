@@ -1657,6 +1657,9 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       </div>
     )}
 
+
+
+
     {/* Sales Table */}
     <div className="overflow-x-auto rounded-lg shadow p-4">
       {viewMode === 'list' ? (
