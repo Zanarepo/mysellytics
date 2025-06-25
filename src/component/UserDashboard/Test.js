@@ -1371,42 +1371,48 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                   </button>
                 </div>
               </div>
-              <div className="mt-2">
-                <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Scan or add Product Manually (Optional)</label>
-                {line.deviceIds.map((id, deviceIdx) => (
-                  <div key={deviceIdx} className="flex gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={id}
-                      onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
-                      onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
-                        }
-                      }}
-                      placeholder="Enter barcode manually to sale"
-                      className="flex-1 p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openScanner('add', lineIdx, deviceIdx)}
-                        className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                        title="Scan Barcode"
-                      >
-                        <FaCamera />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeDeviceId(lineIdx, deviceIdx)}
-                        className="p-2 text-red-600 hover:text-red-800"
-                      >
-                        <FaTrashAlt />
-                      </button>
-                    </div>
-                  </div>
+
+ <div className="mt-2">
+  <label className="block mb-1 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
+    Scan or Add Product ID Manually (Optional)
+  </label>
+  {line.deviceIds.map((id, deviceIdx) => (
+    <div key={deviceIdx} className="mb-3 sm:mb-2">
+       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+      <input
+        type="text"
+        value={id}
+        onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
+        onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
+          }
+        }}
+        placeholder="Enter Barcode ID"
+        className="w-full p-1.5 xs:p-2 text-xs xs:text-sm border rounded-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-600"
+      />
+     <div className="flex gap-1 justify-start mt-1 sm:mt-0 sm:justify-start">
+          <button
+         type="button"
+            onClick={() => openScanner('add', lineIdx, deviceIdx)}
+            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-indigo-600 hover:text-indigo-700 text-xs xs:text-sm"
+            title="Scan Barcode"
+          >
+           <FaCamera className="inline-block" />
+          </button>
+          <button
+            type="button"
+            onClick={() => removeDeviceId(lineIdx, deviceIdx)}
+            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-red-600 hover:text-red-700 text-xs xs:text-sm"
+            title="Delete Barcode"
+          >
+            <FaTrashAlt className="inline-block" />
+          </button>
+      </div>
+    </div>
+    </div>
                 ))}
                 
               </div>
