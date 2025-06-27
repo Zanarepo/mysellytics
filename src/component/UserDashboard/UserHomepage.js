@@ -19,6 +19,7 @@ import WhatsapUsers from './WhatsapUsers';
 import Notifications from './Notifications';
 import PricingFeatures from '../Payments/PricingFeatures';
 import ERetailStores from './ERetailStores';
+
 //import DashboardAccess from '../Ops/DashboardAccess';
 import Test from './Test';
 
@@ -162,6 +163,7 @@ const Dashboard = () => {
   { name: 'Employees', icon: FaIdBadge, aria: 'Employees: Manage store employees' },
   { name: 'Upgrade', icon: FaCrown, aria: 'Upgrade: Upgrade your plan for more features' },
   { name: 'Profile', icon: FaUser, aria: 'Profile: View and edit your profile' },
+  
         ].map((item) => (
           <li
             key={item.name}
