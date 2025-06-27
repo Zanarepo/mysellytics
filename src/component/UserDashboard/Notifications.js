@@ -101,39 +101,39 @@ export default function NotificationsTable() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">Notifications</h2>
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+  <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4 sm:mb-6">Notifications</h2>
 
-      {error && (
-        <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-4">{error}</div>
-      )}
+  {error && (
+    <div className="bg-red-100 text-red-700 p-3 sm:p-4 rounded-lg mb-4">{error}</div>
+  )}
 
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center space-x-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Sort by:</label>
-          <select
-            className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={sortOrder}
-            onChange={e => setSortOrder(e.target.value)}
-          >
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-        </div>
-        <div className="flex items-center space-x-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Show:</label>
-          <select
-            className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={pageSize}
-            onChange={e => setPageSize(Number(e.target.value))}
-          >
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
-        </div>
-      </div>
+  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6 gap-4">
+    <div className="flex items-center space-x-2">
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Sort by:</label>
+      <select
+        className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 sm:px-3 sm:py-2 bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        value={sortOrder}
+        onChange={(e) => setSortOrder(e.target.value)}
+      >
+        <option value="desc">Newest First</option>
+        <option value="asc">Oldest First</option>
+      </select>
+    </div>
+    <div className="flex items-center space-x-2">
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Show:</label>
+      <select
+        className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 sm:px-3 sm:py-2 bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        value={pageSize}
+        onChange={(e) => setPageSize(Number(e.target.value))}
+      >
+        <option value={5}>5</option>
+        <option value={10}>10</option>
+        <option value={20}>20</option>
+        <option value={50}>50</option>
+      </select>
+    </div>
+  </div>
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
@@ -201,39 +201,71 @@ export default function NotificationsTable() {
         </table>
       </div>
 
+      
+
       {/* Pagination Controls */}
-      <div className="flex justify-between items-center mt-6">
-        <div className="text-sm text-gray-700 dark:text-gray-200">
-          Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, notifications.length)} of {notifications.length} notifications
-        </div>
-        <div className="flex space-x-2">
-          <button
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </button>
-          <div className="flex space-x-1">
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i + 1}
-                className={`px-4 py-2 rounded-lg ${currentPage === i + 1 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'} transition-colors`}
-                onClick={() => handlePageChange(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-          <button
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 sm:mt-6 gap-4">
+  {/* Showing Text */}
+  <div className="text-xs sm:text-sm text-gray-700 dark:text-gray-200 text-center sm:text-left">
+    Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, notifications.length)} of {notifications.length} notifications
+  </div>
+
+  {/* Pagination Controls */}
+  <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+    {/* Previous Button */}
+    <button
+      className="px-3 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors text-sm sm:text-base"
+      onClick={() => handlePageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+    >
+      Previous
+    </button>
+
+    {/* Mobile: Current Page and Jump Input */}
+    <div className="sm:hidden flex items-center space-x-2">
+      <span className="text-xs text-gray-700 dark:text-gray-200">
+        Page {currentPage} of {totalPages}
+      </span>
+      <select
+        className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs"
+        value={currentPage}
+        onChange={(e) => handlePageChange(Number(e.target.value))}
+      >
+        {[...Array(totalPages)].map((_, i) => (
+          <option key={i + 1} value={i + 1}>
+            {i + 1}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Desktop: Page Number Buttons */}
+    <div className="hidden sm:flex sm:space-x-1">
+      {[...Array(totalPages)].map((_, i) => (
+        <button
+          key={i + 1}
+          className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+            currentPage === i + 1
+              ? 'bg-indigo-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+          } transition-colors`}
+          onClick={() => handlePageChange(i + 1)}
+        >
+          {i + 1}
+        </button>
+      ))}
+    </div>
+
+    {/* Next Button */}
+    <button
+      className="px-3 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors text-sm sm:text-base"
+      onClick={() => handlePageChange(currentPage + 1)}
+      disabled={currentPage === totalPages}
+    >
+      Next
+    </button>
+  </div>
+</div>
 
       {viewDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">

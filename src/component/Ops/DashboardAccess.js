@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaStore, FaUsers, FaUserShield, FaUserCog } from 'react-icons/fa';
@@ -22,7 +23,7 @@ const buttonVariants = {
 
 const AccessSwitcher = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // Get current URL path
+  const location = useLocation();
   const [accessOptions, setAccessOptions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +33,7 @@ const AccessSwitcher = () => {
     if (path === '/dashboard') return 'owner';
     if (path === '/owner-dashboard') return 'store_owner';
     if (path === '/team-dashboard') return 'team';
-    if (path === '/admin-dashboard') return ['admin', 'superadmin']; // Both admin and superadmin
+    if (path === '/admin-dashboard') return ['admin', 'superadmin'];
     return null;
   };
 
@@ -47,13 +48,15 @@ const AccessSwitcher = () => {
       }
 
       const opts = [];
+      // Deduplicate store_ids to prevent duplicate Single Store buttons
+      const uniqueStoreIds = [...new Set(userAccess.store_ids || [])];
 
       // Owner access (stores)
-      if (userAccess.store_ids && userAccess.store_ids.length > 0) {
-        userAccess.store_ids.forEach((storeId) => {
+      if (uniqueStoreIds.length > 0) {
+        uniqueStoreIds.forEach((storeId, index) => {
           opts.push({
             type: 'owner',
-            label: `Single Store `,
+            label: `Single Store ${index + 1}`,
             storeId,
             role: 'owner',
             screenclipExtensionId: userAccess.screenclipExtensionId || 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
@@ -82,7 +85,7 @@ const AccessSwitcher = () => {
           opts.push({
             type: 'team',
             label: `Team Role: Store ${index + 1}`,
-            storeId: userAccess.store_ids[index] || '3', // Fallback store_id
+            storeId: userAccess.store_ids?.[index] || '3',
             userId,
             role: userAccess.role || 'team',
             screenclipExtensionId: userAccess.screenclipExtensionId || 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
@@ -115,13 +118,13 @@ const AccessSwitcher = () => {
     }
   }, []);
 
-  // Reuse pickAccess from Login.js
+  // Updated pickAccess function
   const pickAccess = (opt, allAccess) => {
     const userAccess = {
-      store_ids: allAccess.filter((a) => a.storeId).map((a) => a.storeId),
+      store_ids: opt.type === 'owner' ? [opt.storeId] : allAccess.filter((a) => a.storeId).map((a) => a.storeId),
       owner_id: allAccess.find((a) => a.ownerId)?.ownerId || null,
-      user_ids: allAccess.filter((a) => a.userId).map((a) => a.userId),
-      admin_id: allAccess.find((a) => a.adminId)?.adminId || null,
+      user_ids: opt.type === 'team' ? [opt.userId] : allAccess.filter((a) => a.userId).map((a) => a.userId),
+      admin_id: opt.type === 'admin' || opt.type === 'superadmin' ? opt.adminId : null,
       role: opt.role || opt.type,
       screenclipExtensionId: opt.screenclipExtensionId || null,
     };
@@ -186,14 +189,14 @@ const AccessSwitcher = () => {
     }
   };
 
-  // Filter out the current dashboard's role
+  // Filter out the exact current role, but allow admin/superadmin to coexist
   const currentRole = getCurrentRole();
   const filteredAccessOptions = accessOptions.filter((opt) => {
-    if (!currentRole) return true; // Show all if no current role detected
+    if (!currentRole) return true;
     if (Array.isArray(currentRole)) {
-      return !currentRole.includes(opt.type); // Exclude admin or superadmin
+      return opt.type !== 'admin' && opt.type !== 'superadmin';
     }
-    return opt.type !== currentRole; // Exclude single role
+    return opt.type !== currentRole;
   });
 
   // Don't render if loading, single role, or no options remain
@@ -203,16 +206,16 @@ const AccessSwitcher = () => {
 
   return (
     <motion.div
-      className="w-full px-4 py-2 bg-white dark:bg-gray-900 backdrop-blur-md  flex flex-col sm:flex-row gap-2 justify-center items-center"
+      className="w-full px-4 py-2 bg-white dark:bg-gray-900 backdrop-blur-md flex flex-wrap justify-center items-center gap-2 sm:gap-3"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
       {filteredAccessOptions.map((opt, index) => (
         <motion.button
-          key={index}
+          key={`${opt.type}-${opt.storeId || opt.ownerId || opt.userId || opt.adminId}-${index}`}
           onClick={() => pickAccess(opt, accessOptions)}
-          className="flex items-center px-4 py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white rounded-xl hover:shadow-indigo-500/30 transition-all duration-300 text-sm"
+          className="flex items-center px-3 py-1 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white rounded-xl hover:shadow-indigo-500/30 transition-all duration-300 text-xs sm:text-sm min-w-[120px]"
           variants={buttonVariants}
           initial="rest"
           whileHover="hover"

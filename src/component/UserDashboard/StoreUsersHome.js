@@ -4,7 +4,8 @@ import {
   FaUser,
   FaBars,
   FaTimes,
-  FaConciergeBell,
+  FaBarcode,
+  FaQrcode,
   FaBell,
   FaIdBadge,
 } from 'react-icons/fa';
@@ -21,7 +22,7 @@ import UsersERetailStores from './UsersERetailStores';
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('Fix Scan');
   const [darkMode, setDarkMode] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Default open on desktop
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Default open on desktop
   const [isTourOpen, setIsTourOpen] = useState(false);
 
   // Trigger tour on first load
@@ -106,131 +107,84 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 mt-20">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 mt-24">
       <WhatsapUsers />
       <StoreUsersTour
         isOpen={isTourOpen}
         onClose={handleTourClose}
         setActiveTab={setActiveTab}
       />
-      {/* Sidebar */}
-      <aside
-        className={`fixed md:static top-20 left-0 h-[calc(100vh-5rem)] transition-all duration-300 bg-gray-100 dark:bg-gray-800 z-40 ${
-          sidebarOpen ? 'w-64' : 'w-0'
-        } md:${sidebarOpen ? 'w-64' : 'w-0'}`}
+     
+<aside
+  className={`fixed md:static top-20 left-0 h-[calc(100vh-5rem)] transition-all duration-300 bg-gray-100 dark:bg-gray-800 z-40 ${
+    sidebarOpen ? 'w-64' : 'w-0 md:w-16'
+  } ${sidebarOpen ? 'block' : 'hidden md:block'}`}
+>
+  <div className="p-4 md:p-4">
+    <div className="flex items-center justify-between mb-4">
+      <h2 className={`text-xl font-bold text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
+        Menu
+      </h2>
+      {/* Mobile Close Button */}
+      <button
+        onClick={toggleSidebar}
+        className="text-indigo-800 dark:text-indigo-200 md:hidden"
+        aria-label="Close sidebar"
       >
-        <div className={`${sidebarOpen ? 'block' : 'hidden'} md:${sidebarOpen ? 'block' : 'hidden'}`}>
-          <div className="p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-indigo-800 dark:text-indigo-200">
-                Menu
-              </h2>
-              {/* Mobile Close Button */}
-              <button
-                onClick={toggleSidebar}
-                className="text-indigo-800 dark:text-indigo-200 md:hidden"
-                aria-label="Close sidebar"
-              >
-                <FaTimes size={24} />
-              </button>
-            </div>
-            <nav className="mt-4">
-              <ul className="space-y-2">
-                <li
-                  data-tour="toolkits"
-                  onClick={() => handleNavClick('Flex Scan')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Flex Scan' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Flex Scan: Access your store management tools"
-                >
-                  <FaConciergeBell className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Flex Scan</span>
-                </li>
-
-                <li
-                  data-tour="Fix Scan"
-                  onClick={() => handleNavClick('Fix Scan')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Fix Scan' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Sales Dashboard: View and analyze sales data"
-                >
-                  <FaMoneyBillWave className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Fix Scan</span>
-                </li>
-                <li
-                  data-tour="sales-summary"
-                  onClick={() => handleNavClick('Sales Summary')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Sales Summary' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Sales Dashboard: View and analyze sales data"
-                >
-                  <FaMoneyBillWave className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Sales Dashboard</span>
-                </li>
-                <li
-                  data-tour="notifications"
-                  onClick={() => handleNavClick('Notifications')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Notifications' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Notifications: Stay updated with store-related notifications"
-                >
-                  <FaBell className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Notifications</span>
-                </li>
-                <li
-                  data-tour="colleagues"
-                  onClick={() => handleNavClick('Colleagues')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Colleagues' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Colleagues: Manage your colleagues"
-                >
-                  <FaIdBadge className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Colleagues</span>
-                </li>
-                <li
-                  data-tour="profile"
-                  onClick={() => handleNavClick('Profile')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Profile' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Profile: View and edit your profile"
-                >
-                  <FaUser className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Profile</span>
-                </li>
-              </ul>
-            </nav>
-          </div>
-          <div
-            data-tour="dark-mode"
-            className="p-4 md:p-6 mt-auto flex items-center justify-between"
+        <FaTimes size={24} />
+      </button>
+    </div>
+    <nav className="pt-4">
+      <ul className="space-y-2">
+        {[
+          { name: 'Flex Scan', icon: FaBarcode, aria: 'Flex Scan: Access your store management tools', dataTour: 'toolkits' },
+          { name: 'Fix Scan', icon: FaQrcode, aria: 'Fix Scan: Fixed barcode scanning', dataTour: 'Fix Scan' },
+          { name: 'Sales Summary', icon: FaMoneyBillWave, aria: 'Sales Dashboard: View and analyze sales data', dataTour: 'sales-summary' },
+          { name: 'Notifications', icon: FaBell, aria: 'Notifications: Stay updated with store-related notifications', dataTour: 'notifications' },
+          { name: 'Colleagues', icon: FaIdBadge, aria: 'Colleagues: Manage your colleagues', dataTour: 'colleagues' },
+          { name: 'Profile', icon: FaUser, aria: 'Profile: View and edit your profile', dataTour: 'profile' },
+        ].map((item) => (
+          <li
+            key={item.name}
+            data-tour={item.dataTour}
+            onClick={() => handleNavClick(item.name)}
+            className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
+              activeTab === item.name ? 'bg-indigo-200 dark:bg-indigo-600' : ''
+            }`}
+            aria-label={item.aria}
           >
-            <span className="text-indigo-800 dark:text-indigo-200">
-              {darkMode ? 'Dark Mode' : 'Light Mode'}
+            <item.icon className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+            <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
+              {item.name}
             </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={darkMode}
-                onChange={() => setDarkMode(!darkMode)}
-              />
-              <div className="w-11 h-6 bg-indigo-800 dark:bg-gray-600 rounded-full transition-colors duration-300">
-                <span
-                  className={`absolute left-1 top-1 bg-white dark:bg-indigo-200 w-4 h-4 rounded-full transition-transform duration-300 ${
-                    darkMode ? 'translate-x-5' : ''
-                  }`}
-                ></span>
-              </div>
-            </label>
-          </div>
-        </div>
-      </aside>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+  <div className={`p-4 md:p-6 mt-auto flex items-center justify-between ${sidebarOpen ? 'block' : 'hidden md:flex'}`}>
+    <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
+      {darkMode ? 'Dark Mode' : 'Light Mode'}
+    </span>
+    <label className="relative inline-flex items-center cursor-pointer">
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={darkMode}
+        onChange={() => setDarkMode(!darkMode)}
+      />
+      <div className="w-11 h-6 bg-indigo-800 dark:bg-gray-600 rounded-full transition-colors duration-300">
+        <span
+          className={`absolute left-1 top-1 bg-white dark:bg-indigo-200 w-4 h-4 rounded-full transition-transform duration-300 ${
+            darkMode ? 'translate-x-5' : ''
+          }`}
+        ></span>
+      </div>
+    </label>
+  </div>
+</aside>
+
+
 
       {/* Floating Toggle Button (Desktop Only) */}
       <button

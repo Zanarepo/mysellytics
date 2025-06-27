@@ -14,9 +14,9 @@ import DashboardAccess from '../Ops/DashboardAccess';
 import PriceUpdateCompo from '../Payments/PriceUpdateCompo';
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('AdminProfile');
+  const [activeTab, setActiveTab] = useState('Stores');
   const [darkMode, setDarkMode] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Default open on desktop
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Default open on desktop
 
   // Toggle dark mode by adding or removing the "dark" class on <html>
   useEffect(() => {
@@ -32,7 +32,7 @@ const Dashboard = () => {
             <Stores />
           </div>
         );
-      case 'StoreUsers':
+      case 'Store Users':
         return (
           <div className="w-full bg-white dark:bg-gray-700 rounded-lg shadow p-4">
             <StoreUsers />
@@ -45,7 +45,7 @@ const Dashboard = () => {
           </div>
         );
       
-      case 'AdminProfile':
+      case 'Admin Profile':
         return (
           <div className="w-full bg-white dark:bg-gray-700 rounded-lg shadow p-4">
             <AdminProfile />
@@ -97,120 +97,81 @@ const Dashboard = () => {
   return (
     <div className="flex h-screen bg-gray-300 dark:bg-gray-700 mt-20">
       {/* Sidebar */}
-      <aside
-        className={`fixed md:static top-20 left-0 h-[calc(100vh-5rem)] transition-all duration-300 bg-gray-100 dark:bg-gray-800 z-40 ${
-          sidebarOpen ? 'w-64' : 'w-0'
-        } md:${sidebarOpen ? 'w-64' : 'w-0'}`} 
+         
+<aside
+  className={`fixed md:static top-20 left-0 h-[calc(100vh-5rem)] transition-all duration-300 bg-gray-100 dark:bg-gray-800 z-40 ${
+    sidebarOpen ? 'w-64' : 'w-0 md:w-16'
+  } ${sidebarOpen ? 'block' : 'hidden md:block'}`}
+>
+  <div className="p-4 md:p-4">
+    <div className="flex items-center justify-between mb-4">
+      <h2 className={`text-xl font-bold text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
+        Menu
+      </h2>
+      {/* Mobile Close Button */}
+      <button
+        onClick={toggleSidebar}
+        className="text-indigo-800 dark:text-indigo-200 md:hidden"
+        aria-label="Close sidebar"
       >
-        <div className={`${sidebarOpen ? 'block' : 'hidden'} md:${sidebarOpen ? 'block' : 'hidden'}`}>
-          <div className="p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-indigo-800 dark:text-indigo-200">Menu</h2>
-              {/* Mobile Close Button */}
-              <button
-                onClick={toggleSidebar}
-                className="text-indigo-800 dark:text-indigo-200 md:hidden"
-                aria-label="Close sidebar"
-              >
-                <FaTimes size={24} />
-              </button>
-            </div>
-            <nav className="mt-4">
-              <ul className="space-y-2">
-                <li
-                  onClick={() => handleNavClick('AdminProfile')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'AdminProfile' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Admin Profile: View and edit admin profile"
-                >
-                  <FaStore className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Admin Profile</span>
-                </li>
-                <li
-                  onClick={() => handleNavClick('Owners')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Owners' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Store Owners: Manage store owners"
-                >
-                  <FaConciergeBell className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Store Owners</span>
-                </li>
-                <li
-                  onClick={() => handleNavClick('StoreUsers')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'StoreUsers' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Store Users: Manage store users"
-                >
-                  <FaConciergeBell className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Store Users</span>
-                </li>
-              
-              
-                <li
-                  onClick={() => handleNavClick('Stores')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Stores' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Stores: Manage stores"
-                >
-                  <FaMoneyBillWave className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Stores</span>
-                </li>
+        <FaTimes size={24} />
+      </button>
+    </div>
 
+    <nav className="mt-4 pt-4">
+      <ul className="space-y-2">
+        {[
+          { name: 'Admin Profile', icon: FaStore, aria: 'Admin Profile: View and edit admin profile' },
+          { name: 'Owners', icon: FaConciergeBell, aria: 'Store Owners: Manage store owners' },
+          { name: 'Store Users', icon: FaConciergeBell, aria: 'Store Users: Manage store users' },
+          { name: 'Stores', icon: FaConciergeBell, aria: 'Stores: Manage stores' },
+          { name: 'Pricing', icon: FaMoneyBillWave, aria: 'Pricing: Manage pricing plans' },
+          { name: 'Access', icon: FaMoneyBillWave, aria: 'Access Dashboard: Manage store access' },
+        ].map((item) => (
+          <li
+            key={item.name}
+            data-tour={item.name.toLowerCase().replace(' ', '-')}
+            onClick={() => handleNavClick(item.name)}
+            className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
+              activeTab === item.name ? 'bg-indigo-200 dark:bg-indigo-600' : ''
+            }`}
+            aria-label={item.aria}
+          >
+            <item.icon className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+            <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
+              {item.name}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+  {/* Dark/Light Mode Toggle */}
+  <div
+    data-tour="dark-mode"
+    className={`p-6 mt-auto flex items-center justify-between ${sidebarOpen ? 'block' : 'flex'}`}
+  >
+    <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
+      {darkMode ? 'Dark Mode' : 'Light Mode'}
+    </span>
+    <label className="relative inline-flex items-center cursor-pointer">
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={darkMode}
+        onChange={() => setDarkMode(!darkMode)}
+      />
+      <div className="w-11 h-6 bg-indigo-800 dark:bg-gray-600 rounded-full transition-colors duration-300">
+        <span
+          className={`absolute left-1 top-1 bg-white dark:bg-indigo-200 w-4 h-4 rounded-full transition-transform duration-300 ${
+            darkMode ? 'translate-x-5' : ''
+          }`}
+        ></span>
+      </div>
+    </label>
+  </div>
+</aside>
 
-                <li
-                  onClick={() => handleNavClick('Pricing')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Pricing' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Stores: Manage stores"
-                >
-                  <FaMoneyBillWave className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Pricing</span>
-                </li>
-
-                <li
-                  onClick={() => handleNavClick('Access')}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-300 dark:hover:bg-indigo-600 transition ${
-                    activeTab === 'Access' ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label="Stores: Manage stores"
-                >
-                  <FaMoneyBillWave className="text-indigo-800 dark:text-indigo-200 mr-3" />
-                  <span className="text-indigo-800 dark:text-indigo-200">Access Dashboard</span>
-                </li>
-
-
-
-
-                
-              </ul>
-            </nav>
-          </div>
-          {/* Dark/Light Mode Toggle */}
-          <div className="p-6 mt-auto flex items-center justify-between">
-            <span className="text-indigo-800 dark:text-indigo-200">{darkMode ? 'Dark Mode' : 'Light Mode'}</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={darkMode}
-                onChange={() => setDarkMode(!darkMode)}
-              />
-              <div className="w-11 h-6 bg-indigo-800 dark:bg-gray-600 rounded-full transition-colors duration-300">
-                <span
-                  className={`absolute left-1 top-1 bg-white dark:bg-indigo-200 w-4 h-4 rounded-full transition-transform duration-300 ${
-                    darkMode ? 'translate-x-5' : ''
-                  }`}
-                ></span>
-              </div>
-            </label>
-          </div>
-        </div>
-      </aside>
 
       {/* Floating Toggle Button (Desktop Only) */}
       <button
