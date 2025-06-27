@@ -59,29 +59,11 @@ export default function DebtsManager() {
   const manualInputRef = useRef(null);
   // Persistent audio instance to prevent "media removed" error
 
-  const audioRef = useRef(new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3')); // Public domain success sound
+const playSuccessSound = () => {
+  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+  audio.play().catch((err) => console.error('Audio play error:', err));
+};
 
-  // Play success sound
-  const playSuccessSound = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.currentTime = 0;
-      audio.play().catch(err => {
-        console.error('Audio play error:', err);
-        // Removed toast.error notification
-      });
-    }
-  }, []);
-
-  // Cleanup audio on component unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
-    };
-  }, []);
 
   // Fetch store details
   useEffect(() => {
@@ -186,8 +168,8 @@ export default function DebtsManager() {
 
 
 
-  
-  const checkDeviceInProduct = async (deviceId, modal, entryIndex, deviceIndex) => {
+  const checkDeviceInProduct = useCallback(
+  async (deviceId, modal, entryIndex, deviceIndex) => {
     try {
       const { data, error } = await supabase
         .from('dynamic_product')
@@ -298,7 +280,7 @@ export default function DebtsManager() {
               dynamic_product_id: product.id.toString(),
               product_name: product.name,
               deviceIds: prev.deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
-              deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
+              deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? size : size).concat(['']),
               qty: prev.isQuantityManual ? prev.qty : (prev.deviceIds.filter(id => id.trim()).length + 1 || 1),
               date: prev.date || new Date().toISOString().split('T')[0],
               isQuantityManual: false,
@@ -355,9 +337,9 @@ export default function DebtsManager() {
       toast.error('Failed to verify device ID.');
       return false;
     }
-  };
-
-
+  },
+  [ storeId, debtEntries, setDebtEntries, setScannerTarget, editing, setEditing]
+);
 
   // Fetch debts
   const fetchDebts = useCallback(async () => {
@@ -462,10 +444,8 @@ export default function DebtsManager() {
   }, [filteredDevices, detailPage]);
 
 
-
-
-// Modified processScannedBarcode to append device IDs and update quantity
-  const processScannedBarcode = useCallback(async (scannedCode) => {
+const processScannedBarcode = useCallback(
+  async (scannedCode) => {
     const trimmedCode = scannedCode.trim();
     if (!trimmedCode) {
       toast.error('Invalid barcode: Empty value');
@@ -536,9 +516,9 @@ export default function DebtsManager() {
       return true;
     }
     return false;
-  }, [scannerTarget, debtEntries, editing, playSuccessSound]);
-
-
+  },
+  [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError]
+);
 
 // Modified handleManualInput to append device IDs and update quantity
   // Modified handleManualInput to append device IDs and update quantity
@@ -1886,6 +1866,7 @@ const saveDebts = async () => {
             </div>
           </div>
         </div>
+        
       )}
     </div>
   );
