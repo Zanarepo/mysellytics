@@ -328,6 +328,7 @@ const checkSoldDevices = useCallback(async (deviceIds, productId, lineIdx) => {
       disableFlip: true,
       videoConstraints: { width: 640, height: 480, facingMode: 'environment' },
     };
+
 const onScanSuccess = async (scannedDeviceId) => {
   const currentTime = Date.now();
   // Debounce: Ignore scans within 500ms or of the same barcode
@@ -515,10 +516,7 @@ const onScanSuccess = async (scannedDeviceId) => {
 
     setScannerError(null);
     toast.success(`Scanned Product ID: ${scannedDeviceId}`);
-    stopScanner();
-    setShowScanner(false);
-    setScannerTarget(null);
-    setScannerLoading(false);
+    // Do not stop scanner or close modal to allow continuous scanning
     return true;
   }
   console.error('No scanner target set');
@@ -529,7 +527,6 @@ const onScanSuccess = async (scannedDeviceId) => {
   setScannerLoading(false);
   return false;
 };
-
 
 
 
@@ -1530,6 +1527,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
             />
           )}
         </div>
+        
         <button
   onClick={() => setShowAdd(true)}
   className="flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full sm:w-auto new-sale-button"
@@ -1989,21 +1987,21 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
 </div>
 
 <div className="flex justify-end">
-  <button
-    type="button"
-    onClick={() => {
-      setShowScanner(false);
-      setScannerTarget(null);
-      setScannerError(null);
-      setScannerLoading(false);
-      setManualInput('');
-      setExternalScannerMode(false);
-      stopScanner();
-    }}
-    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
-  >
-    Cancel
-  </button>
+<button
+  type="button"
+  onClick={() => {
+    setShowScanner(false);
+    setScannerTarget(null);
+    setScannerError(null);
+    setScannerLoading(false);
+    setManualInput('');
+    setExternalScannerMode(false);
+    stopScanner();
+  }}
+  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+>
+  Done
+</button>
 </div>
 
           </div>
