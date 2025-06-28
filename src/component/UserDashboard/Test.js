@@ -45,22 +45,22 @@ function DynamicProducts() {
   const [scannerBuffer, setScannerBuffer] = useState('');
   const [lastKeyTime, setLastKeyTime] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [scanSuccess, setScanSuccess] = useState(false); // New state for scan feedback
+  const [scanSuccess, setScanSuccess] = useState(false);
   const itemsPerPage = 20;
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const [detailPage, setDetailPage] = useState(1);
   const detailPageSize = 20;
 
+  // Debouncing refs for scanner
+  const lastScanTimeRef = useRef(0);
+  const lastScannedCodeRef = useRef(null);
 
-
-
-
-  // Utility Function (add above the component)
-const formatCurrency = (value) =>
-  value.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  // Utility Function
+  const formatCurrency = (value) =>
+    value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   // Scanner
   const videoRef = useRef(null);
@@ -215,28 +215,33 @@ const formatCurrency = (value) =>
       return;
     }
 
-const config = {
-  fps: 60, // High FPS for instant detection
-  qrbox: { width: 220, height: 100 }, // Smaller qrbox for faster focus
-  formatsToSupport: [
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.QR_CODE,
-  ],
-  aspectRatio: 1.0, // Square for better alignment
-  disableFlip: true,
-  videoConstraints: { width: 1280, height: 720, facingMode: 'environment' }, // Higher resolution
-};
-
+    const config = {
+      fps: 60,
+      qrbox: { width: 220, height: 100 },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.QR_CODE,
+      ],
+      aspectRatio: 1.0,
+      disableFlip: true,
+      videoConstraints: { width: 1280, height: 720, facingMode: 'environment' },
+    };
 
     const onScanSuccess = (decodedText) => {
+      const currentTime = Date.now();
+      if (currentTime - lastScanTimeRef.current < 500 || lastScannedCodeRef.current === decodedText) {
+        return; // Ignore duplicate scans within 500ms or same code
+      }
+      lastScanTimeRef.current = currentTime;
+      lastScannedCodeRef.current = decodedText;
       const success = processScannedBarcode(decodedText);
       if (success) {
         setScanSuccess(true);
         playSuccessSound();
-        setTimeout(() => setScanSuccess(false), 1000); // Reset visual feedback
+        setTimeout(() => setScanSuccess(false), 1000);
         setManualInput('');
         if (manualInputRef.current) {
           manualInputRef.current.focus();
@@ -823,7 +828,7 @@ const config = {
         name: editForm.name,
         description: editForm.description || '',
         purchase_price: parseFloat(editForm.purchase_price) || 0,
-        purchase_qty: cleanedDeviceIds.length, // Total device IDs for dynamic_product
+        purchase_qty: cleanedDeviceIds.length,
         selling_price: parseFloat(editForm.selling_price) || 0,
         suppliers_name: editForm.suppliers_name || '',
         dynamic_product_imeis: cleanedDeviceIds.join(','),
@@ -929,126 +934,124 @@ const config = {
         </button>
       </div>
 
-     {showAdd && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <form
-      onSubmit={createProducts}
-     className="bg-white dark:bg-gray-900 w-full max-w-5xl sm:rounded-lg shadow-lg space-y-6 p-4 sm:p-6 max-h-[90vh] overflow-y-auto mt-28"
+      {showAdd && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <form
+            onSubmit={createProducts}
+            className="bg-white dark:bg-gray-900 w-full max-w-5xl sm:rounded-lg shadow-lg space-y-6 p-4 sm:p-6 max-h-[90vh] overflow-y-auto mt-28"
+          >
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Add Products</h2>
 
-    >
-      <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Add Products</h2>
-
-      {addForm.map((p, pi) => (
-        <div
-          key={pi}
-          className="relative bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
-        >
-          {addForm.length > 1 && (
-            <button
-              type="button"
-              onClick={() => removeProductForm(pi)}
-              className="absolute top-4 right-4 text-red-500 hover:text-red-700 text-lg focus:outline-none"
-              title="Remove this product"
-            >
-              <FaTrashAlt />
-            </button>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Product Name"
-              value={p.name}
-              onChange={(e) => handleAddChange(pi, 'name', e.target.value)}
-              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Supplier Name"
-              value={p.suppliers_name}
-              onChange={(e) => handleAddChange(pi, 'suppliers_name', e.target.value)}
-              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-            <textarea
-              placeholder="Description"
-              value={p.description}
-              onChange={(e) => handleAddChange(pi, 'description', e.target.value)}
-              className="p-2 border rounded w-full md:col-span-2 resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              rows={3}
-            />
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Purchase Price"
-              value={p.purchase_price}
-              onChange={(e) => handleAddChange(pi, 'purchase_price', e.target.value)}
-              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Selling Price"
-              value={p.selling_price}
-              onChange={(e) => handleAddChange(pi, 'selling_price', e.target.value)}
-              className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-          </div>
-    
-                
-      <div className="mt-4">
-        <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
-          Product IDs and Sizes
-        </label>
-        {p.deviceIds.map((id, i) => (
-          <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 mt-2">
-            <input
-              value={id}
-              onChange={(e) => handleAddId(pi, i, e.target.value)}
-              placeholder="Product/Device/Goods ID"
-              className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                id.trim() &&
-                p.deviceIds.some((otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase())
-                  ? 'border-red-500'
-                  : ''
-              }`}
-            />
-            <input
-              value={p.deviceSizes[i] || ''}
-              onChange={(e) => handleAddSize(pi, i, e.target.value)}
-              placeholder="Size (e.g., 128GB, Small, Large)"
-              className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => openScanner('add', pi, i)}
-                className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                title="Scan Barcode"
+            {addForm.map((p, pi) => (
+              <div
+                key={pi}
+                className="relative bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
               >
-                <FaCamera />
-              </button>
-              {p.deviceIds.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeIdField(pi, i)}
-                  className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  title="Remove ID"
-                >
-                  <FaTrashAlt />
-                </button>
-              )}
-            </div>
-    </div>
-  ))}
-  <button
-    type="button"
-    onClick={() => addIdField(pi)}
-    className="mt-2 text-indigo-600 hover:underline text-sm dark:text-indigo-400"
-  >
-    + Add Product ID
-  </button>
-</div>
+                {addForm.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeProductForm(pi)}
+                    className="absolute top-4 right-4 text-red-500 hover:text-red-700 text-lg focus:outline-none"
+                    title="Remove this product"
+                  >
+                    <FaTrashAlt />
+                  </button>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Product Name"
+                    value={p.name}
+                    onChange={(e) => handleAddChange(pi, 'name', e.target.value)}
+                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Supplier Name"
+                    value={p.suppliers_name}
+                    onChange={(e) => handleAddChange(pi, 'suppliers_name', e.target.value)}
+                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <textarea
+                    placeholder="Description"
+                    value={p.description}
+                    onChange={(e) => handleAddChange(pi, 'description', e.target.value)}
+                    className="p-2 border rounded w-full md:col-span-2 resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={3}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Purchase Price"
+                    value={p.purchase_price}
+                    onChange={(e) => handleAddChange(pi, 'purchase_price', e.target.value)}
+                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Selling Price"
+                    value={p.selling_price}
+                    onChange={(e) => handleAddChange(pi, 'selling_price', e.target.value)}
+                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Product IDs and Sizes
+                  </label>
+                  {p.deviceIds.map((id, i) => (
+                    <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 mt-2">
+                      <input
+                        value={id}
+                        onChange={(e) => handleAddId(pi, i, e.target.value)}
+                        placeholder="Product/Device/Goods ID"
+                        className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                          id.trim() &&
+                          p.deviceIds.some((otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase())
+                            ? 'border-red-500'
+                            : ''
+                        }`}
+                      />
+                      <input
+                        value={p.deviceSizes[i] || ''}
+                        onChange={(e) => handleAddSize(pi, i, e.target.value)}
+                        placeholder="Size (e.g., 128GB, Small, Large)"
+                        className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openScanner('add', pi, i)}
+                          className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                          title="Scan Barcode"
+                        >
+                          <FaCamera />
+                        </button>
+                        {p.deviceIds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeIdField(pi, i)}
+                            className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            title="Remove ID"
+                          >
+                            <FaTrashAlt />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addIdField(pi)}
+                    className="mt-2 text-indigo-600 hover:underline text-sm dark:text-indigo-400"
+                  >
+                    + Add Product ID
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -1081,67 +1084,67 @@ const config = {
         </div>
       )}
 
-     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded shadow">
-  <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
-    <thead className="bg-gray-100 dark:bg-gray-700 text-xs uppercase text-gray-600 dark:text-gray-400">
-      <tr>
-        <th className="px-4 py-3 whitespace-nowrap">Name</th>
-        <th className="px-4 py-3 whitespace-nowrap">Desc.</th>
-        <th className="px-4 py-3 whitespace-nowrap">Purchase</th>
-        <th className="px-4 py-3 whitespace-nowrap">Qty</th>
-        <th className="px-4 py-3 whitespace-nowrap">Selling</th>
-        <th className="px-4 py-3 whitespace-nowrap">Supplier</th>
-        <th className="px-4 py-3 whitespace-nowrap">Product ID</th>
-        <th className="px-4 py-3 whitespace-nowrap">Date</th>
-        <th className="px-4 py-3 whitespace-nowrap">Action</th>
-      </tr>
-    </thead>
-    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-      {paginated.map((p) => (
-        <tr
-          key={p.id}
-          className="hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-        >
-          <td className="px-4 py-3 whitespace-nowrap">{p.name}</td>
-          <td className="px-4 py-3 whitespace-nowrap">{p.description}</td>
-          <td className="px-4 py-3 whitespace-nowrap">₦{formatCurrency(p.purchase_price || 0)}</td>
-          <td className="px-4 py-3 whitespace-nowrap">{p.deviceList.length}</td>
-          <td className="px-4 py-3 whitespace-nowrap">₦{formatCurrency(p.selling_price || 0)}</td>
-          <td className="px-4 py-3 whitespace-nowrap">{p.suppliers_name}</td>
-          <td className="px-4 py-3 whitespace-nowrap">
-            <button
-              onClick={() => setShowDetail(p)}
-              className="text-indigo-600 hover:underline focus:outline-none dark:text-indigo-400"
-            >
-              {p.device_id || 'View'}
-            </button>
-          </td>
-          <td className="px-4 py-3 whitespace-nowrap">
-            {new Date(p.created_at).toLocaleDateString()}
-          </td>
-          <td className="px-4 py-3 whitespace-nowrap">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => openEdit(p)}
-                className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
-                title="Edit"
+      <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded shadow">
+        <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+          <thead className="bg-gray-100 dark:bg-gray-700 text-xs uppercase text-gray-600 dark:text-gray-400">
+            <tr>
+              <th className="px-4 py-3 whitespace-nowrap">Name</th>
+              <th className="px-4 py-3 whitespace-nowrap">Desc.</th>
+              <th className="px-4 py-3 whitespace-nowrap">Purchase</th>
+              <th className="px-4 py-3 whitespace-nowrap">Qty</th>
+              <th className="px-4 py-3 whitespace-nowrap">Selling</th>
+              <th className="px-4 py-3 whitespace-nowrap">Supplier</th>
+              <th className="px-4 py-3 whitespace-nowrap">Product ID</th>
+              <th className="px-4 py-3 whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 whitespace-nowrap">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {paginated.map((p) => (
+              <tr
+                key={p.id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-700 transition"
               >
-                <FaEdit />
-              </button>
-              <button
-                onClick={() => deleteProduct(p)}
-                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                title="Delete"
-              >
-                <FaTrashAlt />
-              </button>
-            </div>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
+                <td className="px-4 py-3 whitespace-nowrap">{p.name}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{p.description}</td>
+                <td className="px-4 py-3 whitespace-nowrap">₦{formatCurrency(p.purchase_price || 0)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{p.deviceList.length}</td>
+                <td className="px-4 py-3 whitespace-nowrap">₦{formatCurrency(p.selling_price || 0)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{p.suppliers_name}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <button
+                    onClick={() => setShowDetail(p)}
+                    className="text-indigo-600 hover:underline focus:outline-none dark:text-indigo-400"
+                  >
+                    {p.device_id || 'View'}
+                  </button>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {new Date(p.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                      title="Edit"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => deleteProduct(p)}
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                      title="Delete"
+                    >
+                      <FaTrashAlt />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="flex justify-center gap-2 mt-4">
         <button
@@ -1328,56 +1331,55 @@ const config = {
                 <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Products IDs and Sizes</h3>
 
                 <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-    Products IDs and Sizes
-  </label>
-  {editForm.deviceIds.map((id, i) => (
-    <div
-      key={i}
-      className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 mt-2"
-    >
-      <input
-        value={id}
-        onChange={(e) => handleDeviceIdChange(i, e.target.value)}
-        placeholder="Product/Device/Goods ID"
-        className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-          id.trim() &&
-          editForm.deviceIds.some(
-            (otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase()
-          )
-            ? 'border-red-500'
-            : ''
-        }`}
-      />
-      <input
-        value={editForm.deviceSizes[i] || ''}
-        onChange={(e) => handleDeviceSizeChange(i, e.target.value)}
-        placeholder="Size (e.g., 128GB, Small, Large)"
-        className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-      />
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => openScanner('edit', 0, i)}
-          className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          title="Scan Barcode"
-        >
-          <FaCamera />
-        </button>
-        {editForm.deviceIds.length > 1 && (
-          <button
-            type="button"
-            onClick={() => removeEditDeviceId(i)}
-            className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-            title="Remove ID"
-          >
-            <FaTrashAlt />
-          </button>
-        )}
-      </div>
-    </div>
-  ))}
-
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Products IDs and Sizes
+                  </label>
+                  {editForm.deviceIds.map((id, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 mt-2"
+                    >
+                      <input
+                        value={id}
+                        onChange={(e) => handleDeviceIdChange(i, e.target.value)}
+                        placeholder="Product/Device/Goods ID"
+                        className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                          id.trim() &&
+                          editForm.deviceIds.some(
+                            (otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase()
+                          )
+                            ? 'border-red-500'
+                            : ''
+                        }`}
+                      />
+                      <input
+                        value={editForm.deviceSizes[i] || ''}
+                        onChange={(e) => handleDeviceSizeChange(i, e.target.value)}
+                        placeholder="Size (e.g., 128GB, Small, Large)"
+                        className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openScanner('edit', 0, i)}
+                          className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                          title="Scan Barcode"
+                        >
+                          <FaCamera />
+                        </button>
+                        {editForm.deviceIds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeEditDeviceId(i)}
+                            className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            title="Remove ID"
+                          >
+                            <FaTrashAlt />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
 
                   <button
                     type="button"
@@ -1410,65 +1412,63 @@ const config = {
         </div>
       )}
 
-     {showScanner && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
-    <div className="bg-white dark:bg-gray-900 p-3 xs:p-4 rounded-lg shadow-lg w-full max-w-[90vw] xs:max-w-[350px] max-h-[80vh] overflow-y-auto">
-      <h2 className="text-base xs:text-lg font-bold mb-2 xs:mb-3 text-gray-800 dark:text-white">Scan Product ID</h2>
-      <div className="mb-2 xs:mb-3">
-        <label className="flex items-center space-x-2 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            checked={externalScannerMode}
-            onChange={() => {
-              setExternalScannerMode((prev) => !prev);
-              setScannerError(null);
-              setScannerLoading(!externalScannerMode);
-              if (manualInputRef.current) {
-                manualInputRef.current.focus();
-              }
-            }}
-            className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
-          />
-          <span>Use External Scanner</span>
-        </label>
-      </div>
-      {!externalScannerMode && (
-        <>
-          {scannerLoading && (
-            <div className="text-gray-600 dark:text-gray-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
-              Initializing webcam scanner...
+      {showScanner && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Product ID</h2>
+            <div className="mb-4">
+              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={externalScannerMode}
+                  onChange={() => {
+                    setExternalScannerMode((prev) => !prev);
+                    setScannerError(null);
+                    setScannerLoading(!externalScannerMode);
+                    if (manualInputRef.current) {
+                      manualInputRef.current.focus();
+                    }
+                  }}
+                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
+                />
+                <span>Use External Scanner</span>
+              </label>
             </div>
-          )}
-          {scannerError && (
-            <div className="text-red-600 dark:text-red-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm" aria-live="polite">
-              {scannerError}
-            </div>
-          )}
-          <div className="mb-2 xs:mb-3 text-xs xs:text-sm text-gray-600 dark:text-gray-300 text-center">
-            <p className="mb-1">Point camera at barcode (~10–15 cm away).</p>
-            <p>Ensure good lighting and steady hands.</p>
-          </div>
-          <div
-            id="scanner"
-            ref={scannerDivRef}
-            className={`relative w-full h-[55vw] max-h-[280px] min-h-[160px] mb-2 xs:mb-3 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
-              scanSuccess ? 'border-4 border-green-500' : ''
-            }`}
-          >
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              autoPlay
-              playsInline
-            />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[80%] max-w-[240px] h-[70px] xs:h-[80px] border-2 border-red-500 bg-transparent rounded-lg opacity-60"></div>
-            </div>
-          </div>
-        </>
-      )}
-
-
+            {!externalScannerMode && (
+              <>
+                {scannerLoading && (
+                  <div className="text-gray-600 dark:text-gray-400 text-center mb-4 text-sm">
+                    Initializing webcam scanner...
+                  </div>
+                )}
+                {scannerError && (
+                  <div className="text-red-600 dark:text-red-400 text-center mb-4 text-sm" aria-live="polite">
+                    {scannerError}
+                  </div>
+                )}
+                <div className="mb-4 text-sm text-gray-600 dark:text-gray-300 text-center">
+                  <p className="mb-1">Point camera at barcode (~10–15 cm away).</p>
+                  <p>Ensure good lighting and steady hands.</p>
+                </div>
+                <div
+                  id="scanner"
+                  ref={scannerDivRef}
+                  className={`relative w-full h-[500px] mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
+                    scanSuccess ? 'border-4 border-green-500' : ''
+                  }`}
+                >
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    playsInline
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[80%] max-w-[240px] h-[80px] border-2 border-red-500 bg-transparent rounded-lg opacity-60"></div>
+                  </div>
+                </div>
+              </>
+            )}
             {externalScannerMode && (
               <>
                 <div className="text-gray-600 dark:text-gray-400 mb-4">
@@ -1499,7 +1499,6 @@ const config = {
                 </div>
               </>
             )}
-
             <div className="flex justify-end px-2 sm:px-4">
               <button
                 type="button"
