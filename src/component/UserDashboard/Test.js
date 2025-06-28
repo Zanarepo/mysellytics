@@ -1464,7 +1464,7 @@ function DynamicProducts() {
               playsInline
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[80%] max-w-[240px] h-[100px] border-2 border-red-500 bg-transparent rounded-lg opacity-60"></div>
+               <div className="w-[250px] h-[100px] border-2 border-red-500 bg-transparent opacity-50"></div>
             </div>
           </div>
         </>
