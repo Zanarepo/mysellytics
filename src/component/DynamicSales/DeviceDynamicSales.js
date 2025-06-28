@@ -69,6 +69,8 @@ const playSuccessSound = () => {
   const [scannerLoading, setScannerLoading] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [externalScannerMode, setExternalScannerMode] = useState(false);
+  const lastScanTimeRef = useRef(0);
+const lastScannedCodeRef = useRef(null);
  
 
   // Refs
@@ -77,6 +79,40 @@ const playSuccessSound = () => {
   const scannerDivRef = useRef(null);
   const html5QrCodeRef = useRef(null);
 
+
+
+const stopScanner = useCallback(async () => {
+  if (html5QrCodeRef.current) {
+    const currentState = html5QrCodeRef.current.getState();
+    if (
+      [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(currentState)
+    ) {
+      try {
+        // Wait briefly to ensure any ongoing transitions complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await html5QrCodeRef.current.stop();
+        console.log('Scanner stopped successfully');
+        html5QrCodeRef.current = null;
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      }
+    } else {
+      console.log('Scanner not in active state:', currentState);
+      html5QrCodeRef.current = null;
+    }
+  }
+  if (videoRef.current && videoRef.current.srcObject) {
+    const tracks = videoRef.current.srcObject.getTracks();
+    tracks.forEach((track) => track.stop());
+    videoRef.current.srcObject = null;
+    videoRef.current = null; // Reset video element
+  }
+  setScannerError(null);
+  setScannerLoading(false);
+}, []);
+
+
+  
   // Computed Values
   const paginatedSales = useMemo(() => {
     if (viewMode !== 'list') return [];
@@ -285,25 +321,31 @@ const checkSoldDevices = useCallback(async (deviceIds, productId, lineIdx) => {
       return;
     }
 
+const config = {
+  fps: 60, // High FPS for instant detection
+  qrbox: { width: 220, height: 100 }, // Smaller qrbox for faster focus
+  formatsToSupport: [
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.QR_CODE,
+  ],
+  aspectRatio: 1.0, // Square for better alignment
+  disableFlip: true,
+  videoConstraints: { width: 1280, height: 720, facingMode: 'environment' }, // Higher resolution
+};
 
-
-
-    const config = {
-      fps: 15,
-      qrbox: { width: 250, height: 100 },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.QR_CODE,
-      ],
-      aspectRatio: 4 / 3,
-      disableFlip: true,
-      videoConstraints: { width: 640, height: 480, facingMode: 'environment' },
-    };
 
 const onScanSuccess = async (scannedDeviceId) => {
+  const currentTime = Date.now();
+  // Debounce: Ignore scans within 500ms or of the same barcode
+  if (currentTime - lastScanTimeRef.current < 500 || lastScannedCodeRef.current === scannedDeviceId) {
+    return false;
+  }
+  lastScanTimeRef.current = currentTime;
+  lastScannedCodeRef.current = scannedDeviceId;
+
   playSuccessSound();
   if (!scannedDeviceId) {
     toast.error('Scanned Product ID cannot be empty');
@@ -312,6 +354,25 @@ const onScanSuccess = async (scannedDeviceId) => {
   }
 
   console.log('Scanned Device ID:', scannedDeviceId);
+
+  // Check for duplicate in current sale
+  if (scannerTarget) {
+    const { modal, deviceIdx } = scannerTarget;
+    if (modal === 'add') {
+      const ls = [...lines];
+      if (ls.some(line => line.deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase()))) {
+        toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+        return false;
+      }
+    } else if (modal === 'edit') {
+      if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+        toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+        return false;
+      }
+    }
+  }
 
   // Check if device ID is already sold
   const { data: soldData, error: soldError } = await supabase
@@ -366,11 +427,6 @@ const onScanSuccess = async (scannedDeviceId) => {
       });
 
       if (existingLineIdx !== -1) {
-        if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-          toast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
-          setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-          return false;
-        }
         ls[existingLineIdx].deviceIds.push(scannedDeviceId);
         ls[existingLineIdx].deviceSizes.push(idIndex !== -1 ? deviceSizes[idIndex] || '' : '');
         if (!ls[existingLineIdx].isQuantityManual) {
@@ -396,11 +452,6 @@ const onScanSuccess = async (scannedDeviceId) => {
         setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
       } else {
         if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
-          if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-            toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
-            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-            return false;
-          }
           ls[lineIdx] = {
             ...ls[lineIdx],
             dynamic_product_id: Number(productData.id),
@@ -432,11 +483,6 @@ const onScanSuccess = async (scannedDeviceId) => {
         }
       }
     } else if (modal === 'edit') {
-      if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-        toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
-        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-        return false;
-      }
       const updatedForm = {
         ...saleForm,
         dynamic_product_id: Number(productData.id),
@@ -458,9 +504,9 @@ const onScanSuccess = async (scannedDeviceId) => {
   }
   console.error('No scanner target set');
   toast.error('No scanner target set');
+  setScannerError('No scanner target set');
   return false;
 };
-
 
 
 
@@ -551,27 +597,13 @@ return () => {
     }
     html5QrCodeRef.current = null;
   };
- }, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, checkSoldDevices, storeId, products]);
+ }, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, checkSoldDevices,stopScanner, storeId, products]);
 
 
 
-  const stopScanner = useCallback(() => {
-    if (html5QrCodeRef.current &&
-        [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
-          html5QrCodeRef.current.getState()
-        )) {
-      html5QrCodeRef.current
-        .stop()
-        .then(() => console.log('Scanner stopped'))
-        .catch((err) => console.error('Error stopping scanner:', err));
-    }
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    html5QrCodeRef.current = null;
-  }, []);
 
+
+  
   const openScanner = (modal, lineIdx, deviceIdx) => {
     setScannerTarget({ modal, lineIdx, deviceIdx });
     setShowScanner(true);
@@ -1475,6 +1507,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
             />
           )}
         </div>
+        
         <button
   onClick={() => setShowAdd(true)}
   className="flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full sm:w-auto new-sale-button"
@@ -1784,16 +1817,22 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       ))}
 
       <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
-        <button
-          type="button"
-          onClick={() => {
-            stopScanner();
-            setEditing(null);
-          }}
-          className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-sm"
-        >
-          Cancel
-        </button>
+  <button
+  type="button"
+  onClick={async () => {
+    await stopScanner(); // Async to handle stopScanner promise
+    setShowScanner(false);
+    setScannerTarget(null);
+    setScannerError(null);
+    setScannerLoading(false);
+    setManualInput('');
+    setExternalScannerMode(false);
+  }}
+  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+>
+  Done
+</button>
+
         <button
           type="submit"
           className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
@@ -1934,21 +1973,21 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
 </div>
 
 <div className="flex justify-end">
-  <button
-    type="button"
-    onClick={() => {
-      setShowScanner(false);
-      setScannerTarget(null);
-      setScannerError(null);
-      setScannerLoading(false);
-      setManualInput('');
-      setExternalScannerMode(false);
-      stopScanner();
-    }}
-    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
-  >
-    Cancel
-  </button>
+<button
+  type="button"
+  onClick={() => {
+    setShowScanner(false);
+    setScannerTarget(null);
+    setScannerError(null);
+    setScannerLoading(false);
+    setManualInput('');
+    setExternalScannerMode(false);
+    stopScanner();
+  }}
+  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+>
+  Done
+</button>
 </div>
 
           </div>
