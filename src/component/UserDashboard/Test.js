@@ -217,7 +217,7 @@ function DynamicProducts() {
 
     const config = {
       fps: 60,
-      qrbox: { width: 220, height: 100 },
+      qrbox: { width: 250, height: 125 },
       formatsToSupport: [
         Html5QrcodeSupportedFormats.CODE_128,
         Html5QrcodeSupportedFormats.CODE_39,
@@ -1411,8 +1411,7 @@ function DynamicProducts() {
           </div>
         </div>
       )}
-
-     {showScanner && (
+{showScanner && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
       <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Product ID</h2>
@@ -1431,29 +1430,25 @@ function DynamicProducts() {
             }}
             className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
           />
-          <span>Use External Scanner</span>
+          <span>Use External Barcode Scanner</span>
         </label>
       </div>
       {!externalScannerMode && (
         <>
           {scannerLoading && (
-            <div className="text-gray-600 dark:text-gray-400 text-center mb-4 text-sm">
+            <div className="text-gray-600 dark:text-gray-400 mb-4 text-center text-sm">
               Initializing webcam scanner...
             </div>
           )}
           {scannerError && (
-            <div className="text-red-600 dark:text-red-400 text-center mb-4 text-sm" aria-live="polite">
+            <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm" aria-live="polite">
               {scannerError}
             </div>
           )}
-          <div className="mb-4 text-sm text-gray-600 dark:text-gray-300 text-center">
-            <p className="mb-1">Point camera at barcode (~10–15 cm away).</p>
-            <p>Ensure good lighting and steady hands.</p>
-          </div>
           <div
             id="scanner"
             ref={scannerDivRef}
-            className={`relative w-full h-[200px] mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
+            className={`relative w-full h-[250px] mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
               scanSuccess ? 'border-4 border-green-500' : ''
             }`}
           >
@@ -1464,42 +1459,40 @@ function DynamicProducts() {
               playsInline
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-               <div className="w-[250px] h-[100px] border-2 border-red-500 bg-transparent opacity-50"></div>
+              <div className="w-[300px] h-[150px] border-2 border-red-500 bg-transparent opacity-50"></div>
             </div>
           </div>
         </>
       )}
       {externalScannerMode && (
-        <>
-          <div className="text-gray-600 dark:text-gray-400 mb-4">
-            Waiting for external scanner to proceed... Scan a barcode to proceed.
+        <div className="mb-4">
+          <div className="text-gray-600 dark:text-gray-400 mb-4 text-center">
+            Waiting for external scanner input... Scan a barcode to proceed.
           </div>
-          <div className="mb-4 px-2 sm:px-0">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Or enter barcode manually
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                ref={manualInputRef}
-                value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
-                onKeyDown={handleManualInputKeyDown}
-                placeholder="Enter barcode"
-                className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white w-full sm:flex-1"
-              />
-              <button
-                type="button"
-                onClick={handleManualInput}
-                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 w-full sm:w-auto"
-              >
-                Submit
-              </button>
-            </div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Or Enter Product ID Manually
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              ref={manualInputRef}
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              onKeyDown={handleManualInputKeyDown}
+              placeholder="Enter Product ID"
+              className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={handleManualInput}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 w-full sm:w-auto"
+            >
+              Submit
+            </button>
           </div>
-        </>
+        </div>
       )}
-      <div className="flex justify-end px-2 sm:px-4">
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={() => {
@@ -1513,14 +1506,14 @@ function DynamicProducts() {
             setScannerBuffer('');
             setScanSuccess(false);
           }}
-          className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white text-center"
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
         >
           Done
         </button>
       </div>
     </div>
   </div>
-      )}
+)}
     </div>
   );
 }
