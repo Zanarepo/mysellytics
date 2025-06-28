@@ -55,7 +55,7 @@ export default function DebtsManager() {
   const manualInputRef = useRef(null);
 
   // Add notification with type and auto-close
-  const addNotification = useCallback((message, type = 'info', duration = 3000) => {
+  const addNotification = useCallback((message, type = 'info', duration = 5000) => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
@@ -1381,23 +1381,8 @@ export default function DebtsManager() {
 
   return (
     <div className="p-0 space-y-6 dark:bg-gray-900 dark:text-white">
-      <DeviceDebtRepayment />
-      <div className="fixed top-4 right-4 space-y-2 z-50">
-        {notifications.map(notification => (
-          <div
-            key={notification.id}
-            className={`p-4 rounded shadow-lg text-white ${
-              notification.type === 'success' ? 'bg-green-600' :
-              notification.type === 'error' ? 'bg-red-600' :
-              notification.type === 'warning' ? 'bg-yellow-600' :
-              'bg-blue-600'
-            }`}
-          >
-            {notification.message}
-          </div>
-        ))}
-      </div>
-
+      <DeviceDebtRepayment/>
+   
       {error && (
         <div className="p-4 mb-4 bg-red-100 text-red-700 rounded">
           {error}
@@ -1499,6 +1484,39 @@ export default function DebtsManager() {
 
       {editing && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+
+    <div className="fixed top-0 right-0 space-y-2 z-[1000] p-4">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+
+  <div className="fixed top-16 right-4 space-y-2 z-[1000]">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+
           <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6 dark:bg-gray-900 dark:text-white mt-16">
             <h2 className="text-xl font-bold text-center">{editing.id ? 'Edit Debt' : 'Add Debt'}</h2>
 
@@ -1768,6 +1786,39 @@ export default function DebtsManager() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
             <h2 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Scan Barcode ID</h2>
+ <div className="fixed top-0 right-0 space-y-2 z-[1000] p-4">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+  <div className="fixed top-16 right-4 space-y-2 z-[1000]">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+
+
+            
             <div className="mb-4">
               <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
