@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from "../../supabaseClient";
-import { FaEdit, FaTrashAlt, FaPlus, FaBell, FaCamera } from 'react-icons/fa';
+import { FaEdit, FaTrashAlt, FaPlus, FaBell, FaCamera, FaTimes } from 'react-icons/fa';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode';
 import DeviceDebtRepayment from './DeviceDebtRepayment';
 
@@ -1382,7 +1382,21 @@ export default function DebtsManager() {
   return (
     <div className="p-0 space-y-6 dark:bg-gray-900 dark:text-white">
       <DeviceDebtRepayment/>
-   
+   <div className="fixed top-16 right-4 space-y-2 z-[1000]">
+  {notifications.map(notification => (
+    <div
+      key={notification.id}
+      className={`p-4 rounded shadow-lg text-white ${
+        notification.type === 'success' ? 'bg-green-600' :
+        notification.type === 'error' ? 'bg-red-600' :
+        notification.type === 'warning' ? 'bg-yellow-600' :
+        'bg-blue-600'
+      }`}
+    >
+      {notification.message}
+    </div>
+  ))}
+</div>
       {error && (
         <div className="p-4 mb-4 bg-red-100 text-red-700 rounded">
           {error}
@@ -1402,20 +1416,22 @@ export default function DebtsManager() {
           />
         </div>
 
-        <div className="mb-4 flex gap-3">
-          <button
-            onClick={() => setEditing({})}
-            className="px-4 py-2 bg-indigo-600 text-white rounded flex items-center gap-2"
-          >
-            <FaPlus /> Debt
-          </button>
-          <button
-            onClick={() => setShowReminderForm(true)}
-            className="px-4 py-2 bg-yellow-600 text-white rounded flex items-center gap-2"
-          >
-            <FaBell /> Set Debt Reminders
-          </button>
-        </div>
+        <div className="mb-4 flex gap-2 sm:gap-3">
+        <button
+          onClick={() => setEditing({})}
+          className="p-3 sm:p-4 bg-indigo-600 text-white rounded-full shadow-md hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200 flex items-center justify-center"
+          aria-label="Add new debt"
+        >
+          <FaPlus className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+        <button
+          onClick={() => setShowReminderForm(true)}
+          className="p-3 sm:p-4 bg-yellow-600 text-white rounded-full shadow-md hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 transition-colors duration-200 flex items-center justify-center"
+          aria-label="Set debt reminders"
+        >
+          <FaBell className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+      </div>
 
         <div ref={debtsRef} className="overflow-x-auto">
           <table className="min-w-full text-sm border rounded-lg">
@@ -1500,213 +1516,312 @@ export default function DebtsManager() {
       </div>
     ))}
   </div>
+<div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white mt-4 sm:mt-8">
+  <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+    {editing.id ? 'Edit Debt' : 'Add Debt'}
+  </h2>
 
-  <div className="fixed top-16 right-4 space-y-2 z-[1000]">
-    {notifications.map(notification => (
-      <div
-        key={notification.id}
-        className={`p-4 rounded shadow-lg text-white ${
-          notification.type === 'success' ? 'bg-green-600' :
-          notification.type === 'error' ? 'bg-red-600' :
-          notification.type === 'warning' ? 'bg-yellow-600' :
-          'bg-blue-600'
-        }`}
-      >
-        {notification.message}
+  {debtEntries.map((entry, index) => (
+    <div key={index} className="border border-gray-200 dark:border-gray-700 p-3 sm:p-4 rounded-lg space-y-3 dark:bg-gray-800">
+      <div className="flex justify-between items-center">
+        <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-200">
+          Debt Entry {index + 1}
+        </h3>
+        {debtEntries.length > 1 && (
+          <button
+            onClick={() => removeDebtEntry(index)}
+            className="p-1.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+            aria-label="Remove debt entry"
+          >
+            <svg
+              className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
-    ))}
-  </div>
 
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6 dark:bg-gray-900 dark:text-white mt-16">
-            <h2 className="text-xl font-bold text-center">{editing.id ? 'Edit Debt' : 'Add Debt'}</h2>
-
-            {debtEntries.map((entry, index) => (
-              <div key={index} className="border p-4 rounded-lg space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold">Debt Entry {index + 1}</h3>
-                  {debtEntries.length > 1 && (
-                    <button
-                      onClick={() => removeDebtEntry(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Customer</span>
-                    <select
-                      name="customer_id"
-                      value={editing.id ? editing.customer_id : entry.customer_id}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, customer_id: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Customer</option>
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.fullname}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Product</span>
-                    <select
-                      name="dynamic_product_id"
-                      value={editing.id ? editing.dynamic_product_id : entry.dynamic_product_id}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, dynamic_product_id: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Product</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Supplier</span>
-                    <input
-                      name="supplier"
-                      value={editing.id ? editing.supplier : entry.supplier}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, supplier: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Quantity</span>
-                    <input
-                      type="number"
-                      name="qty"
-                      value={editing.id ? editing.qty : entry.qty}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, qty: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                      min="1"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Owed</span>
-                    <input
-                      type="number"
-                      name="owed"
-                      value={editing.id ? editing.owed : entry.owed}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, owed: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                      min="0"
-                      step="0.01"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Deposited</span>
-                    <input
-                      type="number"
-                      name="deposited"
-                      value={editing.id ? editing.deposited : entry.deposited}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, deposited: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      min="0"
-                      step="0.01"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Date</span>
-                    <input
-                      type="date"
-                      name="date"
-                      value={editing.id ? editing.date : entry.date}
-                      onChange={e => editing.id ? setEditing(prev => ({ ...prev, date: e.target.value })) : handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                    />
-                  </label>
-
-                  <div className="block sm:col-span-2">
-                    <span className="font-semibold block mb-1">Device IDs and Sizes</span>
-                    {(editing.id ? editing.deviceIds : entry.deviceIds).map((id, deviceIdx) => (
-                      <div key={deviceIdx} className="flex flex-wrap gap-2 mt-2 items-center">
-                        <input
-                          value={id}
-                          onChange={e => editing.id ? handleEditDeviceIdChange(deviceIdx, e.target.value) : handleDeviceIdChange(index, deviceIdx, e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' && !editing.id) {
-                              e.preventDefault();
-                              handleDeviceIdConfirm(index, deviceIdx, e.target.value);
-                            }
-                          }}
-                          onBlur={e => !editing.id && handleDeviceIdConfirm(index, deviceIdx, e.target.value)}
-                          placeholder="Device ID"
-                          className="flex-1 p-2 border rounded dark:bg-gray-900 dark:text-white min-w-[150px]"
-                        />
-                        <input
-                          value={editing.id ? editing.deviceSizes[deviceIdx] || '' : entry.deviceSizes[deviceIdx] || ''}
-                          onChange={e => editing.id ? handleEditDeviceSizeChange(deviceIdx, e.target.value) : handleDeviceSizeChange(index, deviceIdx, e.target.value)}
-                          placeholder="Device Size"
-                          className="flex-1 p-2 border rounded dark:bg-gray-900 dark:text-white min-w-[150px]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => openScanner(editing.id ? 'edit' : 'add', index, deviceIdx)}
-                          className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                          title="Scan Barcode"
-                        >
-                          <FaCamera />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => editing.id ? removeEditDeviceIdField(deviceIdx) : removeDeviceIdField(index, deviceIdx)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Remove"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => editing.id ? addEditDeviceIdField() : addDeviceIdField(index)}
-                      className="mt-2 text-indigo-600 hover:underline text-sm"
-                    >
-                      + Add Device ID
-                    </button>
-                  </div>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 gap-3 sm:gap-4">
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Customer
+          </span>
+          <select
+            name="customer_id"
+            value={editing.id ? editing.customer_id : entry.customer_id}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, customer_id: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+            required
+          >
+            <option value="">Select Customer</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.fullname}
+              </option>
             ))}
+          </select>
+        </label>
 
-            {!editing.id && (
-              <button
-                onClick={addDebtEntry}
-                className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2"
-              >
-                <FaPlus /> Add Another Debt
-              </button>
-            )}
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Product
+          </span>
+          <select
+            name="dynamic_product_id"
+            value={editing.id ? editing.dynamic_product_id : entry.dynamic_product_id}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, dynamic_product_id: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+            required
+          >
+            <option value="">Select Product</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => { stopScanner(); setEditing(null); }} className="px-4 py-2 bg-gray-500 text-white rounded">
-                Cancel
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Supplier
+          </span>
+          <input
+            name="supplier"
+            value={editing.id ? editing.supplier : entry.supplier}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, supplier: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+          />
+        </label>
+
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Quantity
+          </span>
+          <input
+            type="number"
+            name="qty"
+            value={editing.id ? editing.qty : entry.qty}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, qty: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+            required
+            min="1"
+          />
+        </label>
+
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Owed
+          </span>
+          <input
+            type="number"
+            name="owed"
+            value={editing.id ? editing.owed : entry.owed}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, owed: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+            required
+            min="0"
+            step="0.01"
+          />
+        </label>
+
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Deposited
+          </span>
+          <input
+            type="number"
+            name="deposited"
+            value={editing.id ? editing.deposited : entry.deposited}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, deposited: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+            min="0"
+            step="0.01"
+          />
+        </label>
+
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Date
+          </span>
+          <input
+            type="date"
+            name="date"
+            value={editing.id ? editing.date : entry.date}
+            onChange={(e) =>
+              editing.id
+                ? setEditing((prev) => ({ ...prev, date: e.target.value }))
+                : handleDebtChange(index, e)
+            }
+            className="border p-2 sm:p-3 w-full rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+            required
+          />
+        </label>
+
+        <div className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Device IDs and Sizes
+          </span>
+          {(editing.id ? editing.deviceIds : entry.deviceIds).map((id, deviceIdx) => (
+            <div key={deviceIdx} className="flex flex-wrap gap-2 sm:gap-3 mt-2 items-center">
+              <input
+                value={id}
+                onChange={(e) =>
+                  editing.id
+                    ? handleEditDeviceIdChange(deviceIdx, e.target.value)
+                    : handleDeviceIdChange(index, deviceIdx, e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !editing.id) {
+                    e.preventDefault();
+                    handleDeviceIdConfirm(index, deviceIdx, e.target.value);
+                  }
+                }}
+                onBlur={(e) => !editing.id && handleDeviceIdConfirm(index, deviceIdx, e.target.value)}
+                placeholder="Device ID"
+                className="flex-1 p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px] sm:min-w-[120px]"
+              />
+              <input
+                value={editing.id ? editing.deviceSizes[deviceIdx] || '' : entry.deviceSizes[deviceIdx] || ''}
+                onChange={(e) =>
+                  editing.id
+                    ? handleEditDeviceSizeChange(deviceIdx, e.target.value)
+                    : handleDeviceSizeChange(index, deviceIdx, e.target.value)
+                }
+                placeholder="Device Size"
+                className="flex-1 p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px] sm:min-w-[120px]"
+              />
+              <button
+                type="button"
+                onClick={() => openScanner(editing.id ? 'edit' : 'add', index, deviceIdx)}
+                className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+                aria-label="Scan barcode for device ID"
+              >
+                <FaCamera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
               </button>
               <button
-                onClick={saveDebts}
-                className="px-4 py-2 bg-indigo-600 text-white rounded"
+                type="button"
+                onClick={() => editing.id ? removeEditDeviceIdField(deviceIdx) : removeDeviceIdField(index, deviceIdx)}
+                className="p-1.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                aria-label="Remove device ID"
               >
-                {editing.id ? 'Save Debt' : 'Create Debt'}
+                <svg
+                  className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => editing.id ? addEditDeviceIdField() : addDeviceIdField(index)}
+            className="mt-2 p-2 sm:p-2.5 bg-gray-600 text-white rounded-full shadow-sm hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200"
+            aria-label="Add new device ID"
+          >
+            <svg
+              className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  ))}
+
+  {!editing.id && (
+    <button
+      onClick={addDebtEntry}
+      className="p-2 sm:p-3 bg-green-600 text-white rounded-full shadow-sm hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-200 w-full sm:w-auto flex items-center justify-center gap-2"
+      aria-label="Add another debt entry"
+    >
+      <svg
+        className="w-4 h-4 sm:w-5 sm:h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+      </svg>
+      <span className="text-sm sm:text-base">Add Another Debt</span>
+    </button>
+  )}
+
+  <div className="flex justify-end gap-2 sm:gap-3 mt-4">
+    <button
+      onClick={() => {
+        stopScanner();
+        setEditing(null);
+      }}
+      className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+      aria-label="Cancel debt form"
+    >
+      <svg
+        className="w-4 h-4 sm:w-5 sm:h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+    <button
+      onClick={saveDebts}
+      className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+      aria-label={editing.id ? 'Save debt' : 'Create debt'}
+    >
+      <svg
+        className="w-4 h-4 sm:w-5 sm:h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+      </svg>
+    </button>
+  </div>
+</div>
         </div>
       )}
 
@@ -1782,137 +1897,166 @@ export default function DebtsManager() {
         </div>
       )}
 
-      {showScanner && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
-            <h2 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Scan Barcode ID</h2>
- <div className="fixed top-0 right-0 space-y-2 z-[1000] p-4">
-    {notifications.map(notification => (
-      <div
-        key={notification.id}
-        className={`p-4 rounded shadow-lg text-white ${
-          notification.type === 'success' ? 'bg-green-600' :
-          notification.type === 'error' ? 'bg-red-600' :
-          notification.type === 'warning' ? 'bg-yellow-600' :
-          'bg-blue-600'
-        }`}
+  {showScanner && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div className="bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-lg max-w-[90vw] sm:max-w-md w-full relative">
+      {/* Close Button */}
+      <button
+        type="button"
+        onClick={() => {
+          stopScanner();
+          setShowScanner(false);
+          setScannerTarget(null);
+          setScannerError(null);
+          setScannerLoading(false);
+          setManualInput('');
+          setExternalScannerMode(false);
+          setScannerBuffer('');
+        }}
+        className="absolute top-3 right-3 p-2 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+        aria-label="Close scanner modal"
       >
-        {notification.message}
+        <FaTimes className="text-gray-800 dark:text-gray-200 w-5 h-5" />
+      </button>
+
+      {/* Notifications */}
+      <div className="fixed top-4 right-4 space-y-2 z-[1000] max-w-[80vw] sm:max-w-xs">
+        {notifications.map((notification) => (
+          <div
+            key={notification.id}
+            className={`p-3 rounded-lg shadow-lg text-white text-sm font-medium ${
+              notification.type === 'success'
+                ? 'bg-green-600'
+                : notification.type === 'error'
+                ? 'bg-red-600'
+                : notification.type === 'warning'
+                ? 'bg-yellow-600'
+                : 'bg-blue-600'
+            }`}
+          >
+            {notification.message}
+          </div>
+        ))}
       </div>
-    ))}
-  </div>
-  <div className="fixed top-16 right-4 space-y-2 z-[1000]">
-    {notifications.map(notification => (
-      <div
-        key={notification.id}
-        className={`p-4 rounded shadow-lg text-white ${
-          notification.type === 'success' ? 'bg-green-600' :
-          notification.type === 'error' ? 'bg-red-600' :
-          notification.type === 'warning' ? 'bg-yellow-600' :
-          'bg-blue-600'
-        }`}
-      >
-        {notification.message}
+
+      {/* Modal Content */}
+      <h2 className="text-lg sm:text-xl font-semibold mb-3 text-gray-900 dark:text-white">
+        Scan Barcode ID
+      </h2>
+
+      <div className="mb-4">
+        <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={externalScannerMode}
+            onChange={() => {
+              setExternalScannerMode((prev) => !prev);
+              setScannerError(null);
+              setScannerLoading(!externalScannerMode);
+              if (manualInputRef.current) {
+                manualInputRef.current.focus();
+              }
+            }}
+            className="h-5 w-5 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-indigo-500"
+          />
+          <span>Use External Barcode Scanner</span>
+        </label>
       </div>
-    ))}
-  </div>
 
-
-            
-            <div className="mb-4">
-              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={externalScannerMode}
-                  onChange={() => {
-                    setExternalScannerMode(prev => !prev);
-                    setScannerError(null);
-                    setScannerLoading(!externalScannerMode);
-                    if (manualInputRef.current) {
-                      manualInputRef.current.focus();
-                    }
-                  }}
-                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
-                />
-                <span>Use External Barcode Scanner</span>
-              </label>
+      {!externalScannerMode && (
+        <>
+          {scannerLoading && (
+            <div className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+              Initializing scanner...
             </div>
-            {!externalScannerMode && (
-              <>
-                {scannerLoading && (
-                  <div className="text-gray-600 dark:text-gray-400 mb-4">Initializing scanner...</div>
-                )}
-                {scannerError && (
-                  <div className="text-red-600 dark:text-red-400 mb-4">{scannerError}</div>
-                )}
-                <div
-                  id="scanner"
-                  ref={scannerDivRef}
-                  className="relative w-full h-64 mb-4 bg-gray-100 dark:bg-gray-800"
-                >
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover rounded"
-                    autoPlay
-                    playsInline
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[250px] h-[100px] border-2 border-red-500 bg-transparent opacity-50"></div>
-                  </div>
-                </div>
-              </>
-            )}
-            {externalScannerMode && (
-              <div className="text-gray-600 dark:text-gray-400 mb-4">
-                Waiting for external scanner input... Scan a barcode to proceed.
-              </div>
-            )}
-            <div className="mb-4 px-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Or Enter Barcode Manually
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  ref={manualInputRef}
-                  value={manualInput}
-                  onChange={e => setManualInput(e.target.value)}
-                  onKeyDown={handleManualInputKeyDown}
-                  placeholder="Enter barcode"
-                  className="flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white"
-                />
-                <button
-                  type="button"
-                  onClick={handleManualInput}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
-                  Submit
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  stopScanner();
-                  setShowScanner(false);
-                  setScannerTarget(null);
-                  setScannerError(null);
-                  setScannerLoading(false);
-                  setManualInput('');
-                  setExternalScannerMode(false);
-                  setScannerBuffer('');
-                }}
-                className="px-4 py-2 bg-gray-600 text-white rounded"
-              >
-                Done
-              </button>
+          )}
+          {scannerError && (
+            <div className="text-red-600 dark:text-red-400 mb-4 text-sm">{scannerError}</div>
+          )}
+          <div
+            id="scanner"
+            ref={scannerDivRef}
+            className="relative w-full h-48 sm:h-64 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
+          >
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              autoPlay
+              playsInline
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-[200px] sm:w-[250px] h-[80px] sm:h-[100px] border-2 border-red-500 bg-transparent opacity-50"></div>
             </div>
           </div>
+        </>
+      )}
+
+      {externalScannerMode && (
+        <div className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+          Waiting for external scanner input... Scan a barcode to proceed.
         </div>
       )}
 
+      <div className="mb-4 px-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Or Enter Barcode Manually
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            ref={manualInputRef}
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            onKeyDown={handleManualInputKeyDown}
+            placeholder="Enter barcode"
+            className="flex-1 p-3 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleManualInput}
+            className="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 shadow-md"
+            aria-label="Submit barcode"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            stopScanner();
+            setShowScanner(false);
+            setScannerTarget(null);
+            setScannerError(null);
+            setScannerLoading(false);
+            setManualInput('');
+            setExternalScannerMode(false);
+            setScannerBuffer('');
+          }}
+          className="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 shadow-md"
+          aria-label="Close scanner"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {showReminderForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 space-y-4 dark:bg-gray-900 dark:text-white">

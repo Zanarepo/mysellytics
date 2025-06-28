@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from "../../supabaseClient";
-import {  FaPlus, FaBell, FaCamera } from 'react-icons/fa';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { FaEdit, FaTrashAlt, FaPlus, FaBell, FaCamera } from 'react-icons/fa';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode';
 import DeviceDebtRepayment from './DeviceDebtRepayment';
 
@@ -28,10 +26,11 @@ export default function DebtsManager() {
       qty: "",
       owed: "",
       deposited: "",
-      date: ""
+      date: new Date().toISOString().split('T')[0],
     }
   ]);
   const [error, setError] = useState(null);
+  const [notifications, setNotifications] = useState([]); // Custom notification state
   const [showReminderForm, setShowReminderForm] = useState(false);
   const [reminderType, setReminderType] = useState('one-time');
   const [reminderTime, setReminderTime] = useState('');
@@ -43,7 +42,7 @@ export default function DebtsManager() {
   const debtsRef = useRef();
   const reminderIntervalRef = useRef(null);
   const [showScanner, setShowScanner] = useState(false);
-  const [scannerTarget, setScannerTarget] = useState(null); // { modal: 'add'|'edit', entryIndex: number, deviceIndex: number }
+  const [scannerTarget, setScannerTarget] = useState(null);
   const [scannerError, setScannerError] = useState(null);
   const [scannerLoading, setScannerLoading] = useState(false);
   const [manualInput, setManualInput] = useState('');
@@ -55,11 +54,25 @@ export default function DebtsManager() {
   const html5QrCodeRef = useRef(null);
   const manualInputRef = useRef(null);
 
+  // Add notification with type and auto-close
+  const addNotification = useCallback((message, type = 'info', duration = 5000) => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, duration);
+  }, []);
+
+  const playSuccessSound = useCallback(() => {
+    const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+    audio.play().catch((err) => console.error('Audio play error:', err));
+  }, []);
+
   // Fetch store details
   useEffect(() => {
     if (!storeId) {
       setError("Store ID is missing. Please log in or select a store.");
-      toast.error("Store ID is missing.");
+      addNotification("Store ID is missing.", 'error');
       return;
     }
     supabase
@@ -70,12 +83,12 @@ export default function DebtsManager() {
       .then(({ data, error }) => {
         if (error) {
           setError("Failed to fetch store details: " + error.message);
-          toast.error("Failed to fetch store details.");
+          addNotification("Failed to fetch store details.", 'error');
         } else {
           setStore(data);
         }
       });
-  }, [storeId]);
+  }, [storeId, addNotification]);
 
   // Fetch customers
   useEffect(() => {
@@ -87,31 +100,267 @@ export default function DebtsManager() {
       .then(({ data, error }) => {
         if (error) {
           setError("Failed to fetch customers: " + error.message);
-          toast.error("Failed to fetch customers.");
+          addNotification("Failed to fetch customers.", 'error');
         } else {
           setCustomers(data || []);
         }
       });
-  }, [storeId]);
+  }, [storeId, addNotification]);
 
   // Fetch products
   useEffect(() => {
     if (!storeId) return;
     supabase
       .from('dynamic_product')
-      .select('id, name')
+      .select('id, name, dynamic_product_imeis, device_size')
       .eq('store_id', storeId)
       .then(({ data, error }) => {
         if (error) {
           setError("Failed to fetch products: " + error.message);
-          toast.error("Failed to fetch products.");
+          addNotification("Failed to fetch products.", 'error');
         } else {
           setProducts(data || []);
         }
       });
-  }, [storeId]);
+  }, [storeId, addNotification]);
 
-  // Fetch debts
+  const updateInventory = async (dynamic_product_id, qty) => {
+    try {
+      const { data: inventory, error: fetchError } = await supabase
+        .from('dynamic_inventory')
+        .select('available_qty, quantity_sold')
+        .eq('dynamic_product_id', dynamic_product_id)
+        .eq('store_id', storeId)
+        .single();
+  
+      if (fetchError) {
+        throw new Error(`Failed to fetch inventory: ${fetchError.message}`);
+      }
+  
+      if (!inventory) {
+        throw new Error('Inventory record not found for this product.');
+      }
+  
+      const newAvailableQty = inventory.available_qty - qty;
+      const newQuantitySold = (inventory.quantity_sold || 0) + qty;
+  
+      if (newAvailableQty < 0) {
+        throw new Error('Insufficient inventory available.');
+      }
+  
+      const { error: updateError } = await supabase
+        .from('dynamic_inventory')
+        .update({
+          available_qty: newAvailableQty,
+          quantity_sold: newQuantitySold,
+        })
+        .eq('dynamic_product_id', dynamic_product_id)
+        .eq('store_id', storeId);
+  
+      if (updateError) {
+        throw new Error(`Failed to update inventory: ${updateError.message}`);
+      }
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const checkDeviceInProduct = useCallback(
+    async (deviceId, modal, entryIndex, deviceIndex) => {
+      if (!deviceId || typeof deviceId !== 'string' || deviceId.trim() === '') {
+        addNotification('Invalid Device ID: Empty or undefined value', 'error');
+        return false;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('dynamic_product')
+          .select('id, name, dynamic_product_imeis, device_size')
+          .eq('store_id', storeId)
+          .ilike('dynamic_product_imeis', `%${deviceId}%`);
+
+        if (error) {
+          throw new Error(`Error checking device ID: ${error.message}`);
+        }
+
+        let entries = [...debtEntries];
+
+        if (data && data.length > 0) {
+          const product = data[0];
+          const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
+          const deviceIndexInProduct = deviceIds.indexOf(deviceId.trim());
+
+          if (deviceIndexInProduct !== -1) {
+            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
+
+            if (modal === 'add') {
+              const existingEntryIndex = entries.findIndex(
+                entry => entry.dynamic_product_id === product.id.toString()
+              );
+
+              entries[entryIndex].deviceIds[deviceIndex] = '';
+              entries[entryIndex].deviceSizes[deviceIndex] = '';
+              if (!entries[entryIndex].isQuantityManual) {
+                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+              }
+
+              if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
+                entries[existingEntryIndex].deviceIds = [
+                  ...entries[existingEntryIndex].deviceIds.filter(id => id.trim()),
+                  deviceId,
+                  ''
+                ];
+                entries[existingEntryIndex].deviceSizes = [
+                  ...entries[existingEntryIndex].deviceSizes.filter((_, i) => entries[existingEntryIndex].deviceIds[i].trim()),
+                  deviceSize,
+                  ''
+                ];
+                if (!entries[existingEntryIndex].isQuantityManual) {
+                  entries[existingEntryIndex].qty = entries[existingEntryIndex].deviceIds.filter(id => id.trim()).length || 1;
+                }
+                if (
+                  !entries[entryIndex].customer_id &&
+                  !entries[entryIndex].dynamic_product_id &&
+                  entries[entryIndex].deviceIds.every(id => !id.trim())
+                ) {
+                  entries.splice(entryIndex, 1);
+                  setDebtEntries([...entries]);
+                  setScannerTarget({
+                    modal,
+                    entryIndex: existingEntryIndex,
+                    deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
+                  });
+                } else {
+                  setDebtEntries([...entries]);
+                  setScannerTarget({
+                    modal,
+                    entryIndex: existingEntryIndex,
+                    deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
+                  });
+                }
+              } else if (entries[entryIndex].dynamic_product_id && entries[entryIndex].dynamic_product_id !== product.id.toString()) {
+                const newEntry = {
+                  customer_id: entries[entryIndex].customer_id || '',
+                  customer_name: entries[entryIndex].customer_name || '',
+                  phone_number: entries[entryIndex].phone_number || '',
+                  dynamic_product_id: product.id.toString(),
+                  product_name: product.name,
+                  supplier: entries[entryIndex].supplier || '',
+                  deviceIds: [deviceId, ''],
+                  deviceSizes: [deviceSize, ''],
+                  qty: 1,
+                  owed: entries[entryIndex].owed || '',
+                  deposited: entries[entryIndex].deposited || '',
+                  date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
+                  isQuantityManual: false
+                };
+                entries.push(newEntry);
+                if (
+                  !entries[entryIndex].customer_id &&
+                  !entries[entryIndex].dynamic_product_id &&
+                  entries[entryIndex].deviceIds.every(id => !id.trim())
+                ) {
+                  entries.splice(entryIndex, 1);
+                  setDebtEntries([...entries]);
+                  setScannerTarget({
+                    modal,
+                    entryIndex: entries.length - 1,
+                    deviceIndex: 1
+                  });
+                } else {
+                  setDebtEntries([...entries]);
+                  setScannerTarget({
+                    modal,
+                    entryIndex: entries.length - 1,
+                    deviceIndex: 1
+                  });
+                }
+              } else {
+                entries[entryIndex] = {
+                  ...entries[entryIndex],
+                  dynamic_product_id: product.id.toString(),
+                  product_name: product.name,
+                  deviceIds: entries[entryIndex].deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
+                  deviceSizes: entries[entryIndex].deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
+                  qty: entries[entryIndex].isQuantityManual ? entries[entryIndex].qty : (entries[entryIndex].deviceIds.filter(id => id.trim()).length + 1 || 1),
+                  date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
+                  isQuantityManual: false
+                };
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex,
+                  deviceIndex: entries[entryIndex].deviceIds.length - 1
+                });
+              }
+              return true;
+            } else if (modal === 'edit') {
+              setEditing(prev => ({
+                ...prev,
+                dynamic_product_id: product.id.toString(),
+                product_name: product.name,
+                deviceIds: prev.deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
+                deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
+                qty: prev.isQuantityManual ? prev.qty : (prev.deviceIds.filter(id => id.trim()).length + 1 || 1),
+                date: prev.date || new Date().toISOString().split('T')[0],
+                isQuantityManual: false
+              }));
+              setScannerTarget({
+                modal,
+                entryIndex,
+                deviceIndex: editing.deviceIds.length
+              });
+              return true;
+            }
+          }
+        }
+
+        if (modal === 'add') {
+          entries[entryIndex].deviceIds[deviceIndex] = deviceId;
+          entries[entryIndex].deviceSizes[deviceIndex] = '';
+          if (!entries[entryIndex].isQuantityManual) {
+            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+          }
+          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+          setDebtEntries([...entries]);
+          setScannerTarget({
+            modal,
+            entryIndex,
+            deviceIndex: entries[entryIndex].deviceIds.length - 1
+          });
+        } else if (modal === 'edit') {
+          const newDeviceIds = [...editing.deviceIds];
+          const newDeviceSizes = [...editing.deviceSizes];
+          newDeviceIds[deviceIndex] = deviceId;
+          newDeviceSizes[deviceIndex] = '';
+          newDeviceIds.push('');
+          newDeviceSizes.push('');
+          setEditing(prev => ({
+            ...prev,
+            deviceIds: newDeviceIds,
+            deviceSizes: newDeviceSizes,
+            qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+            date: prev.date || new Date().toISOString().split('T')[0],
+            isQuantityManual: false
+          }));
+          setScannerTarget({
+            modal,
+            entryIndex,
+            deviceIndex: newDeviceIds.length - 1
+          });
+        }
+        return false;
+      } catch (err) {
+        console.error(err);
+        addNotification('Failed to verify device ID.', 'error');
+        return false;
+      }
+    },
+    [storeId, debtEntries, setDebtEntries, setScannerTarget, editing, setEditing, addNotification]
+  );
+
   const fetchDebts = useCallback(async () => {
     if (!storeId) return;
     const { data, error } = await supabase
@@ -120,7 +369,7 @@ export default function DebtsManager() {
       .eq('store_id', storeId);
     if (error) {
       setError("Failed to fetch debts: " + error.message);
-      toast.error("Failed to fetch debts.");
+      addNotification("Failed to fetch debts.", 'error');
     } else {
       const debtsWithIds = data.map(debt => ({
         ...debt,
@@ -130,13 +379,12 @@ export default function DebtsManager() {
       setDebts(debtsWithIds);
       setFilteredDebts(debtsWithIds);
     }
-  }, [storeId]);
+  }, [storeId, addNotification]);
 
   useEffect(() => {
     fetchDebts();
   }, [fetchDebts]);
 
-  // Filter debts
   useEffect(() => {
     const term = searchTerm.toLowerCase();
     setFilteredDebts(
@@ -159,14 +407,12 @@ export default function DebtsManager() {
     );
   }, [searchTerm, debts]);
 
-  // Scroll debts into view
   useEffect(() => {
     if (debtsRef.current) {
       debtsRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [debts]);
 
-  // Check sold devices
   const checkSoldDevices = useCallback(async (deviceIds) => {
     if (!deviceIds || deviceIds.length === 0) return [];
     setIsLoadingSoldStatus(true);
@@ -196,7 +442,6 @@ export default function DebtsManager() {
     }
   }, [showDetail, checkSoldDevices]);
 
-  // Pagination for device IDs modal
   const filteredDevices = useMemo(() => {
     if (!showDetail) return [];
     return showDetail.deviceIds.map((id, i) => ({
@@ -213,61 +458,239 @@ export default function DebtsManager() {
     return filteredDevices.slice(start, end);
   }, [filteredDevices, detailPage]);
 
-  // Process scanned barcode
-  const processScannedBarcode = useCallback((scannedCode) => {
-    const trimmedCode = scannedCode.trim();
-    if (!trimmedCode) {
-      toast.error('Invalid barcode: Empty value');
-      setScannerError('Invalid barcode: Empty value');
-      return false;
-    }
-
-    if (scannerTarget) {
-      const { modal, entryIndex, deviceIndex } = scannerTarget;
-      let newDeviceIndex;
-
-      if (modal === 'add') {
-        const entries = [...debtEntries];
-        if (entries[entryIndex].deviceIds.some((id) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
-          toast.error(`Barcode "${trimmedCode}" already exists in this debt`);
-          setScannerError(`Barcode "${trimmedCode}" already exists`);
-          return false;
-        }
-        entries[entryIndex].deviceIds[deviceIndex] = trimmedCode;
-        entries[entryIndex].deviceSizes[deviceIndex] = entries[entryIndex].deviceSizes[deviceIndex] || '';
-        entries[entryIndex].deviceIds.push('');
-        entries[entryIndex].deviceSizes.push('');
-        setDebtEntries(entries);
-        newDeviceIndex = entries[entryIndex].deviceIds.length - 1;
-      } else if (modal === 'edit') {
-        if (editing.deviceIds.some((id) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
-          toast.error(`Barcode "${trimmedCode}" already exists in this debt`);
-          setScannerError(`Barcode "${trimmedCode}" already exists`);
-          return false;
-        }
-        const newDeviceIds = [...editing.deviceIds];
-        const newDeviceSizes = [...editing.deviceSizes];
-        newDeviceIds[deviceIndex] = trimmedCode;
-        newDeviceSizes[deviceIndex] = newDeviceSizes[deviceIndex] || '';
-        newDeviceIds.push('');
-        newDeviceSizes.push('');
-        setEditing(prev => ({ ...prev, deviceIds: newDeviceIds, deviceSizes: newDeviceSizes }));
-        newDeviceIndex = newDeviceIds.length - 1;
+  const processScannedBarcode = useCallback(
+    async (scannedCode) => {
+      const trimmedCode = scannedCode.trim();
+      if (!trimmedCode) {
+        setScannerError('Invalid barcode: Empty value');
+        addNotification('Invalid barcode: Empty value', 'error');
+        return false;
       }
 
-      setScannerTarget({
-        modal,
-        entryIndex,
-        deviceIndex: newDeviceIndex,
-      });
-      setScannerError(null);
-      toast.success(`Scanned barcode: ${trimmedCode}`);
-      return true;
-    }
-    return false;
-  }, [scannerTarget, debtEntries, editing]);
+      if (scannerTarget) {
+        const { modal, entryIndex, deviceIndex } = scannerTarget;
+        let entries = [...debtEntries];
 
-  // External scanner input
+        if (entries[entryIndex].deviceIds.some((id, idx) => idx !== deviceIndex && id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
+          setScannerError(`Barcode "${trimmedCode}" already exists in this debt entry`);
+          addNotification(`Barcode "${trimmedCode}" already exists in this debt entry`, 'error');
+          return false;
+        }
+
+        const existingEntryIndex = entries.findIndex(
+          entry => entry.deviceIds.some(id => id.trim().toLowerCase() === trimmedCode.toLowerCase())
+        );
+        if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
+          setScannerError(`Barcode "${trimmedCode}" already exists`);
+          addNotification(`Barcode "${trimmedCode}" already exists in debt entry ${existingEntryIndex + 1}`, 'error');
+          return false;
+        }
+
+        const { data, error } = await supabase
+          .from('dynamic_product')
+          .select('id, name, dynamic_product_imeis, device_size')
+          .eq('store_id', storeId)
+          .ilike('dynamic_product_imeis', `%${trimmedCode}%`);
+
+        if (error) {
+          setScannerError(`Error checking device ID: ${error.message}`);
+          addNotification(`Error checking device ID: ${error.message}`, 'error');
+          return false;
+        }
+
+        let newScannerTarget = { modal, entryIndex, deviceIndex };
+
+        if (data && data.length > 0) {
+          const product = data[0];
+          const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceIndexInProduct = deviceIds.indexOf(trimmedCode);
+
+          if (deviceIndexInProduct !== -1) {
+            const currentProductId = modal === 'add' ? entries[entryIndex].dynamic_product_id : editing.dynamic_product_id;
+
+            if (currentProductId && currentProductId !== product.id.toString()) {
+              const deviceFound = await checkDeviceInProduct(trimmedCode, modal, entryIndex, deviceIndex);
+              if (deviceFound) {
+                setScannerError(null);
+                addNotification(`Scanned barcode: ${trimmedCode} (moved to correct product line)`, 'success');
+                playSuccessSound();
+                return true;
+              }
+              return false;
+            }
+          }
+        }
+
+        if (modal === 'add') {
+          entries[entryIndex].deviceIds[deviceIndex] = trimmedCode;
+          entries[entryIndex].deviceSizes[deviceIndex] = '';
+          if (!entries[entryIndex].isQuantityManual) {
+            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+          }
+          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+          setDebtEntries([...entries]);
+          newScannerTarget = {
+            modal,
+            entryIndex,
+            deviceIndex: entries[entryIndex].deviceIds.length - 1,
+          };
+        } else if (modal === 'edit') {
+          const newDeviceIds = [...editing.deviceIds];
+          const newDeviceSizes = [...editing.deviceSizes];
+          newDeviceIds[deviceIndex] = trimmedCode;
+          newDeviceSizes[deviceIndex] = '';
+          newDeviceIds.push('');
+          newDeviceSizes.push('');
+          setEditing(prev => ({
+            ...prev,
+            deviceIds: newDeviceIds,
+            deviceSizes: newDeviceSizes,
+            qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+            date: prev.date || new Date().toISOString().split('T')[0],
+            isQuantityManual: false,
+          }));
+          newScannerTarget = {
+            modal,
+            entryIndex,
+            deviceIndex: newDeviceIds.length - 1,
+          };
+        }
+
+        setScannerTarget(newScannerTarget);
+        setScannerError(null);
+        addNotification(`Scanned barcode: ${trimmedCode}`, 'success');
+        playSuccessSound();
+        return true;
+      }
+      return false;
+    },
+    [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, storeId, addNotification]
+  );
+
+  const handleManualInput = useCallback(
+    async () => {
+      const trimmedInput = manualInput.trim();
+      if (!trimmedInput) {
+        setScannerError('Invalid barcode: Empty value');
+        addNotification('Invalid barcode: Empty value', 'error');
+        return;
+      }
+
+      if (scannerTarget) {
+        const { modal, entryIndex, deviceIndex } = scannerTarget;
+        let entries = [...debtEntries];
+
+        if (entries[entryIndex].deviceIds.some((id, idx) => idx !== deviceIndex && id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
+          setScannerError(`Barcode "${trimmedInput}" already exists in this debt entry`);
+          addNotification(`Barcode "${trimmedInput}" already exists in this debt entry`, 'error');
+          return;
+        }
+
+        const existingEntryIndex = entries.findIndex(
+          entry => entry.deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())
+        );
+        if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
+          setScannerError(`Barcode "${trimmedInput}" already exists`);
+          addNotification(`Barcode "${trimmedInput}" already exists in debt entry ${existingEntryIndex + 1}`, 'error');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('dynamic_product')
+          .select('id, name, dynamic_product_imeis, device_size')
+          .eq('store_id', storeId)
+          .ilike('dynamic_product_imeis', `%${trimmedInput}%`);
+
+        if (error) {
+          setScannerError(`Error checking device ID: ${error.message}`);
+          addNotification(`Error checking device ID: ${error.message}`, 'error');
+          return;
+        }
+
+        let newScannerTarget = { modal, entryIndex, deviceIndex };
+
+        if (data && data.length > 0) {
+          const product = data[0];
+          const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceIndexInProduct = deviceIds.indexOf(trimmedInput);
+
+          if (deviceIndexInProduct !== -1) {
+            const currentProductId = modal === 'add' ? entries[entryIndex].dynamic_product_id : editing.dynamic_product_id;
+
+            if (currentProductId && currentProductId !== product.id.toString()) {
+              const deviceFound = await checkDeviceInProduct(trimmedInput, modal, entryIndex, deviceIndex);
+              if (deviceFound) {
+                setManualInput('');
+                setScannerError(null);
+                addNotification(`Added barcode: ${trimmedInput} (moved to correct product line)`, 'success');
+                playSuccessSound();
+                if (manualInputRef.current) {
+                  manualInputRef.current.focus();
+                }
+                return;
+              }
+              return;
+            }
+          }
+        }
+
+        if (modal === 'add') {
+          entries[entryIndex].deviceIds[deviceIndex] = trimmedInput;
+          entries[entryIndex].deviceSizes[deviceIndex] = '';
+          if (!entries[entryIndex].isQuantityManual) {
+            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+          }
+          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+          setDebtEntries([...entries]);
+          newScannerTarget = {
+            modal,
+            entryIndex,
+            deviceIndex: entries[entryIndex].deviceIds.length - 1,
+          };
+        } else if (modal === 'edit') {
+          const newDeviceIds = [...editing.deviceIds];
+          const newDeviceSizes = [...editing.deviceSizes];
+          newDeviceIds[deviceIndex] = trimmedInput;
+          newDeviceSizes[deviceIndex] = '';
+          newDeviceIds.push('');
+          newDeviceSizes.push('');
+          setEditing(prev => ({
+            ...prev,
+            deviceIds: newDeviceIds,
+            deviceSizes: newDeviceSizes,
+            qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+            date: prev.date || new Date().toISOString().split('T')[0],
+            isQuantityManual: false,
+          }));
+          newScannerTarget = {
+            modal,
+            entryIndex,
+            deviceIndex: newDeviceIds.length - 1,
+          };
+        }
+
+        setScannerTarget(newScannerTarget);
+        setManualInput('');
+        setScannerError(null);
+        addNotification(`Added barcode: ${trimmedInput}`, 'success');
+        playSuccessSound();
+        if (manualInputRef.current) {
+          manualInputRef.current.focus();
+        }
+      }
+    },
+    [manualInput, scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, manualInputRef, storeId, addNotification]
+  );
+
+  const handleManualInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleManualInput();
+    }
+  };
+
   useEffect(() => {
     if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
@@ -302,7 +725,6 @@ export default function DebtsManager() {
     };
   }, [externalScannerMode, scannerTarget, scannerBuffer, lastKeyTime, showScanner, processScannedBarcode]);
 
-  // Webcam scanner
   useEffect(() => {
     if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
 
@@ -313,7 +735,7 @@ export default function DebtsManager() {
       if (!document.getElementById('scanner')) {
         setScannerError('Scanner container not found. Please use manual input.');
         setScannerLoading(false);
-        toast.error('Scanner container not found. Please use manual input.');
+        addNotification('Scanner container not found. Please use manual input.', 'error');
         return;
       }
 
@@ -321,7 +743,7 @@ export default function DebtsManager() {
     } catch (err) {
       setScannerError(`Failed to initialize scanner: ${err.message}`);
       setScannerLoading(false);
-      toast.error('Failed to initialize scanner. Please use manual input.');
+      addNotification('Failed to initialize scanner. Please use manual input.', 'error');
       return;
     }
 
@@ -373,13 +795,13 @@ export default function DebtsManager() {
       if (!videoElement || !scannerDivRef.current) {
         setScannerError('Scanner elements not found');
         setScannerLoading(false);
-        toast.error('Scanner elements not found. Please use manual input.');
+        addNotification('Scanner elements not found. Please use manual input.', 'error');
         return;
       }
       if (attempt > maxAttempts) {
         setScannerError('Failed to initialize scanner after multiple attempts');
         setScannerLoading(false);
-        toast.error('Failed to initialize scanner. Please use manual input.');
+        addNotification('Failed to initialize scanner. Please use manual input.', 'error');
         return;
       }
       try {
@@ -408,13 +830,13 @@ export default function DebtsManager() {
         setScannerError(`Failed to initialize scanner: ${err.message}`);
         setScannerLoading(false);
         if (err.name === 'NotAllowedError') {
-          toast.error('Camera access denied. Please allow camera permissions.');
+          addNotification('Camera access denied. Please allow camera permissions.', 'error');
         } else if (err.name === 'NotFoundError') {
-          toast.error('No camera found. Please use manual input.');
+          addNotification('No camera found. Please use manual input.', 'error');
         } else if (err.name === 'OverconstrainedError') {
           setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
         } else {
-          toast.error('Failed to start camera. Please use manual input.');
+          addNotification('Failed to start camera. Please use manual input.', 'error');
         }
       }
     };
@@ -424,7 +846,7 @@ export default function DebtsManager() {
         if (cameras.length === 0) {
           setScannerError('No cameras detected. Please use manual input.');
           setScannerLoading(false);
-          toast.error('No cameras detected. Please use manual input.');
+          addNotification('No cameras detected. Please use manual input.', 'error');
           return;
         }
         startScanner();
@@ -432,7 +854,7 @@ export default function DebtsManager() {
       .catch(err => {
         setScannerError(`Failed to access cameras: ${err.message}`);
         setScannerLoading(false);
-        toast.error('Failed to access cameras. Please use manual input.');
+        addNotification('Failed to access cameras. Please use manual input.', 'error');
       });
 
     return () => {
@@ -451,9 +873,8 @@ export default function DebtsManager() {
       }
       html5QrCodeRef.current = null;
     };
-  }, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode]);
+  }, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, addNotification]);
 
-  // Stop scanner
   const stopScanner = useCallback(() => {
     if (html5QrCodeRef.current &&
         [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
@@ -471,14 +892,12 @@ export default function DebtsManager() {
     html5QrCodeRef.current = null;
   }, []);
 
-  // Auto-focus manual input
   useEffect(() => {
     if (showScanner && manualInputRef.current) {
       manualInputRef.current.focus();
     }
   }, [showScanner, scannerTarget]);
 
-  // Open scanner
   const openScanner = (modal, entryIndex, deviceIndex) => {
     setScannerTarget({ modal, entryIndex, deviceIndex });
     setShowScanner(true);
@@ -489,50 +908,25 @@ export default function DebtsManager() {
     setScannerBuffer('');
   };
 
-  // Handle manual input
-  const handleManualInput = () => {
-    const trimmedInput = manualInput.trim();
-    const success = processScannedBarcode(trimmedInput);
-    if (success) {
-      setManualInput('');
-      if (manualInputRef.current) {
-        manualInputRef.current.focus();
-      }
-    }
-  };
-
-  // Handle Enter key for manual input
-  const handleManualInputKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleManualInput();
-    }
-  };
-
-  // Handle reminder notifications
   const showDebtReminders = () => {
     const unpaidDebts = debts.filter(d => (d.remaining_balance || 0) > 0);
     if (unpaidDebts.length === 0) {
-      toast.info("No unpaid debts found.");
+      addNotification("No unpaid debts found.", 'info', 5000);
       return;
     }
 
     unpaidDebts.forEach(d => {
-      toast.warn(
-        <div>
-          <p><strong>Debtor:</strong> {d.customer_name}</p>
-          <p><strong>Outstanding:</strong> ₦{(d.remaining_balance || 0).toFixed(2)}</p>
-          <p><strong>Product:</strong> {d.product_name}</p>
-          <p><strong>Date:</strong> {d.date}</p>
-        </div>,
-        { autoClose: 5000 }
+      addNotification(
+        `Debtor: ${d.customer_name}, Outstanding: ₦${(d.remaining_balance || 0).toFixed(2)}, Product: ${d.product_name}, Date: ${d.date}`,
+        'warning',
+        5000
       );
     });
   };
 
   const scheduleReminders = () => {
     if (!reminderTime) {
-      toast.error("Please select a reminder time.");
+      addNotification("Please select a reminder time.", 'error');
       return;
     }
 
@@ -553,7 +947,7 @@ export default function DebtsManager() {
 
     if (reminderType === 'one-time') {
       setTimeout(showDebtReminders, msUntilReminder);
-      toast.success(`Reminder set for ${nextReminder.toLocaleString()}`);
+      addNotification(`Reminder set for ${nextReminder.toLocaleString()}`, 'success');
     } else {
       setTimeout(() => {
         showDebtReminders();
@@ -562,13 +956,12 @@ export default function DebtsManager() {
           reminderType === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
         );
       }, msUntilReminder);
-      toast.success(`Recurring ${reminderType} reminders set starting ${nextReminder.toLocaleString()}`);
+      addNotification(`Recurring ${reminderType} reminders set starting ${nextReminder.toLocaleString()}`, 'success');
     }
 
     setShowReminderForm(false);
   };
 
-  // Handle debt entry changes
   const handleDebtChange = (index, e) => {
     const { name, value } = e.target;
     const updatedEntries = [...debtEntries];
@@ -581,7 +974,8 @@ export default function DebtsManager() {
           ...updatedEntries[index],
           customer_id: value,
           customer_name: selectedCustomer.fullname,
-          phone_number: selectedCustomer.phone_number || ""
+          phone_number: selectedCustomer.phone_number || "",
+          date: updatedEntries[index].date || new Date().toISOString().split('T')[0],
         };
       }
     }
@@ -592,7 +986,8 @@ export default function DebtsManager() {
         updatedEntries[index] = {
           ...updatedEntries[index],
           dynamic_product_id: value,
-          product_name: selectedProduct.name
+          product_name: selectedProduct.name,
+          date: updatedEntries[index].date || new Date().toISOString().split('T')[0],
         };
       }
     }
@@ -600,11 +995,96 @@ export default function DebtsManager() {
     setDebtEntries(updatedEntries);
   };
 
-  // Handle device ID and size changes
-  const handleDeviceIdChange = (index, deviceIndex, value) => {
+  const handleDeviceIdChange = (entryIndex, deviceIndex, value) => {
     const updatedEntries = [...debtEntries];
-    updatedEntries[index].deviceIds[deviceIndex] = value;
+    updatedEntries[entryIndex].deviceIds[deviceIndex] = value.trim();
+    updatedEntries[entryIndex].deviceSizes[deviceIndex] = '';
     setDebtEntries(updatedEntries);
+  };
+
+  const handleDeviceIdConfirm = async (entryIndex, deviceIndex, value) => {
+    const trimmedValue = value?.trim();
+    if (!trimmedValue || typeof trimmedValue !== 'string') {
+      addNotification('Invalid Device ID: Empty or undefined value', 'error');
+      return;
+    }
+
+    let entries = [...debtEntries];
+
+    if (entries[entryIndex].deviceIds.some((id, idx) => idx !== deviceIndex && id.trim().toLowerCase() === trimmedValue.toLowerCase())) {
+      addNotification(`Device ID "${trimmedValue}" already exists in this debt entry`, 'error');
+      return;
+    }
+
+    const existingEntryIndex = entries.findIndex(
+      (entry, idx) => idx !== entryIndex && entry.deviceIds.some(id => id.trim().toLowerCase() === trimmedValue.toLowerCase())
+    );
+    if (existingEntryIndex !== -1) {
+      addNotification(`Device ID "${trimmedValue}" already exists in debt entry ${existingEntryIndex + 1}`, 'error');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('dynamic_product')
+        .select('id, name, dynamic_product_imeis, device_size')
+        .eq('store_id', storeId)
+        .ilike('dynamic_product_imeis', `%${trimmedValue}%`);
+
+      if (error) {
+        addNotification(`Error checking device ID: ${error.message}`, 'error');
+        return;
+      }
+
+      entries = [...debtEntries];
+      if (data && data.length > 0) {
+        const product = data[0];
+        const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+        const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
+        const deviceIndexInProduct = deviceIds.indexOf(trimmedValue);
+
+        if (deviceIndexInProduct !== -1) {
+          const deviceSize = deviceSizes[deviceIndexInProduct] || '';
+          const currentProductId = entries[entryIndex].dynamic_product_id;
+
+          if (currentProductId && currentProductId !== product.id.toString()) {
+            const deviceFound = await checkDeviceInProduct(trimmedValue, 'add', entryIndex, deviceIndex);
+            if (deviceFound) {
+              addNotification(`Device ID ${trimmedValue} moved to correct product line`, 'success');
+            }
+            return;
+          }
+
+          entries[entryIndex].dynamic_product_id = product.id.toString();
+          entries[entryIndex].product_name = product.name;
+          entries[entryIndex].deviceSizes[deviceIndex] = deviceSize;
+          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+          if (!entries[entryIndex].isQuantityManual) {
+            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+          }
+          setDebtEntries([...entries]);
+          addNotification(`Product ${product.name} loaded for Device ID: ${trimmedValue}`, 'success');
+        } else {
+          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+          if (!entries[entryIndex].isQuantityManual) {
+            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+          }
+          setDebtEntries([...entries]);
+        }
+      } else {
+        entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+        entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+        if (!entries[entryIndex].isQuantityManual) {
+          entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+        }
+        setDebtEntries([...entries]);
+      }
+    } catch (err) {
+      console.error(err);
+      addNotification('Failed to verify device ID.', 'error');
+    }
   };
 
   const handleDeviceSizeChange = (index, deviceIndex, value) => {
@@ -649,6 +1129,8 @@ export default function DebtsManager() {
     if (updatedEntries[index].deviceIds.length === 0) {
       updatedEntries[index].deviceIds = [''];
       updatedEntries[index].deviceSizes = [''];
+    } else {
+      updatedEntries[index].qty = updatedEntries[index].deviceIds.filter(id => id.trim()).length.toString();
     }
     setDebtEntries(updatedEntries);
   };
@@ -662,6 +1144,8 @@ export default function DebtsManager() {
       if (newDeviceIds.length === 0) {
         newDeviceIds.push('');
         newDeviceSizes.push('');
+      } else {
+        newDeviceIds.qty = newDeviceIds.filter(id => id.trim()).length.toString();
       }
       return { ...prev, deviceIds: newDeviceIds, deviceSizes: newDeviceSizes };
     });
@@ -682,7 +1166,7 @@ export default function DebtsManager() {
         qty: "",
         owed: "",
         deposited: "",
-        date: ""
+        date: new Date().toISOString().split('T')[0],
       }
     ]);
   };
@@ -693,26 +1177,115 @@ export default function DebtsManager() {
   };
 
   const saveDebts = async () => {
-  let hasError = false;
+    let hasError = false;
 
-  // Validation for editing an existing debt
-  if (editing && editing.id) {
-    const entry = editing;
-    if (
-      !entry.customer_id ||
-      isNaN(parseInt(entry.customer_id)) ||
-      !entry.dynamic_product_id ||
-      isNaN(parseInt(entry.dynamic_product_id)) ||
-      !entry.qty ||
-      isNaN(parseInt(entry.qty)) ||
-      !entry.owed ||
-      isNaN(parseFloat(entry.owed)) ||
-      !entry.date ||
-      entry.deviceIds.filter(id => id.trim()).length === 0
-    ) {
-      hasError = true;
+    if (editing && editing.id) {
+      const entry = editing;
+      if (
+        !entry.customer_id ||
+        isNaN(parseInt(entry.customer_id)) ||
+        !entry.dynamic_product_id ||
+        isNaN(parseInt(entry.dynamic_product_id)) ||
+        !entry.qty ||
+        isNaN(parseInt(entry.qty)) ||
+        !entry.owed ||
+        isNaN(parseFloat(entry.owed)) ||
+        !entry.date ||
+        entry.deviceIds.filter(id => id.trim()).length === 0
+      ) {
+        hasError = true;
+      } else {
+        const debtData = {
+          store_id: parseInt(storeId),
+          customer_id: parseInt(entry.customer_id),
+          dynamic_product_id: parseInt(entry.dynamic_product_id),
+          customer_name: entry.customer_name || null,
+          product_name: entry.product_name || null,
+          phone_number: entry.phone_number || null,
+          supplier: entry.supplier || null,
+          device_id: entry.deviceIds.filter(id => id.trim()).join(','),
+          device_sizes: entry.deviceSizes
+            .filter((_, i) => entry.deviceIds[i].trim())
+            .join(','),
+          qty: parseInt(entry.qty),
+          owed: parseFloat(entry.owed),
+          deposited: entry.deposited ? parseFloat(entry.deposited) : 0.00,
+          remaining_balance:
+            parseFloat(entry.owed) -
+            (entry.deposited ? parseFloat(entry.deposited) : 0.00),
+          date: entry.date,
+        };
+
+        try {
+          const { data: originalDebt, error: fetchError } = await supabase
+            .from('debts')
+            .select('qty')
+            .eq('id', editing.id)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          const qtyDifference = parseInt(entry.qty) - (originalDebt.qty || 0);
+          if (qtyDifference !== 0) {
+            await updateInventory(entry.dynamic_product_id, qtyDifference);
+          }
+
+          await supabase.from('debts').update(debtData).eq('id', editing.id);
+          setEditing(null);
+          setDebtEntries([
+            {
+              customer_id: '',
+              customer_name: '',
+              phone_number: '',
+              dynamic_product_id: '',
+              product_name: '',
+              supplier: '',
+              deviceIds: [''],
+              deviceSizes: [''],
+              qty: '',
+              owed: '',
+              deposited: '',
+              date: '',
+            },
+          ]);
+          setError(null);
+          addNotification('Debt updated successfully!', 'success');
+          fetchDebts();
+        } catch (err) {
+          setError('Failed to update debt or inventory: ' + err.message);
+          addNotification('Failed to update debt or inventory.', 'error');
+        }
+        return;
+      }
     } else {
-      const debtData = {
+      const validEntries = debtEntries.filter(entry => {
+        if (
+          !entry.customer_id ||
+          isNaN(parseInt(entry.customer_id)) ||
+          !entry.dynamic_product_id ||
+          isNaN(parseInt(entry.dynamic_product_id)) ||
+          !entry.qty ||
+          isNaN(parseInt(entry.qty)) ||
+          !entry.owed ||
+          isNaN(parseFloat(entry.owed)) ||
+          !entry.date ||
+          entry.deviceIds.filter(id => id.trim()).length === 0
+        ) {
+          hasError = true;
+          return false;
+        }
+        return true;
+      });
+
+      if (hasError || validEntries.length === 0) {
+        setError(
+          'Please fill all required fields (Customer, Product, Device ID, Qty, Owed, Date) correctly.'
+        );
+        addNotification('Please fill all required fields correctly.', 'error');
+        return;
+      }
+
+      const debtData = validEntries.map(entry => ({
         store_id: parseInt(storeId),
         customer_id: parseInt(entry.customer_id),
         dynamic_product_id: parseInt(entry.dynamic_product_id),
@@ -731,10 +1304,14 @@ export default function DebtsManager() {
           parseFloat(entry.owed) -
           (entry.deposited ? parseFloat(entry.deposited) : 0.00),
         date: entry.date,
-      };
+      }));
 
       try {
-        await supabase.from('debts').update(debtData).eq('id', editing.id);
+        for (const entry of debtData) {
+          await updateInventory(entry.dynamic_product_id, entry.qty);
+        }
+
+        await supabase.from('debts').insert(debtData);
         setEditing(null);
         setDebtEntries([
           {
@@ -753,102 +1330,50 @@ export default function DebtsManager() {
           },
         ]);
         setError(null);
-        toast.success('Debt updated successfully!');
+        addNotification(`${debtData.length} debt(s) saved successfully!`, 'success');
         fetchDebts();
       } catch (err) {
-        setError('Failed to update debt: ' + err.message);
-        toast.error('Failed to update debt.');
+        setError('Failed to save debts or update inventory: ' + err.message);
+        addNotification('Failed to save debts or update inventory.', 'error');
       }
-      return;
     }
-  } else {
-    // Validation for adding new debts
-    const validEntries = debtEntries.filter(entry => {
-      if (
-        !entry.customer_id ||
-        isNaN(parseInt(entry.customer_id)) ||
-        !entry.dynamic_product_id ||
-        isNaN(parseInt(entry.dynamic_product_id)) ||
-        !entry.qty ||
-        isNaN(parseInt(entry.qty)) ||
-        !entry.owed ||
-        isNaN(parseFloat(entry.owed)) ||
-        !entry.date ||
-        entry.deviceIds.filter(id => id.trim()).length === 0
-      ) {
-        hasError = true;
-        return false;
-      }
-      return true;
-    });
 
-    if (hasError || validEntries.length === 0) {
+    if (hasError) {
       setError(
         'Please fill all required fields (Customer, Product, Device ID, Qty, Owed, Date) correctly.'
       );
-      toast.error('Please fill all required fields correctly.');
-      return;
+      addNotification('Please fill all required fields correctly.', 'error');
     }
+  };
 
-    const debtData = validEntries.map(entry => ({
-      store_id: parseInt(storeId),
-      customer_id: parseInt(entry.customer_id),
-      dynamic_product_id: parseInt(entry.dynamic_product_id),
-      customer_name: entry.customer_name || null,
-      product_name: entry.product_name || null,
-      phone_number: entry.phone_number || null,
-      supplier: entry.supplier || null,
-      device_id: entry.deviceIds.filter(id => id.trim()).join(','),
-      device_sizes: entry.deviceSizes
-        .filter((_, i) => entry.deviceIds[i].trim())
-        .join(','),
-      qty: parseInt(entry.qty),
-      owed: parseFloat(entry.owed),
-      deposited: entry.deposited ? parseFloat(entry.deposited) : 0.00,
-      remaining_balance:
-        parseFloat(entry.owed) -
-        (entry.deposited ? parseFloat(entry.deposited) : 0.00),
-      date: entry.date,
-    }));
-
+  const deleteDebt = async id => {
     try {
-      await supabase.from('debts').insert(debtData);
-      setEditing(null);
-      setDebtEntries([
-        {
-          customer_id: '',
-          customer_name: '',
-          phone_number: '',
-          dynamic_product_id: '',
-          product_name: '',
-          supplier: '',
-          deviceIds: [''],
-          deviceSizes: [''],
-          qty: '',
-          owed: '',
-          deposited: '',
-          date: '',
-        },
-      ]);
-      setError(null);
-      toast.success(`${debtData.length} debt(s) saved successfully!`);
+      await supabase.from("debts").delete().eq("id", id);
+      addNotification("Debt deleted successfully!", 'success');
       fetchDebts();
     } catch (err) {
-      setError('Failed to save debts: ' + err.message);
-      toast.error('Failed to save debts.');
+      setError("Failed to delete debt: " + err.message);
+      addNotification("Failed to delete debt.", 'error');
     }
-  }
+  };
 
-  if (hasError) {
-    setError(
-      'Please fill all required fields (Customer, Product, Device ID, Qty, Owed, Date) correctly.'
-    );
-    toast.error('Please fill all required fields correctly.');
-  }
-};
-
-
-
+  const openEdit = (debt) => {
+    setEditing({
+      id: debt.id,
+      customer_id: debt.customer_id,
+      customer_name: debt.customer_name,
+      phone_number: debt.phone_number,
+      dynamic_product_id: debt.dynamic_product_id,
+      product_name: debt.product_name,
+      supplier: debt.supplier,
+      deviceIds: [...debt.deviceIds, ''],
+      deviceSizes: [...debt.deviceSizes, ''],
+      qty: debt.qty,
+      owed: debt.owed,
+      deposited: debt.deposited,
+      date: debt.date || new Date().toISOString().split('T')[0],
+    });
+  };
 
   if (!storeId) {
     return <div className="p-4 text-center text-red-500">Store ID is missing. Please log in or select a store.</div>;
@@ -856,9 +1381,8 @@ export default function DebtsManager() {
 
   return (
     <div className="p-0 space-y-6 dark:bg-gray-900 dark:text-white">
-      <DeviceDebtRepayment />
-      <ToastContainer position="top-right" autoClose={3000} />
-
+      <DeviceDebtRepayment/>
+   
       {error && (
         <div className="p-4 mb-4 bg-red-100 text-red-700 rounded">
           {error}
@@ -906,7 +1430,7 @@ export default function DebtsManager() {
                 <th className="text-left px-4 py-2 border-b">Deposited</th>
                 <th className="text-left px-4 py-2 border-b">Remaining Balance</th>
                 <th className="text-left px-4 py-2 border-b">Date</th>
-               
+                <th className="text-left px-4 py-2 border-b">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -928,12 +1452,27 @@ export default function DebtsManager() {
                   <td className="px-4 py-2 border-b">₦{(d.deposited || 0).toFixed(2)}</td>
                   <td className="px-4 py-2 border-b">₦{(d.remaining_balance || 0).toFixed(2)}</td>
                   <td className="px-4 py-2 border-b">{d.date}</td>
-                  
+                  <td className="px-4 py-2 border-b">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => openEdit(d)}
+                        className="text-indigo-600 hover:text-indigo-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => deleteDebt(d.id)}
+                        className="text-red-400 hover:text-red-600"
+                      >
+                        <FaTrashAlt />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {filteredDebts.length === 0 && (
-                <tr>
-                  <td colSpan="10" className="text-center text-gray-500 py-4 dark:bg-gray-900 dark:text-white">
+                <tr className="dark:bg-gray-900 dark:text-white">
+                  <td colSpan="10" className="text-center text-gray-500 py-4">
                     No debts found.
                   </td>
                 </tr>
@@ -944,8 +1483,41 @@ export default function DebtsManager() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-24">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6 dark:bg-gray-900 dark:text-white">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+
+    <div className="fixed top-0 right-0 space-y-2 z-[1000] p-4">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+
+  <div className="fixed top-16 right-4 space-y-2 z-[1000]">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6 dark:bg-gray-900 dark:text-white mt-16">
             <h2 className="text-xl font-bold text-center">{editing.id ? 'Edit Debt' : 'Add Debt'}</h2>
 
             {debtEntries.map((entry, index) => (
@@ -1068,6 +1640,13 @@ export default function DebtsManager() {
                         <input
                           value={id}
                           onChange={e => editing.id ? handleEditDeviceIdChange(deviceIdx, e.target.value) : handleDeviceIdChange(index, deviceIdx, e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !editing.id) {
+                              e.preventDefault();
+                              handleDeviceIdConfirm(index, deviceIdx, e.target.value);
+                            }
+                          }}
+                          onBlur={e => !editing.id && handleDeviceIdConfirm(index, deviceIdx, e.target.value)}
                           placeholder="Device ID"
                           className="flex-1 p-2 border rounded dark:bg-gray-900 dark:text-white min-w-[150px]"
                         />
@@ -1207,6 +1786,39 @@ export default function DebtsManager() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
             <h2 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Scan Barcode ID</h2>
+ <div className="fixed top-0 right-0 space-y-2 z-[1000] p-4">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+  <div className="fixed top-16 right-4 space-y-2 z-[1000]">
+    {notifications.map(notification => (
+      <div
+        key={notification.id}
+        className={`p-4 rounded shadow-lg text-white ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'warning' ? 'bg-yellow-600' :
+          'bg-blue-600'
+        }`}
+      >
+        {notification.message}
+      </div>
+    ))}
+  </div>
+
+
+            
             <div className="mb-4">
               <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
@@ -1345,6 +1957,7 @@ export default function DebtsManager() {
             </div>
           </div>
         </div>
+        
       )}
     </div>
   );

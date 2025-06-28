@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FaMoneyBillWave,
   FaBell,
@@ -11,6 +11,7 @@ import {
   FaQrcode,
   FaIdBadge,
   FaCrown,
+  FaHome,
 } from 'react-icons/fa';
 import OnboardingTour from './DashboardTour';
 import Test from '../UserDashboard/Test';
@@ -29,6 +30,7 @@ const Dashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Default open on desktop
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Check if tour has been shown before
   useEffect(() => {
@@ -120,13 +122,6 @@ const Dashboard = () => {
             <StoreNotications />
           </div>
         );
-      case 'Access':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            {/* Placeholder for Access Dashboard content */}
-            Access Dashboard Content
-          </div>
-        );
       default:
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
@@ -138,8 +133,12 @@ const Dashboard = () => {
 
   // Handle navigation click: update active tab and close sidebar on mobile
   const handleNavClick = (tab) => {
-    setActiveTab(tab);
-    setSidebarOpen(false); // Close sidebar on mobile
+    if (tab === 'Home') {
+      navigate('/');
+    } else {
+      setActiveTab(tab);
+      setSidebarOpen(false); // Close sidebar on mobile
+    }
   };
 
   // Toggle sidebar
@@ -148,7 +147,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 mt-20">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
       <WhatsapUsers />
       {/* Onboarding Tour */}
       <OnboardingTour
@@ -157,9 +156,8 @@ const Dashboard = () => {
         setActiveTab={setActiveTab}
       />
       {/* Sidebar */}
-           
       <aside
-        className={`fixed md:static top-20 left-0 h-[calc(100vh-5rem)] transition-all duration-300 bg-gray-100 dark:bg-gray-800 z-40 ${
+        className={`fixed md:static top-0 left-0 h-full transition-all duration-300 bg-gray-100 dark:bg-gray-800 z-40 ${
           sidebarOpen ? 'w-64' : 'w-0 md:w-16'
         } ${sidebarOpen ? 'block' : 'hidden md:block'}`}
       >
@@ -180,6 +178,7 @@ const Dashboard = () => {
           <nav className="mt-8 pt-4">
             <ul className="space-y-2">
               {[
+                { name: 'Home', icon: FaHome, aria: 'Home: Go to the landing page' },
                 { name: 'My Stores', icon: FaStore, aria: 'Stores Dashboard: Manage your stores and their details' },
                 { name: 'Multi Sales', icon: FaQrcode, aria: 'Sales Dashboard: View and analyze sales across stores' },
                 { name: 'Multi Inventory', icon: FaBarcode, aria: 'Inventory Dashboard: Manage inventory across all stores' },
@@ -188,7 +187,6 @@ const Dashboard = () => {
                 { name: 'Upgrade', icon: FaCrown, aria: 'Upgrade: Upgrade your plan for more features' },
                 { name: 'Employees', icon: FaIdBadge, aria: 'Employees: Manage store employees' },
                 { name: 'Profile', icon: FaUser, aria: 'Profile: View and edit your profile' },
-                { name: 'Access', icon: FaMoneyBillWave, aria: 'Access Dashboard: Manage store access' },
               ].map((item) => (
                 <li
                   key={item.name}
@@ -205,9 +203,6 @@ const Dashboard = () => {
                   </span>
                 </li>
               ))}
-              {/*
-             
-              */}
             </ul>
           </nav>
         </div>
@@ -239,7 +234,7 @@ const Dashboard = () => {
       {/* Floating Toggle Button (Desktop Only) */}
       <button
         onClick={toggleSidebar}
-        className={`fixed top-24 md:top-24 transition-all duration-300 z-50 rounded-full p-2 bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 md:block hidden ${
+        className={`fixed top-4 md:top-4 transition-all duration-300 z-50 rounded-full p-2 bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 md:block hidden ${
           sidebarOpen ? 'left-64' : 'left-4'
         }`}
         aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
