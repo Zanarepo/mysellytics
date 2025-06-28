@@ -322,8 +322,8 @@ const checkSoldDevices = useCallback(async (deviceIds, productId, lineIdx) => {
     }
 
 const config = {
-  fps: 30, // High FPS for instant detection
-  qrbox: { width: 200, height: 80 }, // Smaller qrbox for faster focus
+  fps: 60, // High FPS for instant detection
+  qrbox: { width: 200, height: 150 }, // Smaller qrbox for faster focus
   formatsToSupport: [
     Html5QrcodeSupportedFormats.CODE_128,
     Html5QrcodeSupportedFormats.CODE_39,
