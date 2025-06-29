@@ -9,7 +9,6 @@ import {
 } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
 import { ToastContainer, toast } from 'react-toastify';
-//import DynamiclowStockAlert from './DynamiclowStockAlert';
 import 'react-toastify/dist/ReactToastify.css';
 import { motion } from 'framer-motion';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode';
@@ -44,6 +43,8 @@ export default function SalesTracker() {
     payment_method: 'Cash',
     isQuantityManual: false,
   });
+
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
@@ -59,68 +60,63 @@ export default function SalesTracker() {
   const scannerDivRef = useRef(null);
   const html5QrCodeRef = useRef(null);
 
-
-
-const debounce = (func, wait) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+  const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
   };
-};
 
-const debouncedToast = useMemo(() => ({
-  success: debounce((message) => {
-    toast.dismiss(); // Clear all existing toasts
-    toast.success(message);
-  }, 300),
-  error: debounce((message) => {
-    toast.dismiss(); // Clear all existing toasts
-    toast.error(message);
-  }, 300),
-}), []);
+  const debouncedToast = useMemo(() => ({
+    success: debounce((message) => {
+      toast.dismiss(); // Clear all existing toasts
+      toast.success(message);
+    }, 300),
+    error: debounce((message) => {
+      toast.dismiss(); // Clear all existing toasts
+      toast.error(message);
+    }, 300),
+  }), []);
 
-// Place this before the scanner useEffect (around line 335)
-const checkSoldDevices = useCallback(
-  async (deviceIds, productId, lineIdx) => {
-    if (!deviceIds || deviceIds.length === 0) {
-      setAvailableDeviceIds((prev) => ({ ...prev, [lineIdx]: { deviceIds: [] } }));
-      return;
-    }
-    try {
-      const normalizedIds = deviceIds.map((id) => id.trim());
-      const { data, error } = await supabase
-        .from('dynamic_sales')
-        .select('device_id')
-        .in('device_id', normalizedIds);
-      if (error) throw error;
-
-      const product = products.find((p) => p.id === productId);
-      if (!product) {
+  const checkSoldDevices = useCallback(
+    async (deviceIds, productId, lineIdx) => {
+      if (!deviceIds || deviceIds.length === 0) {
         setAvailableDeviceIds((prev) => ({ ...prev, [lineIdx]: { deviceIds: [] } }));
         return;
       }
+      try {
+        const normalizedIds = deviceIds.map((id) => id.trim());
+        const { data, error } = await supabase
+          .from('dynamic_sales')
+          .select('device_id')
+          .in('device_id', normalizedIds);
+        if (error) throw error;
 
-      const deviceIdsFromProduct = product.device_id
-        ? product.device_id.split(',').map((id) => id.trim()).filter((id) => id)
-        : [];
-      const soldDeviceIds = data.map((item) => item.device_id.trim());
-      const availableDeviceIds = deviceIdsFromProduct.filter((id) => !soldDeviceIds.includes(id));
+        const product = products.find((p) => p.id === productId);
+        if (!product) {
+          setAvailableDeviceIds((prev) => ({ ...prev, [lineIdx]: { deviceIds: [] } }));
+          return;
+        }
 
-      setAvailableDeviceIds((prev) => ({
-        ...prev,
-        [lineIdx]: { deviceIds: availableDeviceIds },
-      }));
-    } catch (error) {
-      console.error('Error fetching sold devices:', error);
-      toast.error('Failed to check sold devices');
-      setAvailableDeviceIds((prev) => ({ ...prev, [lineIdx]: { deviceIds: [] } }));
-    }
-  },
-  [products]
-);
+        const deviceIdsFromProduct = product.device_id
+          ? product.device_id.split(',').map((id) => id.trim()).filter((id) => id)
+          : [];
+        const soldDeviceIds = data.map((item) => item.device_id.trim());
+        const availableDeviceIds = deviceIdsFromProduct.filter((id) => !soldDeviceIds.includes(id));
 
-
+        setAvailableDeviceIds((prev) => ({
+          ...prev,
+          [lineIdx]: { deviceIds: availableDeviceIds },
+        }));
+      } catch (error) {
+        console.error('Error fetching sold devices:', error);
+        toast.error('Failed to check sold devices');
+        setAvailableDeviceIds((prev) => ({ ...prev, [lineIdx]: { deviceIds: [] } }));
+      }
+    },
+    [products]
+  );
 
   // Utility Function
   const formatCurrency = (value) =>
@@ -129,105 +125,103 @@ const checkSoldDevices = useCallback(
       maximumFractionDigits: 2,
     });
 
-const successSoundRef = useRef(null);
-const duplicateSoundRef = useRef(null);
-const notFoundSoundRef = useRef(null);
+  const successSoundRef = useRef(null);
+  const duplicateSoundRef = useRef(null);
+  const notFoundSoundRef = useRef(null);
 
-useEffect(() => {
-  successSoundRef.current = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
-  duplicateSoundRef.current = new Audio('https://soundjay.com/buttons/sounds/button-5.mp3');
-  notFoundSoundRef.current = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
+  useEffect(() => {
+    successSoundRef.current = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+    duplicateSoundRef.current = new Audio('https://soundjay.com/buttons/sounds/button-5.mp3');
+    notFoundSoundRef.current = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
 
-  // Preload audio
-  const preload = (audio) => {
-    audio.preload = 'auto';
-    audio.load();
+    // Preload audio
+    const preload = (audio) => {
+      audio.preload = 'auto';
+      audio.load();
+    };
+    preload(successSoundRef.current);
+    preload(duplicateSoundRef.current);
+    preload(notFoundSoundRef.current);
+
+    return () => {
+      successSoundRef.current = null;
+      duplicateSoundRef.current = null;
+      notFoundSoundRef.current = null;
+    };
+  }, []);
+
+  const playSuccessSound = () => {
+    if (successSoundRef.current) {
+      successSoundRef.current.currentTime = 0;
+      successSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
+    }
   };
-  preload(successSoundRef.current);
-  preload(duplicateSoundRef.current);
-  preload(notFoundSoundRef.current);
 
-  return () => {
-    successSoundRef.current = null;
-    duplicateSoundRef.current = null;
-    notFoundSoundRef.current = null;
+  const playDuplicateSound = () => {
+    if (duplicateSoundRef.current) {
+      duplicateSoundRef.current.currentTime = 0;
+      duplicateSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
+    }
   };
-}, []);
 
-const playSuccessSound = () => {
-  if (successSoundRef.current) {
-    successSoundRef.current.currentTime = 0;
-    successSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
-  }
-};
-
-const playDuplicateSound = () => {
-  if (duplicateSoundRef.current) {
-    duplicateSoundRef.current.currentTime = 0;
-    duplicateSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
-  }
-};
-
-const playNotFoundSound = () => {
-  if (notFoundSoundRef.current) {
-    notFoundSoundRef.current.currentTime = 0;
-    notFoundSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
-  }
-};
-
-
-
+  const playNotFoundSound = () => {
+    if (notFoundSoundRef.current) {
+      notFoundSoundRef.current.currentTime = 0;
+      notFoundSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
+    }
+  };
 
   // Computed Values
-  const paginatedSales = useMemo(() => {
-    if (viewMode !== 'list') return [];
-    const start = (currentPage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [filtered, currentPage, viewMode]);
+// Computed Values
+const paginatedSales = useMemo(() => {
+  if (viewMode !== 'list') return [];
+  const start = (currentPage - 1) * itemsPerPage;
+  return filtered.slice(start, start + itemsPerPage);
+}, [filtered, currentPage, viewMode]);
 
-  const dailyTotals = useMemo(() => {
-    const groups = {};
-    sales.forEach((s) => {
-      const date = new Date(s.sold_at).toISOString().split('T')[0];
-      if (!groups[date]) groups[date] = { period: date, total: 0, count: 0 };
-      groups[date].total += s.amount;
-      groups[date].count += 1;
-    });
-    return Object.values(groups).sort((a, b) => b.period.localeCompare(a.period));
-  }, [sales]);
+const dailyTotals = useMemo(() => {
+  const groups = {};
+  sales.forEach((s) => {
+    const date = new Date(s.sold_at).toISOString().split('T')[0];
+    if (!groups[date]) groups[date] = { period: date, total: 0, count: 0 };
+    groups[date].total += s.amount;
+    groups[date].count += 1;
+  });
+  return Object.values(groups).sort((a, b) => b.period.localeCompare(a.period));
+}, [sales]);
 
-  const weeklyTotals = useMemo(() => {
-    const groups = {};
-    sales.forEach((s) => {
-      const date = new Date(s.sold_at);
-      const day = date.getDay();
-      const diff = day === 0 ? 6 : day - 1;
-      const monday = new Date(date);
-      monday.setDate(date.getDate() - diff);
-      const key = monday.toISOString().split('T')[0];
-      if (!groups[key]) groups[key] = { period: `Week of ${key}`, total: 0, count: 0 };
-      groups[key].total += s.amount;
-      groups[key].count += 1;
-    });
-    return Object.values(groups).sort((a, b) => b.period.localeCompare(a.period));
-  }, [sales]);
+const weeklyTotals = useMemo(() => {
+  const groups = {};
+  sales.forEach((s) => {
+    const date = new Date(s.sold_at);
+    const day = date.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - diff);
+    const key = monday.toISOString().split('T')[0];
+    if (!groups[key]) groups[key] = { period: `Week of ${key}`, total: 0, count: 0 };
+    groups[key].total += s.amount;
+    groups[key].count += 1;
+  });
+  return Object.values(groups).sort((a, b) => b.period.localeCompare(a.period));
+}, [sales]);
 
-  const totalsData = useMemo(() => {
-    if (viewMode === 'daily') return dailyTotals;
-    if (viewMode === 'weekly') return weeklyTotals;
-    return [];
-  }, [viewMode, dailyTotals, weeklyTotals]);
+const totalsData = useMemo(() => {
+  if (viewMode === 'daily') return dailyTotals;
+  if (viewMode === 'weekly') return weeklyTotals;
+  return [];
+}, [viewMode, dailyTotals, weeklyTotals]);
 
-  const paginatedTotals = useMemo(() => {
-    if (viewMode === 'list') return [];
-    const start = (currentPage - 1) * itemsPerPage;
-    return totalsData.slice(start, start + itemsPerPage);
-  }, [viewMode, totalsData, currentPage]);
+const paginatedTotals = useMemo(() => {
+  if (viewMode === 'list') return [];
+  const start = (currentPage - 1) * itemsPerPage;
+  return totalsData.slice(start, start + itemsPerPage);
+}, [viewMode, totalsData, currentPage]);
 
-  const totalPages = useMemo(() => {
-    if (viewMode === 'list') return Math.ceil(filtered.length / itemsPerPage);
-    return Math.ceil(totalsData.length / itemsPerPage);
-  }, [viewMode, filtered, totalsData]);
+const totalPages = useMemo(() => {
+  const data = viewMode === 'list' ? filtered : totalsData;
+  return Math.ceil(data.length / itemsPerPage);
+}, [viewMode, filtered, totalsData, itemsPerPage]);
 
   const totalAmount = useMemo(() => lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0), [lines]);
 
@@ -238,34 +232,234 @@ const playNotFoundSound = () => {
     { target: '.view-mode-selector', content: 'Switch to Daily or Weekly Totals to view sales summaries.' },
   ];
 
+  useEffect(() => {
+    if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
+    let buffer = '';
+    let lastKeyTime = 0;
 
+    const handleKeypress = async (e) => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
 
-useEffect(() => {
-  if (!externalScannerMode || !scannerTarget || !showScanner) return;
+      if (timeDiff > 50 && buffer) {
+        buffer = '';
+      }
 
-  let buffer = '';
-  let lastKeyTime = 0;
+      if (e.key === 'Enter' && buffer) {
+        const scannedDeviceId = buffer.trim();
+        if (!scannedDeviceId) {
+          playNotFoundSound();
+          debouncedToast.error('Scanned Product ID cannot be empty');
+          setScannerError('Scanned Product ID cannot be empty');
+          return;
+        }
 
-  const handleKeypress = async (e) => {
-    const currentTime = Date.now();
-    const timeDiff = currentTime - lastKeyTime;
+        const { modal, lineIdx, deviceIdx } = scannerTarget;
+        let newDeviceIdx;
 
-    if (timeDiff > 50 && buffer) {
-      buffer = '';
+        // Check if device ID is already sold
+        const { data: soldData, error: soldError } = await supabase
+          .from('dynamic_sales')
+          .select('device_id')
+          .eq('device_id', scannedDeviceId)
+          .eq('store_id', storeId)
+          .single();
+        if (soldError && soldError.code !== 'PGRST116') {
+          console.error('Error checking sold status:', soldError);
+          playNotFoundSound();
+          debouncedToast.error('Failed to validate Product ID');
+          setScannerError('Failed to validate Product ID');
+          return;
+        }
+        if (soldData) {
+          console.log('Device ID is sold:', scannedDeviceId);
+          playDuplicateSound();
+          debouncedToast.error(`Product ID "${scannedDeviceId}" has already been sold`);
+          setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
+          return;
+        }
+
+        // Query product details
+        const { data: productData, error } = await supabase
+          .from('dynamic_product')
+          .select('id, name, selling_price, device_id')
+          .eq('store_id', storeId)
+          .ilike('device_id', `%${scannedDeviceId}%`)
+          .single();
+
+        if (error || !productData) {
+          console.error('Supabase Query Error:', error);
+          playNotFoundSound();
+          debouncedToast.error(`Product ID "${scannedDeviceId}" not found`);
+          setScannerError(`Product ID "${scannedDeviceId}" not found`);
+          return;
+        }
+
+        console.log('Found Product:', productData);
+
+        const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
+
+        if (modal === 'add') {
+          const ls = [...lines];
+          const existingLineIdx = ls.findIndex(line => {
+            const product = products.find(p => p.id === line.dynamic_product_id);
+            return product && product.name === productData.name;
+          });
+
+          if (existingLineIdx !== -1) {
+            if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+              playDuplicateSound();
+              debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
+              setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+              return;
+            }
+            ls[existingLineIdx].deviceIds.push(scannedDeviceId);
+            ls[existingLineIdx].deviceIds = [...ls[existingLineIdx].deviceIds, ''];
+            if (!ls[existingLineIdx].isQuantityManual) {
+              ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
+            }
+            setLines(ls);
+            newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
+            checkSoldDevices(deviceIds, productData.id, existingLineIdx);
+            setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
+          } else {
+            if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
+              if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+                playDuplicateSound();
+                debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+                setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+                return;
+              }
+              ls[lineIdx] = {
+                ...ls[lineIdx],
+                dynamic_product_id: Number(productData.id),
+                unit_price: Number(productData.selling_price),
+                deviceIds: [scannedDeviceId, ''],
+                quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
+              };
+              setLines(ls);
+              newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
+              checkSoldDevices(deviceIds, productData.id, lineIdx);
+              setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+            } else {
+              const currentProduct = products.find(p => p.id === ls[lineIdx].dynamic_product_id);
+              if (currentProduct && currentProduct.name !== productData.name) {
+                const newLine = {
+                  dynamic_product_id: Number(productData.id),
+                  quantity: 1,
+                  unit_price: Number(productData.selling_price),
+                  deviceIds: [scannedDeviceId, ''],
+                  isQuantityManual: false,
+                };
+                ls.push(newLine);
+                setLines(ls);
+                newDeviceIdx = 1;
+                checkSoldDevices(deviceIds, productData.id, ls.length - 1);
+                setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
+              } else {
+                ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
+                ls[lineIdx].deviceIds = [...ls[lineIdx].deviceIds, ''];
+                ls[lineIdx].dynamic_product_id = Number(productData.id);
+                ls[lineIdx].unit_price = Number(productData.selling_price);
+                if (!ls[lineIdx].isQuantityManual) {
+                  ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
+                }
+                setLines(ls);
+                newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
+                checkSoldDevices(deviceIds, productData.id, lineIdx);
+                setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+              }
+            }
+          }
+        } else if (modal === 'edit') {
+          if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+            playDuplicateSound();
+            debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+            return;
+          }
+          const newDeviceIds = [...saleForm.deviceIds];
+          newDeviceIds[deviceIdx] = scannedDeviceId;
+          newDeviceIds.push('');
+          setSaleForm({
+            ...saleForm,
+            dynamic_product_id: Number(productData.id),
+            unit_price: Number(productData.selling_price),
+            deviceIds: newDeviceIds,
+            quantity: saleForm.isQuantityManual ? saleForm.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
+          });
+          newDeviceIdx = newDeviceIds.length - 1;
+          await checkSoldDevices(deviceIds, productData.id, 0);
+          setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+        }
+
+        setScannerError(null);
+        playSuccessSound();
+        debouncedToast.success(`Scanned Product ID: ${scannedDeviceId}`);
+
+        buffer = '';
+      } else if (e.key !== 'Enter') {
+        buffer += e.key;
+      }
+
+      lastKeyTime = currentTime;
+    };
+
+    document.addEventListener('keypress', handleKeypress);
+
+    return () => {
+      document.removeEventListener('keypress', handleKeypress);
+    };
+  }, [externalScannerMode, scannerTarget, lines, saleForm, showScanner, products, storeId, checkSoldDevices, debouncedToast]);
+
+  // Scanner: Webcam Scanner
+  useEffect(() => {
+    if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
+
+    setScannerLoading(true);
+    const currentVideo = videoRef.current;
+
+    try {
+      if (!document.getElementById('scanner')) {
+        setScannerError('Scanner container not found');
+        setScannerLoading(false);
+        debouncedToast.error('Scanner container not found. Please use manual input.');
+        return;
+      }
+
+      html5QrCodeRef.current = new Html5Qrcode('scanner');
+    } catch (err) {
+      setScannerError(`Failed to initialize scanner: ${err.message}`);
+      setScannerLoading(false);
+      debouncedToast.error('Failed to initialize scanner. Please use manual input.');
+      return;
     }
 
-    if (e.key === 'Enter' && buffer) {
-      const scannedDeviceId = buffer.trim();
+    const config = {
+      fps: 30,
+      qrbox: { width: 280, height: 160 },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.QR_CODE,
+      ],
+      aspectRatio: 1.0,
+      disableFlip: true,
+      videoConstraints: { width: 1280, height: 720, facingMode: 'environment' },
+    };
+
+    const onScanSuccess = async (scannedDeviceId) => {
       if (!scannedDeviceId) {
         playNotFoundSound();
         debouncedToast.error('Scanned Product ID cannot be empty');
         setScannerError('Scanned Product ID cannot be empty');
-        return;
+        return false;
       }
 
-      const { modal, lineIdx, deviceIdx } = scannerTarget;
-      let newDeviceIdx;
+      console.log('Scanned Device ID:', scannedDeviceId);
 
       // Check if device ID is already sold
       const { data: soldData, error: soldError } = await supabase
@@ -279,14 +473,14 @@ useEffect(() => {
         playNotFoundSound();
         debouncedToast.error('Failed to validate Product ID');
         setScannerError('Failed to validate Product ID');
-        return;
+        return false;
       }
       if (soldData) {
         console.log('Device ID is sold:', scannedDeviceId);
         playDuplicateSound();
         debouncedToast.error(`Product ID "${scannedDeviceId}" has already been sold`);
         setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
-        return;
+        return false;
       }
 
       // Query product details
@@ -302,443 +496,214 @@ useEffect(() => {
         playNotFoundSound();
         debouncedToast.error(`Product ID "${scannedDeviceId}" not found`);
         setScannerError(`Product ID "${scannedDeviceId}" not found`);
-        return;
+        return false;
       }
 
       console.log('Found Product:', productData);
 
       const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
 
-      if (modal === 'add') {
-        const ls = [...lines];
-        const existingLineIdx = ls.findIndex(line => {
-          const product = products.find(p => p.id === line.dynamic_product_id);
-          return product && product.name === productData.name;
-        });
+      if (scannerTarget) {
+        const { modal, lineIdx, deviceIdx } = scannerTarget;
+        let newDeviceIdx;
 
-        if (existingLineIdx !== -1) {
-          if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-            playDuplicateSound();
-            debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
-            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-            return;
-          }
-          ls[existingLineIdx].deviceIds.push(scannedDeviceId);
-          ls[existingLineIdx].deviceIds = [...ls[existingLineIdx].deviceIds, ''];
-          if (!ls[existingLineIdx].isQuantityManual) {
-            ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
-          }
-          setLines(ls);
-          newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
-          checkSoldDevices(deviceIds, productData.id, existingLineIdx);
-          setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
-        } else {
-          if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
-            if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+        if (modal === 'add') {
+          const ls = [...lines];
+          const existingLineIdx = ls.findIndex(line => {
+            const product = products.find(p => p.id === line.dynamic_product_id);
+            return product && product.name === productData.name;
+          });
+
+          if (existingLineIdx !== -1) {
+            if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
               playDuplicateSound();
-              debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
-              setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-              return;
-            }
-            ls[lineIdx] = {
-              ...ls[lineIdx],
-              dynamic_product_id: Number(productData.id),
-              unit_price: Number(productData.selling_price),
-              deviceIds: [scannedDeviceId, ''],
-              quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
-            };
-            setLines(ls);
-            newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
-            checkSoldDevices(deviceIds, productData.id, lineIdx);
-            setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
-          } else {
-            const currentProduct = products.find(p => p.id === ls[lineIdx].dynamic_product_id);
-            if (currentProduct && currentProduct.name !== productData.name) {
-              const newLine = {
-                dynamic_product_id: Number(productData.id),
-                quantity: 1,
-                unit_price: Number(productData.selling_price),
-                deviceIds: [scannedDeviceId, ''],
-                isQuantityManual: false,
-              };
-              ls.push(newLine);
-              setLines(ls);
-              newDeviceIdx = 1;
-              checkSoldDevices(deviceIds, productData.id, ls.length - 1);
-              setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
-            } else {
-              ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
-              ls[lineIdx].deviceIds = [...ls[lineIdx].deviceIds, ''];
-              ls[lineIdx].dynamic_product_id = Number(productData.id);
-              ls[lineIdx].unit_price = Number(productData.selling_price);
-              if (!ls[lineIdx].isQuantityManual) {
-                ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
-              }
-              setLines(ls);
-              newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
-              checkSoldDevices(deviceIds, productData.id, lineIdx);
-              setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
-            }
-          }
-        }
-      } else if (modal === 'edit') {
-        if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-          playDuplicateSound();
-          debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
-          setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-          return;
-        }
-        const newDeviceIds = [...saleForm.deviceIds];
-        newDeviceIds[deviceIdx] = scannedDeviceId;
-        newDeviceIds.push('');
-        setSaleForm({
-          ...saleForm,
-          dynamic_product_id: Number(productData.id),
-          unit_price: Number(productData.selling_price),
-          deviceIds: newDeviceIds,
-          quantity: saleForm.isQuantityManual ? saleForm.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
-        });
-        newDeviceIdx = newDeviceIds.length - 1;
-        await checkSoldDevices(deviceIds, productData.id, 0);
-        setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
-      }
-
-      setScannerError(null);
-      playSuccessSound();
-      debouncedToast.success(`Scanned Product ID: ${scannedDeviceId}`);
-
-      // Pause scanner and close modal temporarily
-      setShowScanner(false);
-      setTimeout(() => {
-        if (scannerTarget) {
-          setShowScanner(true);
-        }
-      }, 2000);
-
-      buffer = '';
-    } else if (e.key !== 'Enter') {
-      buffer += e.key;
-    }
-
-    lastKeyTime = currentTime;
-  };
-
-  document.addEventListener('keypress', handleKeypress);
-
-  return () => {
-    document.removeEventListener('keypress', handleKeypress);
-  };
-}, [externalScannerMode, scannerTarget, lines, saleForm, showScanner, products, storeId, checkSoldDevices, debouncedToast]);
-
-
-
-  // Scanner: Webcam Scanner
- useEffect(() => {
-  if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
-
-  setScannerLoading(true);
-  const currentVideo = videoRef.current;
-
-  try {
-    if (!document.getElementById('scanner')) {
-      setScannerError('Scanner container not found');
-      setScannerLoading(false);
-      debouncedToast.error('Scanner container not found. Please use manual input.');
-      return;
-    }
-
-    html5QrCodeRef.current = new Html5Qrcode('scanner');
-  } catch (err) {
-    setScannerError(`Failed to initialize scanner: ${err.message}`);
-    setScannerLoading(false);
-    debouncedToast.error('Failed to initialize scanner. Please use manual input.');
-    return;
-  }
-const config = {
-    fps: 30,
-    qrbox: { width: 280, height: 180 },
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.QR_CODE,
-    ],
-    aspectRatio: 1.0,
-    disableFlip: true,
-    videoConstraints: { width: 1280, height: 720, facingMode: 'environment' },
-  };
-
-
-
-  const onScanSuccess = async (scannedDeviceId) => {
-    if (!scannedDeviceId) {
-      playNotFoundSound();
-      debouncedToast.error('Scanned Product ID cannot be empty');
-      setScannerError('Scanned Product ID cannot be empty');
-      return false;
-    }
-
-    console.log('Scanned Device ID:', scannedDeviceId);
-
-    // Check if device ID is already sold
-    const { data: soldData, error: soldError } = await supabase
-      .from('dynamic_sales')
-      .select('device_id')
-      .eq('device_id', scannedDeviceId)
-      .eq('store_id', storeId)
-      .single();
-    if (soldError && soldError.code !== 'PGRST116') {
-      console.error('Error checking sold status:', soldError);
-      playNotFoundSound();
-      debouncedToast.error('Failed to validate Product ID');
-      setScannerError('Failed to validate Product ID');
-      return false;
-    }
-    if (soldData) {
-      console.log('Device ID is sold:', scannedDeviceId);
-      playDuplicateSound();
-      debouncedToast.error(`Product ID "${scannedDeviceId}" has already been sold`);
-      setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
-      return false;
-    }
-
-    // Query product details
-    const { data: productData, error } = await supabase
-      .from('dynamic_product')
-      .select('id, name, selling_price, device_id')
-      .eq('store_id', storeId)
-      .ilike('device_id', `%${scannedDeviceId}%`)
-      .single();
-
-    if (error || !productData) {
-      console.error('Supabase Query Error:', error);
-      playNotFoundSound();
-      debouncedToast.error(`Product ID "${scannedDeviceId}" not found`);
-      setScannerError(`Product ID "${scannedDeviceId}" not found`);
-      return false;
-    }
-
-    console.log('Found Product:', productData);
-
-    const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
-
-    if (scannerTarget) {
-      const { modal, lineIdx, deviceIdx } = scannerTarget;
-      let newDeviceIdx;
-
-      if (modal === 'add') {
-        const ls = [...lines];
-        const existingLineIdx = ls.findIndex(line => {
-          const product = products.find(p => p.id === line.dynamic_product_id);
-          return product && product.name === productData.name;
-        });
-
-        if (existingLineIdx !== -1) {
-          if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-            playDuplicateSound();
-            debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
-            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-            return false;
-          }
-          ls[existingLineIdx].deviceIds.push(scannedDeviceId);
-          ls[existingLineIdx].deviceIds = [...ls[existingLineIdx].deviceIds, ''];
-          if (!ls[existingLineIdx].isQuantityManual) {
-            ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
-          }
-          setLines(ls);
-          newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
-          checkSoldDevices(deviceIds, productData.id, existingLineIdx);
-          setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
-        } else {
-          if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
-            if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-              playDuplicateSound();
-              debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+              debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
               setScannerError(`Product ID "${scannedDeviceId}" already exists`);
               return false;
             }
-            ls[lineIdx] = {
-              ...ls[lineIdx],
-              dynamic_product_id: Number(productData.id),
-              unit_price: Number(productData.selling_price),
-              deviceIds: [scannedDeviceId, ''],
-              quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
-            };
+            ls[existingLineIdx].deviceIds.push(scannedDeviceId);
+            ls[existingLineIdx].deviceIds = [...ls[existingLineIdx].deviceIds, ''];
+            if (!ls[existingLineIdx].isQuantityManual) {
+              ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
+            }
             setLines(ls);
-            newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
-            checkSoldDevices(deviceIds, productData.id, lineIdx);
-            setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+            newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
+            checkSoldDevices(deviceIds, productData.id, existingLineIdx);
+            setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
           } else {
-            const currentProduct = products.find(p => p.id === ls[lineIdx].dynamic_product_id);
-            if (currentProduct && currentProduct.name !== productData.name) {
-              const newLine = {
+            if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
+              if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+                playDuplicateSound();
+                debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+                setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+                return false;
+              }
+              ls[lineIdx] = {
+                ...ls[lineIdx],
                 dynamic_product_id: Number(productData.id),
-                quantity: 1,
                 unit_price: Number(productData.selling_price),
                 deviceIds: [scannedDeviceId, ''],
-                isQuantityManual: false,
+                quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
               };
-              ls.push(newLine);
-              setLines(ls);
-              newDeviceIdx = 1;
-              checkSoldDevices(deviceIds, productData.id, ls.length - 1);
-              setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
-            } else {
-              ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
-              ls[lineIdx].deviceIds = [...ls[lineIdx].deviceIds, ''];
-              ls[lineIdx].dynamic_product_id = Number(productData.id);
-              ls[lineIdx].unit_price = Number(productData.selling_price);
-              if (!ls[lineIdx].isQuantityManual) {
-                ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
-              }
               setLines(ls);
               newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
               checkSoldDevices(deviceIds, productData.id, lineIdx);
               setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+            } else {
+              const currentProduct = products.find(p => p.id === ls[lineIdx].dynamic_product_id);
+              if (currentProduct && currentProduct.name !== productData.name) {
+                const newLine = {
+                  dynamic_product_id: Number(productData.id),
+                  quantity: 1,
+                  unit_price: Number(productData.selling_price),
+                  deviceIds: [scannedDeviceId, ''],
+                  isQuantityManual: false,
+                };
+                ls.push(newLine);
+                setLines(ls);
+                newDeviceIdx = 1;
+                checkSoldDevices(deviceIds, productData.id, ls.length - 1);
+                setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
+              } else {
+                ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
+                ls[lineIdx].deviceIds = [...ls[lineIdx].deviceIds, ''];
+                ls[lineIdx].dynamic_product_id = Number(productData.id);
+                ls[lineIdx].unit_price = Number(productData.selling_price);
+                if (!ls[lineIdx].isQuantityManual) {
+                  ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
+                }
+                setLines(ls);
+                newDeviceIdx = ls[lineIdx].deviceIds.length - 1;
+                checkSoldDevices(deviceIds, productData.id, lineIdx);
+                setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+              }
             }
           }
+        } else if (modal === 'edit') {
+          if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+            playDuplicateSound();
+            debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+            return false;
+          }
+          const newDeviceIds = [...saleForm.deviceIds];
+          newDeviceIds[deviceIdx] = scannedDeviceId;
+          newDeviceIds.push('');
+          setSaleForm({
+            ...saleForm,
+            dynamic_product_id: Number(productData.id),
+            unit_price: Number(productData.selling_price),
+            deviceIds: newDeviceIds,
+            quantity: saleForm.isQuantityManual ? saleForm.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
+          });
+          newDeviceIdx = newDeviceIds.length - 1;
+          await checkSoldDevices(deviceIds, productData.id, 0);
+          setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
         }
-      } else if (modal === 'edit') {
-        if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-          playDuplicateSound();
-          debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
-          setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-          return false;
-        }
-        const newDeviceIds = [...saleForm.deviceIds];
-        newDeviceIds[deviceIdx] = scannedDeviceId;
-        newDeviceIds.push('');
-        setSaleForm({
-          ...saleForm,
-          dynamic_product_id: Number(productData.id),
-          unit_price: Number(productData.selling_price),
-          deviceIds: newDeviceIds,
-          quantity: saleForm.isQuantityManual ? saleForm.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
-        });
-        newDeviceIdx = newDeviceIds.length - 1;
-        await checkSoldDevices(deviceIds, productData.id, 0);
-        setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+
+        setScannerError(null);
+        playSuccessSound();
+        debouncedToast.success(`Scanned Product ID: ${scannedDeviceId}`);
+        return true;
       }
+      console.error('No scanner target set');
+      playNotFoundSound();
+      debouncedToast.error('No scanner target set');
+      return false;
+    };
 
-      setScannerError(null);
-      playSuccessSound();
-      debouncedToast.success(`Scanned Product ID: ${scannedDeviceId}`);
-
-      // Pause scanner and close modal temporarily
-      if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.pause(true);
-      }
-      setShowScanner(false);
-      setTimeout(() => {
-        if (scannerTarget && html5QrCodeRef.current) {
-          setShowScanner(true);
-          html5QrCodeRef.current.resume();
-        }
-      }, 2000);
-
-      return true;
-    }
-    console.error('No scanner target set');
-    playNotFoundSound();
-    debouncedToast.error('No scanner target set');
-    return false;
-  };
-
-
-  const onScanFailure = (error) => {
-    if (
-      error.includes('No MultiFormat Readers were able to detect the code') ||
-      error.includes('No QR code found') ||
-      error.includes('IndexSizeError')
-    ) {
-      console.debug('No barcode detected');
-    } else {
-      setScannerError(`Scan error: ${error}`);
-    }
-  };
-
-  const startScanner = async (attempt = 1, maxAttempts = 5) => {
-    if (!currentVideo || !scannerDivRef.current) {
-      setScannerError('Scanner elements not found');
-      setScannerLoading(false);
-      debouncedToast.error('Scanner elements not found. Please use manual input.');
-      return;
-    }
-
-    if (attempt > maxAttempts) {
-      setScannerError('Failed to initialize scanner after multiple attempts');
-      setScannerLoading(false);
-      debouncedToast.error('Failed to initialize scanner. Please use manual input.');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: config.videoConstraints,
-      });
-      currentVideo.srcObject = stream;
-      await new Promise((resolve) => {
-        currentVideo.onloadedmetadata = () => resolve();
-      });
-
-      await html5QrCodeRef.current.start(
-        { facingMode: 'environment' },
-        config,
-        onScanSuccess,
-        onScanFailure
-      );
-
-      setScannerLoading(false);
-    } catch (err) {
-      setScannerError(`Failed to initialize scanner: ${err.message}`);
-      setScannerLoading(false);
-      if (err.name === 'NotAllowedError') {
-        debouncedToast.error('Camera access denied. Please allow camera permissions.');
-      } else if (err.name === 'NotFoundError') {
-        debouncedToast.error('No camera found. Please use manual input.');
+    const onScanFailure = (error) => {
+      if (
+        error.includes('No MultiFormat Readers were able to detect the code') ||
+        error.includes('No QR code found') ||
+        error.includes('IndexSizeError')
+      ) {
+        console.debug('No barcode detected');
       } else {
-        setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
+        setScannerError(`Scan error: ${error}`);
       }
-    }
-  };
+    };
 
-  Html5Qrcode.getCameras()
-    .then((cameras) => {
-      if (cameras.length === 0) {
-        setScannerError('No camera detected. Please use manual input.');
+    const startScanner = async (attempt = 1, maxAttempts = 5) => {
+      if (!currentVideo || !scannerDivRef.current) {
+        setScannerError('Scanner elements not found');
         setScannerLoading(false);
-        debouncedToast.error('No camera detected. Please use manual input.');
+        debouncedToast.error('Scanner elements not found. Please use manual input.');
         return;
       }
-      startScanner();
-    })
-    .catch((err) => {
-      setScannerError(`Failed to access cameras: ${err.message}`);
-      setScannerLoading(false);
-      debouncedToast.error('Failed to access camera. Please use manual input.');
-    });
 
-  return () => {
-    if (
-      html5QrCodeRef.current &&
-      [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
-        html5QrCodeRef.current.getState()
-      )
-    ) {
-      html5QrCodeRef.current
-        .stop()
-        .then(() => console.log('Webcam scanner stopped'))
-        .catch((err) => console.error('Error stopping scanner:', err));
-    }
-    if (currentVideo && currentVideo.srcObject) {
-      currentVideo.srcObject.getTracks().forEach((track) => track.stop());
-      currentVideo.srcObject = null;
-    }
-    html5QrCodeRef.current = null;
-  };
-}, [showScanner, scannerTarget, lines, saleForm, externalScannerMode,debouncedToast, products, storeId, checkSoldDevices]);
+      if (attempt > maxAttempts) {
+        setScannerError('Failed to initialize scanner after multiple attempts');
+        setScannerLoading(false);
+        debouncedToast.error('Failed to initialize scanner. Please use manual input.');
+        return;
+      }
 
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: config.videoConstraints,
+        });
+        currentVideo.srcObject = stream;
+        await new Promise((resolve) => {
+          currentVideo.onloadedmetadata = () => resolve();
+        });
+
+        await html5QrCodeRef.current.start(
+          { facingMode: 'environment' },
+          config,
+          onScanSuccess,
+          onScanFailure
+        );
+
+        setScannerLoading(false);
+      } catch (err) {
+        setScannerError(`Failed to initialize scanner: ${err.message}`);
+        setScannerLoading(false);
+        if (err.name === 'NotAllowedError') {
+          debouncedToast.error('Camera access denied. Please allow camera permissions.');
+        } else if (err.name === 'NotFoundError') {
+          debouncedToast.error('No camera found. Please use manual input.');
+        } else {
+          setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
+        }
+      }
+    };
+
+    Html5Qrcode.getCameras()
+      .then((cameras) => {
+        if (cameras.length === 0) {
+          setScannerError('No camera detected. Please use manual input.');
+          setScannerLoading(false);
+          debouncedToast.error('No camera detected. Please use manual input.');
+          return;
+        }
+        startScanner();
+      })
+      .catch((err) => {
+        setScannerError(`Failed to access cameras: ${err.message}`);
+        setScannerLoading(false);
+        debouncedToast.error('Failed to access camera. Please use manual input.');
+      });
+
+    return () => {
+      if (
+        html5QrCodeRef.current &&
+        [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
+          html5QrCodeRef.current.getState()
+        )
+      ) {
+        html5QrCodeRef.current
+          .stop()
+          .then(() => console.log('Webcam scanner stopped'))
+          .catch((err) => console.error('Error stopping scanner:', err));
+      }
+      if (currentVideo && currentVideo.srcObject) {
+        currentVideo.srcObject.getTracks().forEach((track) => track.stop());
+        currentVideo.srcObject = null;
+      }
+      html5QrCodeRef.current = null;
+    };
+  }, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, debouncedToast, products, storeId, checkSoldDevices]);
 
   const stopScanner = useCallback(() => {
     if (
@@ -768,195 +733,183 @@ const config = {
     setExternalScannerMode(false);
   };
 
+  const handleManualInput = async () => {
+    const trimmedInput = manualInput.trim();
+    if (!trimmedInput) {
+      playNotFoundSound();
+      debouncedToast.error('Product ID cannot be empty');
+      setScannerError('Product ID cannot be empty');
+      return;
+    }
 
-const handleManualInput = async () => {
-  const trimmedInput = manualInput.trim();
-  if (!trimmedInput) {
-    playNotFoundSound();
-    debouncedToast.error('Product ID cannot be empty');
-    setScannerError('Product ID cannot be empty');
-    return;
-  }
+    console.log('Manual Input Device ID:', trimmedInput);
 
-  console.log('Manual Input Device ID:', trimmedInput);
+    // Check if device ID is already sold
+    const { data: soldData, error: soldError } = await supabase
+      .from('dynamic_sales')
+      .select('device_id')
+      .eq('device_id', trimmedInput)
+      .eq('store_id', storeId)
+      .single();
+    if (soldError && soldError.code !== 'PGRST116') {
+      console.error('Error checking sold status:', soldError);
+      playNotFoundSound();
+      debouncedToast.error('Failed to validate Product ID');
+      setScannerError('Failed to validate Product ID');
+      return;
+    }
+    if (soldData) {
+      console.log('Device ID is sold:', trimmedInput);
+      playDuplicateSound();
+      debouncedToast.error(`Product ID "${trimmedInput}" has already been sold`);
+      setScannerError(`Product ID "${trimmedInput}" has already been sold`);
+      setManualInput('');
+      return;
+    }
 
-  // Check if device ID is already sold
-  const { data: soldData, error: soldError } = await supabase
-    .from('dynamic_sales')
-    .select('device_id')
-    .eq('device_id', trimmedInput)
-    .eq('store_id', storeId)
-    .single();
-  if (soldError && soldError.code !== 'PGRST116') {
-    console.error('Error checking sold status:', soldError);
-    playNotFoundSound();
-    debouncedToast.error('Failed to validate Product ID');
-    setScannerError('Failed to validate Product ID');
-    return;
-  }
-  if (soldData) {
-    console.log('Device ID is sold:', trimmedInput);
-    playDuplicateSound();
-    debouncedToast.error(`Product ID "${trimmedInput}" has already been sold`);
-    setScannerError(`Product ID "${trimmedInput}" has already been sold`);
-    setManualInput('');
-    return;
-  }
+    // Check if Device ID exists in dynamic_product
+    const { data: productData, error } = await supabase
+      .from('dynamic_product')
+      .select('id, name, selling_price, device_id')
+      .eq('store_id', storeId)
+      .ilike('device_id', `%${trimmedInput}%`)
+      .single();
 
-  // Check if Device ID exists in dynamic_product
-  const { data: productData, error } = await supabase
-    .from('dynamic_product')
-    .select('id, name, selling_price, device_id')
-    .eq('store_id', storeId)
-    .ilike('device_id', `%${trimmedInput}%`)
-    .single();
+    if (error || !productData) {
+      console.error('Supabase Query Error:', error);
+      playNotFoundSound();
+      debouncedToast.error(`Product ID "${trimmedInput}" not found`);
+      setScannerError(`Product ID "${trimmedInput}" not found`);
+      setManualInput('');
+      return;
+    }
 
-  if (error || !productData) {
-    console.error('Supabase Query Error:', error);
-    playNotFoundSound();
-    debouncedToast.error(`Product ID "${trimmedInput}" not found`);
-    setScannerError(`Product ID "${trimmedInput}" not found`);
-    setManualInput('');
-    return;
-  }
+    console.log('Found Product:', productData);
 
-  console.log('Found Product:', productData);
+    const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
 
-  const deviceIds = productData.device_id ? productData.device_id.split(',').map(id => id.trim()).filter(id => id) : [];
+    if (scannerTarget) {
+      const { modal, lineIdx, deviceIdx } = scannerTarget;
+      let newDeviceIdx;
 
-  if (scannerTarget) {
-    const { modal, lineIdx, deviceIdx } = scannerTarget;
-    let newDeviceIdx;
+      if (modal === 'add') {
+        setLines((ls) => {
+          const next = [...ls];
+          const existingLineIdx = next.findIndex(line => {
+            const product = products.find(p => p.id === line.dynamic_product_id);
+            return product && product.name === productData.name;
+          });
 
-    if (modal === 'add') {
-      setLines((ls) => {
-        const next = [...ls];
-        const existingLineIdx = next.findIndex(line => {
-          const product = products.find(p => p.id === line.dynamic_product_id);
-          return product && product.name === productData.name;
-        });
-
-        if (existingLineIdx !== -1) {
-          if (next[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
-            playDuplicateSound();
-            debouncedToast.error(`Product ID "${trimmedInput}" already exists in this product`);
-            setScannerError(`Product ID "${trimmedInput}" already exists`);
-            setManualInput('');
-            return next;
-          }
-          next[existingLineIdx].deviceIds.push(trimmedInput);
-          next[existingLineIdx].deviceIds = [...next[existingLineIdx].deviceIds, ''];
-          if (!next[existingLineIdx].isQuantityManual) {
-            next[existingLineIdx].quantity = next[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
-          }
-          newDeviceIdx = next[existingLineIdx].deviceIds.length - 1;
-          checkSoldDevices(deviceIds, productData.id, existingLineIdx);
-          setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
-          return next;
-        } else {
-          if (!next[lineIdx].dynamic_product_id || next[lineIdx].deviceIds.every(id => !id.trim())) {
-            if (next[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
+          if (existingLineIdx !== -1) {
+            if (next[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
               playDuplicateSound();
-              debouncedToast.error(`Product ID "${trimmedInput}" already exists in this line`);
+              debouncedToast.error(`Product ID "${trimmedInput}" already exists in this product`);
               setScannerError(`Product ID "${trimmedInput}" already exists`);
               setManualInput('');
               return next;
             }
-            next[lineIdx] = {
-              ...next[lineIdx],
-              dynamic_product_id: Number(productData.id),
-              unit_price: next[lineIdx].isPriceManual ? next[lineIdx].unit_price : Number(productData.selling_price),
-              deviceIds: [trimmedInput, ''],
-              quantity: next[lineIdx].isQuantityManual ? next[lineIdx].quantity : 1,
-            };
-            newDeviceIdx = next[lineIdx].deviceIds.length - 1;
-            checkSoldDevices(deviceIds, productData.id, lineIdx);
-            setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+            next[existingLineIdx].deviceIds.push(trimmedInput);
+            next[existingLineIdx].deviceIds = [...next[existingLineIdx].deviceIds, ''];
+            if (!next[existingLineIdx].isQuantityManual) {
+              next[existingLineIdx].quantity = next[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
+            }
+            newDeviceIdx = next[existingLineIdx].deviceIds.length - 1;
+            checkSoldDevices(deviceIds, productData.id, existingLineIdx);
+            setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
             return next;
           } else {
-            const currentProduct = products.find(p => p.id === next[lineIdx].dynamic_product_id);
-            if (currentProduct && currentProduct.name !== productData.name) {
-              const newLine = {
+            if (!next[lineIdx].dynamic_product_id || next[lineIdx].deviceIds.every(id => !id.trim())) {
+              if (next[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
+                playDuplicateSound();
+                debouncedToast.error(`Product ID "${trimmedInput}" already exists in this line`);
+                setScannerError(`Product ID "${trimmedInput}" already exists`);
+                setManualInput('');
+                return next;
+              }
+              next[lineIdx] = {
+                ...next[lineIdx],
                 dynamic_product_id: Number(productData.id),
-                quantity: 1,
-                unit_price: Number(productData.selling_price),
+                unit_price: next[lineIdx].isPriceManual ? next[lineIdx].unit_price : Number(productData.selling_price),
                 deviceIds: [trimmedInput, ''],
-                isQuantityManual: false,
-                isPriceManual: false,
+                quantity: next[lineIdx].isQuantityManual ? next[lineIdx].quantity : 1,
               };
-              next.push(newLine);
-              newDeviceIdx = 1;
-              checkSoldDevices(deviceIds, productData.id, next.length - 1);
-              setScannerTarget({ modal, lineIdx: next.length - 1, deviceIdx: newDeviceIdx });
-              return next;
-            } else {
-              next[lineIdx].deviceIds[deviceIdx] = trimmedInput;
-              next[lineIdx].deviceIds = [...next[lineIdx].deviceIds, ''];
-              next[lineIdx].dynamic_product_id = Number(productData.id);
-              if (!next[lineIdx].isPriceManual) {
-                next[lineIdx].unit_price = Number(productData.selling_price);
-              }
-              if (!next[lineIdx].isQuantityManual) {
-                next[lineIdx].quantity = next[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
-              }
               newDeviceIdx = next[lineIdx].deviceIds.length - 1;
               checkSoldDevices(deviceIds, productData.id, lineIdx);
               setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
               return next;
+            } else {
+              const currentProduct = products.find(p => p.id === next[lineIdx].dynamic_product_id);
+              if (currentProduct && currentProduct.name !== productData.name) {
+                const newLine = {
+                  dynamic_product_id: Number(productData.id),
+                  quantity: 1,
+                  unit_price: Number(productData.selling_price),
+                  deviceIds: [trimmedInput, ''],
+                  isQuantityManual: false,
+                  isPriceManual: false,
+                };
+                next.push(newLine);
+                newDeviceIdx = 1;
+                checkSoldDevices(deviceIds, productData.id, next.length - 1);
+                setScannerTarget({ modal, lineIdx: next.length - 1, deviceIdx: newDeviceIdx });
+                return next;
+              } else {
+                next[lineIdx].deviceIds[deviceIdx] = trimmedInput;
+                next[lineIdx].deviceIds = [...next[lineIdx].deviceIds, ''];
+                next[lineIdx].dynamic_product_id = Number(productData.id);
+                if (!next[lineIdx].isPriceManual) {
+                  next[lineIdx].unit_price = Number(productData.selling_price);
+                }
+                if (!next[lineIdx].isQuantityManual) {
+                  next[lineIdx].quantity = next[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
+                }
+                newDeviceIdx = next[lineIdx].deviceIds.length - 1;
+                checkSoldDevices(deviceIds, productData.id, lineIdx);
+                setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+                return next;
+              }
             }
           }
+        });
+      } else if (modal === 'edit') {
+        if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
+          playDuplicateSound();
+          debouncedToast.error(`Product ID "${trimmedInput}" already exists in this sale`);
+          setScannerError(`Product ID "${trimmedInput}" already exists`);
+          setManualInput('');
+          return;
         }
-      });
-    } else if (modal === 'edit') {
-      if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
-        playDuplicateSound();
-        debouncedToast.error(`Product ID "${trimmedInput}" already exists in this sale`);
-        setScannerError(`Product ID "${trimmedInput}" already exists`);
-        setManualInput('');
-        return;
+        setSaleForm((prev) => {
+          const newDeviceIds = [...prev.deviceIds];
+          newDeviceIds[deviceIdx] = trimmedInput;
+          newDeviceIds.push('');
+          const updatedForm = {
+            ...prev,
+            dynamic_product_id: Number(productData.id),
+            unit_price: prev.isPriceManual ? prev.unit_price : Number(productData.selling_price),
+            deviceIds: newDeviceIds,
+            quantity: prev.isQuantityManual ? prev.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
+          };
+          newDeviceIdx = newDeviceIds.length - 1;
+          checkSoldDevices(deviceIds, productData.id, 0);
+          setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+          return updatedForm;
+        });
       }
-      setSaleForm((prev) => {
-        const newDeviceIds = [...prev.deviceIds];
-        newDeviceIds[deviceIdx] = trimmedInput;
-        newDeviceIds.push('');
-        const updatedForm = {
-          ...prev,
-          dynamic_product_id: Number(productData.id),
-          unit_price: prev.isPriceManual ? prev.unit_price : Number(productData.selling_price),
-          deviceIds: newDeviceIds,
-          quantity: prev.isQuantityManual ? prev.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
-        };
-        newDeviceIdx = newDeviceIds.length - 1;
-        checkSoldDevices(deviceIds, productData.id, 0);
-        setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
-        return updatedForm;
-      });
+
+      setScannerError(null);
+      setScannerLoading(false);
+      setManualInput('');
+      playSuccessSound();
+      debouncedToast.success(`Added Product ID: ${trimmedInput}`);
+    } else {
+      console.error('No scanner target set');
+      playNotFoundSound();
+      debouncedToast.error('No scanner target set');
+      setManualInput('');
     }
+  };
 
-    setScannerError(null);
-    setScannerLoading(false);
-    setManualInput('');
-    playSuccessSound();
-    debouncedToast.success(`Added Product ID: ${trimmedInput}`);
-  } else {
-    console.error('No scanner target set');
-    playNotFoundSound();
-    debouncedToast.error('No scanner target set');
-    setManualInput('');
-  }
-
-  // Close modal temporarily
-  setShowScanner(false);
-  setTimeout(() => {
-    if (scannerTarget) {
-      setShowScanner(true);
-    }
-  }, 2000);
-};
-
-
-  // Check Sold Devices
-  
   // Check if onboarding has been completed
   useEffect(() => {
     if (!localStorage.getItem('salesTrackerOnboardingCompleted')) {
@@ -1061,95 +1014,93 @@ const handleManualInput = async () => {
   }, [viewMode]);
 
   // Form Handlers
-const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur = false) => {
-  if (field === 'deviceIds' && deviceIdx !== null) {
-    // Update deviceIds immediately without validation on onChange
-    setLines((ls) => {
-      const next = [...ls];
-      next[lineIdx].deviceIds[deviceIdx] = value;
-      return next;
-    });
-
-    // Perform validation only onBlur or Enter
-    if (isBlur && value.trim()) {
-      const trimmedInput = value.trim();
-      console.log('Validating Barcode:', trimmedInput, 'Line:', lineIdx, 'DeviceIdx:', deviceIdx);
-
-      // Query product for matching barcode
-      const { data: productData, error } = await supabase
-        .from('dynamic_product')
-        .select('id, name, selling_price, device_id')
-        .eq('store_id', storeId)
-        .eq('device_id', trimmedInput) // Exact match for single barcode
-        .limit(1)
-        .single();
-
+  const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur = false) => {
+    if (field === 'deviceIds' && deviceIdx !== null) {
+      // Update deviceIds immediately without validation on onChange
       setLines((ls) => {
         const next = [...ls];
-        if (error || !productData) {
-          console.error('Supabase error:', error, 'Input:', trimmedInput);
-          toast.error(`Barcode "${trimmedInput}" not found`);
-          next[lineIdx].deviceIds[deviceIdx] = '';
+        next[lineIdx].deviceIds[deviceIdx] = value;
+        return next;
+      });
+
+      // Perform validation only onBlur or Enter
+      if (isBlur && value.trim()) {
+        const trimmedInput = value.trim();
+        console.log('Validating Barcode:', trimmedInput, 'Line:', lineIdx, 'DeviceIdx:', deviceIdx);
+
+        // Query product for matching barcode
+        const { data: productData, error } = await supabase
+          .from('dynamic_product')
+          .select('id, name, selling_price, device_id')
+          .eq('store_id', storeId)
+          .eq('device_id', trimmedInput) // Exact match for single barcode
+          .limit(1)
+          .single();
+
+        setLines((ls) => {
+          const next = [...ls];
+          if (error || !productData) {
+            console.error('Supabase error:', error, 'Input:', trimmedInput);
+            toast.error(`Barcode "${trimmedInput}" not found`);
+            next[lineIdx].deviceIds[deviceIdx] = '';
+            return next;
+          }
+
+          console.log('Found Product for Barcode:', productData);
+
+          const existingLineIdx = next.findIndex((line) => line.dynamic_product_id === Number(productData.id));
+
+          if (existingLineIdx !== -1 && existingLineIdx !== lineIdx) {
+            // Merge with existing line for same product
+            next[existingLineIdx].quantity += 1;
+            next[lineIdx].deviceIds[deviceIdx] = '';
+            if (next[lineIdx].deviceIds.every((id) => !id.trim()) && next.length > 1) {
+              next.splice(lineIdx, 1);
+            }
+          } else {
+            // Update current line or create new if empty
+            next[lineIdx].dynamic_product_id = Number(productData.id);
+            if (!next[lineIdx].isPriceManual) {
+              next[lineIdx].unit_price = Number(productData.selling_price);
+            }
+            next[lineIdx].deviceIds[deviceIdx] = trimmedInput;
+            if (!next[lineIdx].isQuantityManual) {
+              next[lineIdx].quantity = 1;
+            }
+          }
+
           return next;
+        });
+      }
+    } else {
+      setLines((ls) => {
+        const next = [...ls];
+        if (field === 'quantity') {
+          next[lineIdx].quantity = +value;
+          next[lineIdx].isQuantityManual = true;
+        } else if (field === 'unit_price') {
+          next[lineIdx].unit_price = +value;
+          next[lineIdx].isPriceManual = true;
+        } else if (field === 'dynamic_product_id') {
+          next[lineIdx].dynamic_product_id = +value;
+          const prod = products.find((p) => p.id === +value);
+          if (prod) {
+            if (!next[lineIdx].isPriceManual) {
+              next[lineIdx].unit_price = prod.selling_price;
+            }
+            next[lineIdx].deviceIds = [prod.device_id || ''];
+            next[lineIdx].quantity = next[lineIdx].isQuantityManual ? next[lineIdx].quantity : 1;
+          }
+          const inv = inventory.find((i) => i.dynamic_product_id === +value);
+          if (inv && inv.available_qty < 6) {
+            const prodName = prod?.name || 'this product';
+            toast.warning(`Low stock: only ${inv.available_qty} left for ${prodName}`);
+          }
         }
-
-        console.log('Found Product for Barcode:', productData);
-
-        const existingLineIdx = next.findIndex((line) => line.dynamic_product_id === Number(productData.id));
-
-        if (existingLineIdx !== -1 && existingLineIdx !== lineIdx) {
-          // Merge with existing line for same product
-          next[existingLineIdx].quantity += 1;
-          next[lineIdx].deviceIds[deviceIdx] = '';
-          if (next[lineIdx].deviceIds.every((id) => !id.trim()) && next.length > 1) {
-            next.splice(lineIdx, 1);
-          }
-        } else {
-          // Update current line or create new if empty
-          next[lineIdx].dynamic_product_id = Number(productData.id);
-          if (!next[lineIdx].isPriceManual) {
-            next[lineIdx].unit_price = Number(productData.selling_price);
-          }
-          next[lineIdx].deviceIds[deviceIdx] = trimmedInput;
-          if (!next[lineIdx].isQuantityManual) {
-            next[lineIdx].quantity = 1;
-          }
-        }
-
         return next;
       });
     }
-  } else {
-    setLines((ls) => {
-      const next = [...ls];
-      if (field === 'quantity') {
-        next[lineIdx].quantity = +value;
-        next[lineIdx].isQuantityManual = true;
-      } else if (field === 'unit_price') {
-        next[lineIdx].unit_price = +value;
-        next[lineIdx].isPriceManual = true;
-      } else if (field === 'dynamic_product_id') {
-        next[lineIdx].dynamic_product_id = +value;
-        const prod = products.find((p) => p.id === +value);
-        if (prod) {
-          if (!next[lineIdx].isPriceManual) {
-            next[lineIdx].unit_price = prod.selling_price;
-          }
-          next[lineIdx].deviceIds = [prod.device_id || ''];
-          next[lineIdx].quantity = next[lineIdx].isQuantityManual ? next[lineIdx].quantity : 1;
-        }
-        const inv = inventory.find((i) => i.dynamic_product_id === +value);
-        if (inv && inv.available_qty < 6) {
-          const prodName = prod?.name || 'this product';
-          toast.warning(`Low stock: only ${inv.available_qty} left for ${prodName}`);
-        }
-      }
-      return next;
-    });
-  }
-};
-
-
+  };
 
   const removeDeviceId = (lineIdx, deviceIdx) => {
     setLines((ls) => {
@@ -1193,7 +1144,6 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       return next;
     });
   };
-
 
   const removeEditDeviceId = (deviceIdx) => {
     setSaleForm((f) => {
@@ -1255,7 +1205,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
         device_id: l.deviceIds.filter((id) => id.trim()).join(',') || null,
         payment_method: paymentMethod,
       }));
-     const { error: insErr } = await supabase.from('dynamic_sales').insert(inserts);
+      const { error: insErr } = await supabase.from('dynamic_sales').insert(inserts);
       if (insErr) throw new Error(`Sales insertion failed: ${insErr.message}`);
 
       for (const line of lines) {
@@ -1279,7 +1229,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       toast.success('Sale added successfully!');
       stopScanner();
       setShowAdd(false);
-      setLines([{ dynamic_product_id: '', quantity: 1, unit_price: '', deviceIds: [''] , isQuantityManual: false }]);
+      setLines([{ dynamic_product_id: '', quantity: 1, unit_price: '', deviceIds: [''], isQuantityManual: false }]);
       setPaymentMethod('Cash');
       fetchSales();
     } catch (err) {
@@ -1380,40 +1330,40 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
   };
 
   // Export Functions
- const exportCSV = () => {
-  let csv = '';
-  if (viewMode === 'list') {
-    csv = 'Product,Device IDs,Quantity,Unit Price,Amount,Payment,Sold At\n';
-    filtered.forEach((s) => {
-      csv += [
-        `"${s.dynamic_product.name.replace(/"/g, '""')}"`,
-        s.deviceIds.join(';') || '-',
-        s.quantity,
-        s.unit_price.toFixed(2),
-        s.amount.toFixed(2),
-        s.payment_method,
-        `"${new Date(s.sold_at).toLocaleString()}"`,
-      ].join(',') + '\n';
-    });
-  } else {
-    csv = 'Period,Total Sales,Number of Sales\n';
-    totalsData.forEach((t) => { // Fixed: datasets -> totalsData
-      csv += [
-        `"${t.period.replace(/"/g, '""')}"`,
-        t.total.toFixed(2),
-        t.count,
-      ].join(',') + '\n';
-    });
-  }
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = viewMode === 'list' ? 'sales.csv' : `${viewMode}_totals.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-  toast.success('CSV exported successfully!');
-};
+  const exportCSV = () => {
+    let csv = '';
+    if (viewMode === 'list') {
+      csv = 'Product,Device IDs,Quantity,Unit Price,Amount,Payment,Sold At\n';
+      filtered.forEach((s) => {
+        csv += [
+          `"${s.dynamic_product.name.replace(/"/g, '""')}"`,
+          s.deviceIds.join(';') || '-',
+          s.quantity,
+          s.unit_price.toFixed(2),
+          s.amount.toFixed(2),
+          s.payment_method,
+          `"${new Date(s.sold_at).toLocaleString()}"`,
+        ].join(',') + '\n';
+      });
+    } else {
+      csv = 'Period,Total Sales,Number of Sales\n';
+      totalsData.forEach((t) => {
+        csv += [
+          `"${t.period.replace(/"/g, '""')}"`,
+          t.total.toFixed(2),
+          t.count,
+        ].join(',') + '\n';
+      });
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = viewMode === 'list' ? 'sales.csv' : `${viewMode}_totals.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('CSV exported successfully!');
+  };
 
   const exportPDF = () => {
     import('jspdf').then(({ jsPDF }) => {
@@ -1475,312 +1425,306 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
   };
 
   // Render
- return (
-  <div className="p-0 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white">
-    {/* Header */}
-    <div className="flex flex-col gap-3 mb-4 px-4 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <label className="text-sm font-medium shrink-0">View:</label>
-            <select
-  value={viewMode}
-  onChange={(e) => setViewMode(e.target.value)}
-  className="w-full sm:w-40 p-2 border rounded dark:bg-gray-800 text-gray-900 dark:text-white bg-white dark:hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 view-mode-selector text-sm transition-colors duration-200"
->
-  <option value="list">Individual Sales</option>
-  <option value="daily">Daily Totals</option>
-  <option value="weekly">Weekly Totals</option>
-</select>
-          </div>
-          {viewMode === 'list' && (
-            <input
-              type="text"
-              placeholder="Search sales by product, payment"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full sm:w-64 p-2 border rounded dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600 text-sm"
-            />
-          )}
-        </div>
-     <button
-  onClick={() => setShowAdd(true)}
-  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto whitespace-nowrap "
->
-  <FaPlus className="text-base" />
-  New Sale
-</button>
-
-
-
-      </div>
-    </div>
-
-    {/* Add Modal */}
-    {showAdd && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 mt-24">
-        <form
-          onSubmit={createSale}
-          className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto mt-4"
-        >
-          <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Record Sale</h2>
-          {lines.map((line, lineIdx) => (
-            <div key={lineIdx} className="mb-6 border-b pb-4 dark:border-gray-700">
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 mb-4">
-                <div className="sm:col-span-4">
-                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
-                  <select
-                    name="dynamic_product_id"
-                    value={line.dynamic_product_id}
-                    onChange={(e) => handleLineChange(lineIdx, 'dynamic_product_id', e.target.value)}
-                    required
-                    className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  >
-                    <option value="">Select product…</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
-                  <input
-                    type="number"
-                    min="1"
-                    name="quantity"
-                    value={line.quantity}
-                    onChange={(e) => handleLineChange(lineIdx, 'quantity', e.target.value)}
-                    className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                    required
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Unit Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="unit_price"
-                    value={line.unit_price}
-                    onChange={(e) => handleLineChange(lineIdx, 'unit_price', e.target.value)}
-                    className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                    required
-                  />
-                </div>
-                <div className="sm:col-span-3 flex items-end">
-                  <button
-                    type="button"
-                    onClick={() => removeLine(lineIdx)}
-                    className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50"
-                    disabled={lines.length === 1}
-                  >
-                    <FaTrashAlt />
-                  </button>
-                </div>
-              </div>
-
- <div className="mt-2">
-  <label className="block mb-1 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
-    Scan or Add Product ID Manually (Optional)
-  </label>
-  {line.deviceIds.map((id, deviceIdx) => (
-    <div key={deviceIdx} className="mb-3 sm:mb-2">
-       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-      <input
-        type="text"
-        value={id}
-        onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
-        onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
-          }
-        }}
-        placeholder="Enter Barcode ID"
-        className="w-full p-1.5 xs:p-2 text-xs xs:text-sm border rounded-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-600"
-      />
-     <div className="flex gap-1 justify-start mt-1 sm:mt-0 sm:justify-start">
-          <button
-         type="button"
-            onClick={() => openScanner('add', lineIdx, deviceIdx)}
-            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-indigo-600 hover:text-indigo-700 text-xs xs:text-sm"
-            title="Scan Barcode"
-          >
-           <FaCamera className="inline-block" />
-          </button>
-          <button
-            type="button"
-            onClick={() => removeDeviceId(lineIdx, deviceIdx)}
-            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-red-600 hover:text-red-700 text-xs xs:text-sm"
-            title="Delete Barcode"
-          >
-            <FaTrashAlt className="inline-block" />
-          </button>
-      </div>
-    </div>
-    </div>
-                ))}
-                
-              </div>
+  return (
+    <div className="p-0 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white">
+      {/* Header */}
+      <div className="flex flex-col gap-3 mb-4 px-4 sm:px-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-sm font-medium shrink-0">View:</label>
+              <select
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
+                className="w-full sm:w-40 p-2 border rounded dark:bg-gray-800 text-gray-900 dark:text-white bg-white dark:hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 view-mode-selector text-sm transition-colors duration-200"
+              >
+                <option value="list">Individual Sales</option>
+                <option value="daily">Daily Totals</option>
+                <option value="weekly">Weekly Totals</option>
+              </select>
             </div>
-          ))}
+            {viewMode === 'list' && (
+              <input
+                type="text"
+                placeholder="Search sales by product, payment"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full sm:w-64 p-2 border rounded dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600 text-sm"
+              />
+            )}
+          </div>
           <button
-            type="button"
-            onClick={addLine}
-            className="flex items-center gap-1 text-green-600 hover:text-green-800 mt-1"
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto whitespace-nowrap new-sale-button"
           >
-            <FaPlus /> Add Another Item for Sale
+            <FaPlus className="text-base" />
+            New Sale
           </button>
-          <div className="mt-4">
-            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-              required
-            >
-              <option value="">Select payment method…</option>
-              <option>Cash</option>
-              <option>Bank Transfer</option>
-              <option>Card</option>
-              <option>Wallet</option>
-            </select>
-          </div>
-          <div className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Total: ₦{formatCurrency(totalAmount)}</div>
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                stopScanner();
-                setShowAdd(false);
-              }}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              Save Sale
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
-    )}
 
-    {/* Edit Modal */}
-    {editing && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 mt-24">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveEdit();
-          }}
-          className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-        >
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Sale #{editing}</h2>
-          <div className="mb-4">
-            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
-            <select
-              name="dynamic_product_id"
-              value={saleForm.dynamic_product_id || ''}
-              onChange={(e) => handleEditChange('dynamic_product_id', e.target.value)}
-              className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-              required
-            >
-              <option value="">Select product…</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-          {['quantity', 'unit_price', 'deviceIds', 'payment_method'].map((field) => (
-            <div className="mb-4" key={field}>
-              <label className="block mb-1 text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
-                {field.replace('Ids', ' IDs').replace('_', ' ')}
-              </label>
-              {field === 'payment_method' ? (
-                <select
-                  name={field}
-                  value={saleForm[field] || ''}
-                  onChange={(e) => handleEditChange(field, e.target.value)}
-                  className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  required
-                >
-                  <option value="">Select payment method…</option>
-                  <option>Cash</option>
-                  <option>Bank Transfer</option>
-                  <option>Card</option>
-                  <option>Wallet</option>
-                </select>
-              ) : field === 'deviceIds' ? (
-                <div>
-                  {saleForm.deviceIds.map((id, deviceIdx) => (
-                    <div key={deviceIdx} className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={id}
-                        onChange={(e) => handleEditChange('deviceIds', e.target.value, deviceIdx)}
-                        placeholder="Or enter barcode manually"
-                        className="flex-1 p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openScanner('edit', 0, deviceIdx)}
-                          className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                          title="Scan Barcode"
-                        >
-                          <FaCamera />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeEditDeviceId(deviceIdx)}
-                          className="p-2 text-red-600 hover:text-red-800"
-                        >
-                          <FaTrashAlt />
-                        </button>
+      {/* Add Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 mt-24">
+          <form
+            onSubmit={createSale}
+            className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto mt-4"
+          >
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Record Sale</h2>
+            {lines.map((line, lineIdx) => (
+              <div key={lineIdx} className="mb-6 border-b pb-4 dark:border-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 mb-4">
+                  <div className="sm:col-span-4">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
+                    <select
+                      name="dynamic_product_id"
+                      value={line.dynamic_product_id}
+                      onChange={(e) => handleLineChange(lineIdx, 'dynamic_product_id', e.target.value)}
+                      required
+                      className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    >
+                      <option value="">Select product…</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
+                    <input
+                      type="number"
+                      min="1"
+                      name="quantity"
+                      value={line.quantity}
+                      onChange={(e) => handleLineChange(lineIdx, 'quantity', e.target.value)}
+                      className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      required
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Unit Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="unit_price"
+                      value={line.unit_price}
+                      onChange={(e) => handleLineChange(lineIdx, 'unit_price', e.target.value)}
+                      className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      required
+                    />
+                  </div>
+                  <div className="sm:col-span-3 flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => removeLine(lineIdx)}
+                      className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50"
+                      disabled={lines.length === 1}
+                    >
+                      <FaTrashAlt />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-2">
+                  <label className="block mb-1 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Scan or Add Product ID Manually (Optional)
+                  </label>
+                  {line.deviceIds.map((id, deviceIdx) => (
+                    <div key={deviceIdx} className="mb-3 sm:mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                        <input
+                          type="text"
+                          value={id}
+                          onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
+                          onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
+                            }
+                          }}
+                          placeholder="Enter Barcode ID"
+                          className="w-full p-1.5 xs:p-2 text-xs xs:text-sm border rounded-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-600"
+                        />
+                        <div className="flex gap-1 justify-start mt-1 sm:mt-0 sm:justify-start">
+                          <button
+                            type="button"
+                            onClick={() => openScanner('add', lineIdx, deviceIdx)}
+                            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-indigo-600 hover:text-indigo-700 text-xs xs:text-sm"
+                            title="Scan Barcode"
+                          >
+                            <FaCamera className="inline-block" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeDeviceId(lineIdx, deviceIdx)}
+                            className="px-2.5 py-1.5 xs:px-3 xs:py-2 text-red-600 hover:text-red-700 text-xs xs:text-sm"
+                            title="Delete Barcode"
+                          >
+                            <FaTrashAlt className="inline-block" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
-              
                 </div>
-              ) : (
-                <input
-                  type="number"
-                  step={field === 'unit_price' ? '0.01' : undefined}
-                  name={field}
-                  value={saleForm[field] || ''}
-                  onChange={(e) => handleEditChange(field, e.target.value)}
-                  className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  required
-                />
-              )}
-            </div>
-          ))}
-          <div className="flex justify-end gap-2">
+              </div>
+            ))}
             <button
               type="button"
-              onClick={() => {
-                stopScanner();
-                setEditing(null);
-              }}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+              onClick={addLine}
+              className="flex items-center gap-1 text-green-600 hover:text-green-800 mt-1"
             >
-              Cancel
+              <FaPlus /> Add Another Item for Sale
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    )}
+            <div className="mt-4">
+              <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                required
+              >
+                <option value="">Select payment method…</option>
+                <option>Cash</option>
+                <option>Bank Transfer</option>
+                <option>Card</option>
+                <option>Wallet</option>
+              </select>
+            </div>
+            <div className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Total: ₦{formatCurrency(totalAmount)}</div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  stopScanner();
+                  setShowAdd(false);
+                }}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                Save Sale
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
+      {/* Edit Modal */}
+      {editing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 mt-24">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveEdit();
+            }}
+            className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+          >
+            <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Sale #{editing}</h2>
+            <div className="mb-4">
+              <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
+              <select
+                name="dynamic_product_id"
+                value={saleForm.dynamic_product_id || ''}
+                onChange={(e) => handleEditChange('dynamic_product_id', e.target.value)}
+                className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                required
+              >
+                <option value="">Select product…</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            {['quantity', 'unit_price', 'deviceIds', 'payment_method'].map((field) => (
+              <div className="mb-4" key={field}>
+                <label className="block mb-1 text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
+                  {field.replace('Ids', ' IDs').replace('_', ' ')}
+                </label>
+                {field === 'payment_method' ? (
+                  <select
+                    name={field}
+                    value={saleForm[field] || ''}
+                    onChange={(e) => handleEditChange(field, e.target.value)}
+                    className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    required
+                  >
+                    <option value="">Select payment method…</option>
+                    <option>Cash</option>
+                    <option>Bank Transfer</option>
+                    <option>Card</option>
+                    <option>Wallet</option>
+                  </select>
+                ) : field === 'deviceIds' ? (
+                  <div>
+                    {saleForm.deviceIds.map((id, deviceIdx) => (
+                      <div key={deviceIdx} className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={id}
+                          onChange={(e) => handleEditChange('deviceIds', e.target.value, deviceIdx)}
+                          placeholder="Or enter barcode manually"
+                          className="flex-1 p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openScanner('edit', 0, deviceIdx)}
+                            className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                            title="Scan Barcode"
+                          >
+                            <FaCamera />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeEditDeviceId(deviceIdx)}
+                            className="p-2 text-red-600 hover:text-red-800"
+                          >
+                            <FaTrashAlt />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    step={field === 'unit_price' ? '0.01' : undefined}
+                    name={field}
+                    value={saleForm[field] || ''}
+                    onChange={(e) => handleEditChange(field, e.target.value)}
+                    className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    required
+                  />
+                )}
+              </div>
+            ))}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  stopScanner();
+                  setEditing(null);
+                }}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
   {showScanner && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
     <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
