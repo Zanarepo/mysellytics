@@ -61,6 +61,24 @@ export default function SalesTracker() {
 
 
 
+const debounce = (func, wait) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
+const debouncedToast = useMemo(() => ({
+  success: debounce((message) => {
+    toast.dismiss(); // Clear all existing toasts
+    toast.success(message);
+  }, 300),
+  error: debounce((message) => {
+    toast.dismiss(); // Clear all existing toasts
+    toast.error(message);
+  }, 300),
+}), []);
 
 // Place this before the scanner useEffect (around line 335)
 const checkSoldDevices = useCallback(
@@ -104,8 +122,6 @@ const checkSoldDevices = useCallback(
 
 
 
-
-
   // Utility Function
   const formatCurrency = (value) =>
     value.toLocaleString('en-US', {
@@ -113,27 +129,52 @@ const checkSoldDevices = useCallback(
       maximumFractionDigits: 2,
     });
 
+const successSoundRef = useRef(null);
+const duplicateSoundRef = useRef(null);
+const notFoundSoundRef = useRef(null);
 
-    
-// Existing success sound
+useEffect(() => {
+  successSoundRef.current = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+  duplicateSoundRef.current = new Audio('https://soundjay.com/buttons/sounds/button-5.mp3');
+  notFoundSoundRef.current = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
+
+  // Preload audio
+  const preload = (audio) => {
+    audio.preload = 'auto';
+    audio.load();
+  };
+  preload(successSoundRef.current);
+  preload(duplicateSoundRef.current);
+  preload(notFoundSoundRef.current);
+
+  return () => {
+    successSoundRef.current = null;
+    duplicateSoundRef.current = null;
+    notFoundSoundRef.current = null;
+  };
+}, []);
+
 const playSuccessSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
+  if (successSoundRef.current) {
+    successSoundRef.current.currentTime = 0;
+    successSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
+  }
 };
-
-
 
 const playDuplicateSound = () => {
-  const audio = new Audio('https://soundjay.com/buttons/sounds/button-5.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
+  if (duplicateSoundRef.current) {
+    duplicateSoundRef.current.currentTime = 0;
+    duplicateSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
+  }
 };
 
-
-// New not found sound
 const playNotFoundSound = () => {
-  const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
+  if (notFoundSoundRef.current) {
+    notFoundSoundRef.current.currentTime = 0;
+    notFoundSoundRef.current.play().catch((err) => console.error('Audio play error:', err));
+  }
 };
+
 
 
 
@@ -200,8 +241,7 @@ const playNotFoundSound = () => {
 
 
 
-
-  useEffect(() => {
+useEffect(() => {
   if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
   let buffer = '';
@@ -219,7 +259,7 @@ const playNotFoundSound = () => {
       const scannedDeviceId = buffer.trim();
       if (!scannedDeviceId) {
         playNotFoundSound();
-        toast.error('Scanned Product ID cannot be empty');
+        debouncedToast.error('Scanned Product ID cannot be empty');
         setScannerError('Scanned Product ID cannot be empty');
         return;
       }
@@ -237,14 +277,14 @@ const playNotFoundSound = () => {
       if (soldError && soldError.code !== 'PGRST116') {
         console.error('Error checking sold status:', soldError);
         playNotFoundSound();
-        toast.error('Failed to validate Product ID');
+        debouncedToast.error('Failed to validate Product ID');
         setScannerError('Failed to validate Product ID');
         return;
       }
       if (soldData) {
         console.log('Device ID is sold:', scannedDeviceId);
         playDuplicateSound();
-        toast.error(`Product ID "${scannedDeviceId}" has already been sold`);
+        debouncedToast.error(`Product ID "${scannedDeviceId}" has already been sold`);
         setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
         return;
       }
@@ -260,7 +300,7 @@ const playNotFoundSound = () => {
       if (error || !productData) {
         console.error('Supabase Query Error:', error);
         playNotFoundSound();
-        toast.error(`Product ID "${scannedDeviceId}" not found`);
+        debouncedToast.error(`Product ID "${scannedDeviceId}" not found`);
         setScannerError(`Product ID "${scannedDeviceId}" not found`);
         return;
       }
@@ -279,7 +319,7 @@ const playNotFoundSound = () => {
         if (existingLineIdx !== -1) {
           if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
             playDuplicateSound();
-            toast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
+            debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
             setScannerError(`Product ID "${scannedDeviceId}" already exists`);
             return;
           }
@@ -296,7 +336,7 @@ const playNotFoundSound = () => {
           if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
             if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
               playDuplicateSound();
-              toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+              debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
               setScannerError(`Product ID "${scannedDeviceId}" already exists`);
               return;
             }
@@ -344,7 +384,7 @@ const playNotFoundSound = () => {
       } else if (modal === 'edit') {
         if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
           playDuplicateSound();
-          toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+          debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
           setScannerError(`Product ID "${scannedDeviceId}" already exists`);
           return;
         }
@@ -365,7 +405,16 @@ const playNotFoundSound = () => {
 
       setScannerError(null);
       playSuccessSound();
-      toast.success(`Scanned Product ID: ${scannedDeviceId}`);
+      debouncedToast.success(`Scanned Product ID: ${scannedDeviceId}`);
+
+      // Pause scanner and close modal temporarily
+      setShowScanner(false);
+      setTimeout(() => {
+        if (scannerTarget) {
+          setShowScanner(true);
+        }
+      }, 2000);
+
       buffer = '';
     } else if (e.key !== 'Enter') {
       buffer += e.key;
@@ -379,13 +428,12 @@ const playNotFoundSound = () => {
   return () => {
     document.removeEventListener('keypress', handleKeypress);
   };
-}, [externalScannerMode, scannerTarget, lines, saleForm, showScanner, products, storeId, checkSoldDevices]);
-
+}, [externalScannerMode, scannerTarget, lines, saleForm, showScanner, products, storeId, checkSoldDevices, debouncedToast]);
 
 
 
   // Scanner: Webcam Scanner
-  useEffect(() => {
+ useEffect(() => {
   if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
 
   setScannerLoading(true);
@@ -395,7 +443,7 @@ const playNotFoundSound = () => {
     if (!document.getElementById('scanner')) {
       setScannerError('Scanner container not found');
       setScannerLoading(false);
-      toast.error('Scanner container not found. Please use manual input.');
+      debouncedToast.error('Scanner container not found. Please use manual input.');
       return;
     }
 
@@ -403,13 +451,12 @@ const playNotFoundSound = () => {
   } catch (err) {
     setScannerError(`Failed to initialize scanner: ${err.message}`);
     setScannerLoading(false);
-    toast.error('Failed to initialize scanner. Please use manual input.');
+    debouncedToast.error('Failed to initialize scanner. Please use manual input.');
     return;
   }
-
-  const config = {
-    fps: 60,
-    qrbox: { width: 250, height: 125 },
+const config = {
+    fps: 30,
+    qrbox: { width: 280, height: 180 },
     formatsToSupport: [
       Html5QrcodeSupportedFormats.CODE_128,
       Html5QrcodeSupportedFormats.CODE_39,
@@ -423,10 +470,11 @@ const playNotFoundSound = () => {
   };
 
 
+
   const onScanSuccess = async (scannedDeviceId) => {
     if (!scannedDeviceId) {
       playNotFoundSound();
-      toast.error('Scanned Product ID cannot be empty');
+      debouncedToast.error('Scanned Product ID cannot be empty');
       setScannerError('Scanned Product ID cannot be empty');
       return false;
     }
@@ -443,14 +491,14 @@ const playNotFoundSound = () => {
     if (soldError && soldError.code !== 'PGRST116') {
       console.error('Error checking sold status:', soldError);
       playNotFoundSound();
-      toast.error('Failed to validate Product ID');
+      debouncedToast.error('Failed to validate Product ID');
       setScannerError('Failed to validate Product ID');
       return false;
     }
     if (soldData) {
       console.log('Device ID is sold:', scannedDeviceId);
       playDuplicateSound();
-      toast.error(`Product ID "${scannedDeviceId}" has already been sold`);
+      debouncedToast.error(`Product ID "${scannedDeviceId}" has already been sold`);
       setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
       return false;
     }
@@ -466,7 +514,7 @@ const playNotFoundSound = () => {
     if (error || !productData) {
       console.error('Supabase Query Error:', error);
       playNotFoundSound();
-      toast.error(`Product ID "${scannedDeviceId}" not found`);
+      debouncedToast.error(`Product ID "${scannedDeviceId}" not found`);
       setScannerError(`Product ID "${scannedDeviceId}" not found`);
       return false;
     }
@@ -489,7 +537,7 @@ const playNotFoundSound = () => {
         if (existingLineIdx !== -1) {
           if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
             playDuplicateSound();
-            toast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
+            debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
             setScannerError(`Product ID "${scannedDeviceId}" already exists`);
             return false;
           }
@@ -506,7 +554,7 @@ const playNotFoundSound = () => {
           if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
             if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
               playDuplicateSound();
-              toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+              debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
               setScannerError(`Product ID "${scannedDeviceId}" already exists`);
               return false;
             }
@@ -554,7 +602,7 @@ const playNotFoundSound = () => {
       } else if (modal === 'edit') {
         if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
           playDuplicateSound();
-          toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+          debouncedToast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
           setScannerError(`Product ID "${scannedDeviceId}" already exists`);
           return false;
         }
@@ -575,17 +623,30 @@ const playNotFoundSound = () => {
 
       setScannerError(null);
       playSuccessSound();
-      toast.success(`Scanned Product ID: ${scannedDeviceId}`);
+      debouncedToast.success(`Scanned Product ID: ${scannedDeviceId}`);
+
+      // Pause scanner and close modal temporarily
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current.pause(true);
+      }
+      setShowScanner(false);
+      setTimeout(() => {
+        if (scannerTarget && html5QrCodeRef.current) {
+          setShowScanner(true);
+          html5QrCodeRef.current.resume();
+        }
+      }, 2000);
+
       return true;
     }
     console.error('No scanner target set');
     playNotFoundSound();
-    toast.error('No scanner target set');
+    debouncedToast.error('No scanner target set');
     return false;
   };
 
 
-   const onScanFailure = (error) => {
+  const onScanFailure = (error) => {
     if (
       error.includes('No MultiFormat Readers were able to detect the code') ||
       error.includes('No QR code found') ||
@@ -597,19 +658,18 @@ const playNotFoundSound = () => {
     }
   };
 
-
   const startScanner = async (attempt = 1, maxAttempts = 5) => {
     if (!currentVideo || !scannerDivRef.current) {
       setScannerError('Scanner elements not found');
       setScannerLoading(false);
-      toast.error('Scanner elements not found. Please use manual input.');
+      debouncedToast.error('Scanner elements not found. Please use manual input.');
       return;
     }
 
     if (attempt > maxAttempts) {
       setScannerError('Failed to initialize scanner after multiple attempts');
       setScannerLoading(false);
-      toast.error('Failed to initialize scanner. Please use manual input.');
+      debouncedToast.error('Failed to initialize scanner. Please use manual input.');
       return;
     }
 
@@ -634,9 +694,9 @@ const playNotFoundSound = () => {
       setScannerError(`Failed to initialize scanner: ${err.message}`);
       setScannerLoading(false);
       if (err.name === 'NotAllowedError') {
-        toast.error('Camera access denied. Please allow camera permissions.');
+        debouncedToast.error('Camera access denied. Please allow camera permissions.');
       } else if (err.name === 'NotFoundError') {
-        toast.error('No camera found. Please use manual input.');
+        debouncedToast.error('No camera found. Please use manual input.');
       } else {
         setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
       }
@@ -648,7 +708,7 @@ const playNotFoundSound = () => {
       if (cameras.length === 0) {
         setScannerError('No camera detected. Please use manual input.');
         setScannerLoading(false);
-        toast.error('No camera detected. Please use manual input.');
+        debouncedToast.error('No camera detected. Please use manual input.');
         return;
       }
       startScanner();
@@ -656,7 +716,7 @@ const playNotFoundSound = () => {
     .catch((err) => {
       setScannerError(`Failed to access cameras: ${err.message}`);
       setScannerLoading(false);
-      toast.error('Failed to access camera. Please use manual input.');
+      debouncedToast.error('Failed to access camera. Please use manual input.');
     });
 
   return () => {
@@ -677,8 +737,7 @@ const playNotFoundSound = () => {
     }
     html5QrCodeRef.current = null;
   };
-}, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, products, storeId, checkSoldDevices]);
-
+}, [showScanner, scannerTarget, lines, saleForm, externalScannerMode,debouncedToast, products, storeId, checkSoldDevices]);
 
 
   const stopScanner = useCallback(() => {
@@ -710,12 +769,11 @@ const playNotFoundSound = () => {
   };
 
 
-
 const handleManualInput = async () => {
   const trimmedInput = manualInput.trim();
   if (!trimmedInput) {
     playNotFoundSound();
-    toast.error('Product ID cannot be empty');
+    debouncedToast.error('Product ID cannot be empty');
     setScannerError('Product ID cannot be empty');
     return;
   }
@@ -732,14 +790,14 @@ const handleManualInput = async () => {
   if (soldError && soldError.code !== 'PGRST116') {
     console.error('Error checking sold status:', soldError);
     playNotFoundSound();
-    toast.error('Failed to validate Product ID');
+    debouncedToast.error('Failed to validate Product ID');
     setScannerError('Failed to validate Product ID');
     return;
   }
   if (soldData) {
     console.log('Device ID is sold:', trimmedInput);
     playDuplicateSound();
-    toast.error(`Product ID "${trimmedInput}" has already been sold`);
+    debouncedToast.error(`Product ID "${trimmedInput}" has already been sold`);
     setScannerError(`Product ID "${trimmedInput}" has already been sold`);
     setManualInput('');
     return;
@@ -756,7 +814,7 @@ const handleManualInput = async () => {
   if (error || !productData) {
     console.error('Supabase Query Error:', error);
     playNotFoundSound();
-    toast.error(`Product ID "${trimmedInput}" not found`);
+    debouncedToast.error(`Product ID "${trimmedInput}" not found`);
     setScannerError(`Product ID "${trimmedInput}" not found`);
     setManualInput('');
     return;
@@ -781,7 +839,7 @@ const handleManualInput = async () => {
         if (existingLineIdx !== -1) {
           if (next[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
             playDuplicateSound();
-            toast.error(`Product ID "${trimmedInput}" already exists in this product`);
+            debouncedToast.error(`Product ID "${trimmedInput}" already exists in this product`);
             setScannerError(`Product ID "${trimmedInput}" already exists`);
             setManualInput('');
             return next;
@@ -799,7 +857,7 @@ const handleManualInput = async () => {
           if (!next[lineIdx].dynamic_product_id || next[lineIdx].deviceIds.every(id => !id.trim())) {
             if (next[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
               playDuplicateSound();
-              toast.error(`Product ID "${trimmedInput}" already exists in this line`);
+              debouncedToast.error(`Product ID "${trimmedInput}" already exists in this line`);
               setScannerError(`Product ID "${trimmedInput}" already exists`);
               setManualInput('');
               return next;
@@ -852,7 +910,7 @@ const handleManualInput = async () => {
     } else if (modal === 'edit') {
       if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === trimmedInput.toLowerCase())) {
         playDuplicateSound();
-        toast.error(`Product ID "${trimmedInput}" already exists in this sale`);
+        debouncedToast.error(`Product ID "${trimmedInput}" already exists in this sale`);
         setScannerError(`Product ID "${trimmedInput}" already exists`);
         setManualInput('');
         return;
@@ -879,14 +937,23 @@ const handleManualInput = async () => {
     setScannerLoading(false);
     setManualInput('');
     playSuccessSound();
-    toast.success(`Added Product ID: ${trimmedInput}`);
+    debouncedToast.success(`Added Product ID: ${trimmedInput}`);
   } else {
     console.error('No scanner target set');
     playNotFoundSound();
-    toast.error('No scanner target set');
+    debouncedToast.error('No scanner target set');
     setManualInput('');
   }
+
+  // Close modal temporarily
+  setShowScanner(false);
+  setTimeout(() => {
+    if (scannerTarget) {
+      setShowScanner(true);
+    }
+  }, 2000);
 };
+
 
   // Check Sold Devices
   
@@ -1973,18 +2040,19 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
     )}
 
     {/* Single ToastContainer */}
-    <ToastContainer
-      position="top-right"
-      autoClose={3000}
-      hideProgressBar={false}
-      newestOnTop={false}
-      closeOnClick
-      rtl={false}
-      pauseOnFocusLoss
-      draggable
-      pauseOnHover
-      theme="colored"
-    />
+  <ToastContainer
+  position="top-right"
+  autoClose={2000}
+  hideProgressBar={false}
+  newestOnTop={false}
+  closeOnClick
+  rtl={false}
+  pauseOnFocusLoss
+  draggable
+  pauseOnHover
+  theme="colored"
+  limit={1}
+/>
   </div>
   );
 }
