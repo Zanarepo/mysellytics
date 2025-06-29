@@ -408,8 +408,8 @@ const playNotFoundSound = () => {
   }
 
   const config = {
-    fps: 15,
-    qrbox: { width: 250, height: 100 },
+    fps: 30,
+    qrbox: { width: 250, height: 125 },
     formatsToSupport: [
       Html5QrcodeSupportedFormats.CODE_128,
       Html5QrcodeSupportedFormats.CODE_39,
@@ -417,13 +417,13 @@ const playNotFoundSound = () => {
       Html5QrcodeSupportedFormats.UPC_A,
       Html5QrcodeSupportedFormats.QR_CODE,
     ],
-    aspectRatio: 4 / 3,
+    aspectRatio: 1.0,
     disableFlip: true,
     videoConstraints: { width: 1280, height: 720, facingMode: 'environment' },
-  
   };
 
-const onScanSuccess = async (scannedDeviceId) => {
+
+  const onScanSuccess = async (scannedDeviceId) => {
     if (!scannedDeviceId) {
       playNotFoundSound();
       toast.error('Scanned Product ID cannot be empty');
@@ -584,6 +584,7 @@ const onScanSuccess = async (scannedDeviceId) => {
     return false;
   };
 
+
    const onScanFailure = (error) => {
     if (
       error.includes('No MultiFormat Readers were able to detect the code') ||
@@ -595,6 +596,7 @@ const onScanSuccess = async (scannedDeviceId) => {
       setScannerError(`Scan error: ${error}`);
     }
   };
+
 
   const startScanner = async (attempt = 1, maxAttempts = 5) => {
     if (!currentVideo || !scannerDivRef.current) {
@@ -641,8 +643,6 @@ const onScanSuccess = async (scannedDeviceId) => {
     }
   };
 
-
-   
   Html5Qrcode.getCameras()
     .then((cameras) => {
       if (cameras.length === 0) {
