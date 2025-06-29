@@ -530,7 +530,6 @@ const processScannedBarcode = useCallback(
         const { data, error } = await supabase
           .from('dynamic_product')
           .select('id, name, dynamic_product_imeis, device_size')
-          .select('id, name, dynamic_product_imeis, device_size')
           .eq('store_id', storeId)
           .ilike('dynamic_product_imeis', `%${trimmedCode}%`);
 
@@ -559,7 +558,6 @@ const processScannedBarcode = useCallback(
                 addNotification(`Scanned barcode: ${trimmedCode} (moved to correct product line)`, 'success');
                 playSuccessSound();
                 stopScanner(); // Stop scanner immediately
-                setShowScanner(false); // Close scanner modal
                 return true;
               }
               return false;
@@ -611,7 +609,6 @@ const processScannedBarcode = useCallback(
         addNotification(`Scanned barcode: ${trimmedCode}`, 'success');
         playSuccessSound();
         stopScanner(); // Stop scanner immediately
-        setShowScanner(false); // Close scanner modal
         return true;
       }
       return false;
@@ -621,8 +618,6 @@ const processScannedBarcode = useCallback(
   },
   [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, stopScanner, storeId, addNotification, lastScannedCode, lastScanTime, isScanning]
 );
-
-
 
 const handleManualInput = useCallback(
   async () => {
@@ -689,7 +684,6 @@ const handleManualInput = useCallback(
                 setTimeout(() => setScanSuccess(false), 1000);
                 addNotification(`Added barcode: ${trimmedInput} (moved to correct product line)`, 'success');
                 playSuccessSound();
-                setShowScanner(false); // Close scanner modal
                 if (manualInputRef.current) {
                   manualInputRef.current.focus();
                 }
@@ -743,7 +737,6 @@ const handleManualInput = useCallback(
         setTimeout(() => setScanSuccess(false), 1000);
         addNotification(`Added barcode: ${trimmedInput}`, 'success');
         playSuccessSound();
-        setShowScanner(false); // Close scanner modal
         if (manualInputRef.current) {
           manualInputRef.current.focus();
         }
@@ -758,6 +751,7 @@ const handleManualInput = useCallback(
 
 
 
+
   
   const handleManualInputKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -765,7 +759,8 @@ const handleManualInput = useCallback(
       handleManualInput();
     }
   };
-useEffect(() => {
+
+ useEffect(() => {
   if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
   const handleKeypress = (e) => {
@@ -782,7 +777,6 @@ useEffect(() => {
           if (success) {
             setScannerBuffer('');
             setManualInput('');
-            setShowScanner(false); // Close scanner modal
             if (manualInputRef.current) {
               manualInputRef.current.focus();
             }
@@ -806,8 +800,7 @@ useEffect(() => {
 
 
 
-
-  useEffect(() => {
+useEffect(() => {
   if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
 
   setScannerLoading(true);
@@ -815,22 +808,18 @@ useEffect(() => {
 
   try {
     if (!document.getElementById('scanner')) {
-      setScannerError('Scanner container not found. Please use manual input.');
       setScannerLoading(false);
-      addNotification('Scanner container not found. Please use manual input.', 'error');
       return;
     }
 
     html5QrCodeRef.current = new Html5Qrcode('scanner');
   } catch (err) {
-    setScannerError(`Failed to initialize scanner: ${err.message}`);
     setScannerLoading(false);
-    addNotification('Failed to initialize scanner. Please use manual input.', 'error');
     return;
   }
 
   const config = {
-    fps: 30, // Reduced FPS for better performance
+    fps: 30,
     qrbox: { width: 250, height: 125 },
     formatsToSupport: [
       Html5QrcodeSupportedFormats.CODE_128,
@@ -857,7 +846,7 @@ useEffect(() => {
     }
   };
 
-     const onScanFailure = (error) => {
+  const onScanFailure = (error) => {
     if (
       error.includes('No MultiFormat Readers were able to detect the code') ||
       error.includes('No QR code found') ||
@@ -871,15 +860,11 @@ useEffect(() => {
 
   const startScanner = async (attempt = 1, maxAttempts = 5) => {
     if (!videoElement || !scannerDivRef.current) {
-      setScannerError('Scanner elements not found');
       setScannerLoading(false);
-      addNotification('Scanner elements not found. Please use manual input.', 'error');
       return;
     }
     if (attempt > maxAttempts) {
-      setScannerError('Failed to initialize scanner after multiple attempts');
       setScannerLoading(false);
-      addNotification('Failed to initialize scanner. Please use manual input.', 'error');
       return;
     }
     try {
@@ -905,17 +890,7 @@ useEffect(() => {
       );
       setScannerLoading(false);
     } catch (err) {
-      setScannerError(`Failed to initialize scanner: ${err.message}`);
-      setScannerLoading(false);
-      if (err.name === 'NotAllowedError') {
-        addNotification('Camera access denied. Please allow camera permissions.', 'error');
-      } else if (err.name === 'NotFoundError') {
-        addNotification('No camera found. Please use manual input.', 'error');
-      } else if (err.name === 'OverconstrainedError') {
-        setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
-      } else {
-        addNotification('Failed to start camera. Please use manual input.', 'error');
-      }
+      setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
     }
   };
 
@@ -923,35 +898,15 @@ useEffect(() => {
     Html5Qrcode.getCameras()
       .then(cameras => {
         if (cameras.length === 0) {
-          setScannerError('No cameras detected. Please use manual input.');
           setScannerLoading(false);
-          addNotification('No cameras detected. Please use manual input.', 'error');
           return;
         }
         startScanner();
       })
       .catch(err => {
-        setScannerError(`Failed to access cameras: ${err.message}`);
         setScannerLoading(false);
-        addNotification('Failed to access cameras. Please use manual input.', 'error');
       });
   }
-
-    Html5Qrcode.getCameras()
-      .then(cameras => {
-        if (cameras.length === 0) {
-          setScannerError('No cameras detected. Please use manual input.');
-          setScannerLoading(false);
-          addNotification('No cameras detected. Please use manual input.', 'error');
-          return;
-        }
-        startScanner();
-      })
-      .catch(err => {
-        setScannerError(`Failed to access cameras: ${err.message}`);
-        setScannerLoading(false);
-        addNotification('Failed to access cameras. Please use manual input.', 'error');
-      });
 
   return () => {
     if (html5QrCodeRef.current &&
@@ -969,7 +924,9 @@ useEffect(() => {
     }
     html5QrCodeRef.current = null;
   };
-}, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, addNotification, scanSuccess, isScanning]);
+}, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, scanSuccess, isScanning]);
+
+
 
 
   useEffect(() => {
@@ -1462,21 +1419,7 @@ useEffect(() => {
   return (
     <div className="p-0 space-y-6 dark:bg-gray-900 dark:text-white">
       <DeviceDebtRepayment/>
-   <div className="fixed top-16 right-4 space-y-2 z-[1000]">
-  {notifications.map(notification => (
-    <div
-      key={notification.id}
-      className={`p-4 rounded shadow-lg text-white ${
-        notification.type === 'success' ? 'bg-green-600' :
-        notification.type === 'error' ? 'bg-red-600' :
-        notification.type === 'warning' ? 'bg-yellow-600' :
-        'bg-blue-600'
-      }`}
-    >
-      {notification.message}
-    </div>
-  ))}
-</div>
+
       {error && (
         <div className="p-4 mb-4 bg-red-100 text-red-700 rounded">
           {error}
