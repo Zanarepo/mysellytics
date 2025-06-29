@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from "../../supabaseClient";
-import { FaEdit, FaTrashAlt, FaPlus, FaBell, FaCamera, FaTimes } from 'react-icons/fa';
+import { FaEdit, FaTrashAlt, FaPlus, FaBell, FaCamera } from 'react-icons/fa';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode';
 import DeviceDebtRepayment from './DeviceDebtRepayment';
 
@@ -53,6 +53,29 @@ export default function DebtsManager() {
   const scannerDivRef = useRef(null);
   const html5QrCodeRef = useRef(null);
   const manualInputRef = useRef(null);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const [lastScannedCode, setLastScannedCode] = useState(null);
+const [lastScanTime, setLastScanTime] = useState(0);
+const [isScanning, setIsScanning] = useState(false);
+
+  const stopScanner = useCallback(() => {
+    if (html5QrCodeRef.current &&
+        [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
+          html5QrCodeRef.current.getState()
+        )) {
+      html5QrCodeRef.current
+        .stop()
+        .then(() => console.log('Scanner stopped'))
+        .catch(err => console.error('Error stopping scanner:', err));
+    }
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    html5QrCodeRef.current = null;
+  }, []);
+
+
 
   // Add notification with type and auto-close
   const addNotification = useCallback((message, type = 'info', duration = 5000) => {
@@ -164,202 +187,188 @@ export default function DebtsManager() {
       throw err;
     }
   };
+const checkDeviceInProduct = useCallback(
+  async (deviceId, modal, entryIndex, deviceIndex) => {
+    if (!deviceId || typeof deviceId !== 'string' || deviceId.trim() === '') {
+      addNotification('Invalid Device ID: Empty or undefined value', 'error');
+      return false;
+    }
 
-  const checkDeviceInProduct = useCallback(
-    async (deviceId, modal, entryIndex, deviceIndex) => {
-      if (!deviceId || typeof deviceId !== 'string' || deviceId.trim() === '') {
-        addNotification('Invalid Device ID: Empty or undefined value', 'error');
-        return false;
+    try {
+      const { data, error } = await supabase
+        .from('dynamic_product')
+        .select('id, name, dynamic_product_imeis, device_size')
+        .eq('store_id', storeId)
+        .ilike('dynamic_product_imeis', `%${deviceId}%`);
+
+      if (error) {
+        throw new Error(`Error checking device ID: ${error.message}`);
       }
 
-      try {
-        const { data, error } = await supabase
-          .from('dynamic_product')
-          .select('id, name, dynamic_product_imeis, device_size')
-          .eq('store_id', storeId)
-          .ilike('dynamic_product_imeis', `%${deviceId}%`);
+      let entries = [...debtEntries];
 
-        if (error) {
-          throw new Error(`Error checking device ID: ${error.message}`);
-        }
+      if (data && data.length > 0) {
+        const product = data[0];
+        const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+        const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
+        const deviceIndexInProduct = deviceIds.indexOf(deviceId.trim());
 
-        let entries = [...debtEntries];
+        if (deviceIndexInProduct !== -1) {
+          const deviceSize = deviceSizes[deviceIndexInProduct] || '';
 
-        if (data && data.length > 0) {
-          const product = data[0];
-          const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
-          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
-          const deviceIndexInProduct = deviceIds.indexOf(deviceId.trim());
+          if (modal === 'add') {
+            const existingEntryIndex = entries.findIndex(
+              entry => entry.dynamic_product_id === product.id.toString()
+            );
 
-          if (deviceIndexInProduct !== -1) {
-            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
+            entries[entryIndex].deviceIds[deviceIndex] = '';
+            entries[entryIndex].deviceSizes[deviceIndex] = '';
+            if (!entries[entryIndex].isQuantityManual) {
+              entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+            }
 
-            if (modal === 'add') {
-              const existingEntryIndex = entries.findIndex(
-                entry => entry.dynamic_product_id === product.id.toString()
-              );
-
-              entries[entryIndex].deviceIds[deviceIndex] = '';
-              entries[entryIndex].deviceSizes[deviceIndex] = '';
-              if (!entries[entryIndex].isQuantityManual) {
-                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+            if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
+              entries[existingEntryIndex].deviceIds = [
+                ...entries[existingEntryIndex].deviceIds.filter(id => id.trim()),
+                deviceId,
+                ''
+              ];
+              entries[existingEntryIndex].deviceSizes = [
+                ...entries[existingEntryIndex].deviceSizes.filter((_, i) => entries[existingEntryIndex].deviceIds[i].trim()),
+                deviceSize,
+                ''
+              ];
+              if (!entries[existingEntryIndex].isQuantityManual) {
+                entries[existingEntryIndex].qty = entries[existingEntryIndex].deviceIds.filter(id => id.trim()).length || 1;
               }
-
-              if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
-                entries[existingEntryIndex].deviceIds = [
-                  ...entries[existingEntryIndex].deviceIds.filter(id => id.trim()),
-                  deviceId,
-                  ''
-                ];
-                entries[existingEntryIndex].deviceSizes = [
-                  ...entries[existingEntryIndex].deviceSizes.filter((_, i) => entries[existingEntryIndex].deviceIds[i].trim()),
-                  deviceSize,
-                  ''
-                ];
-                if (!entries[existingEntryIndex].isQuantityManual) {
-                  entries[existingEntryIndex].qty = entries[existingEntryIndex].deviceIds.filter(id => id.trim()).length || 1;
-                }
-                if (
-                  !entries[entryIndex].customer_id &&
-                  !entries[entryIndex].dynamic_product_id &&
-                  entries[entryIndex].deviceIds.every(id => !id.trim())
-                ) {
-                  entries.splice(entryIndex, 1);
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: existingEntryIndex,
-                    deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
-                  });
-                } else {
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: existingEntryIndex,
-                    deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
-                  });
-                }
-              } else if (entries[entryIndex].dynamic_product_id && entries[entryIndex].dynamic_product_id !== product.id.toString()) {
-                const newEntry = {
-                  customer_id: entries[entryIndex].customer_id || '',
-                  customer_name: entries[entryIndex].customer_name || '',
-                  phone_number: entries[entryIndex].phone_number || '',
-                  dynamic_product_id: product.id.toString(),
-                  product_name: product.name,
-                  supplier: entries[entryIndex].supplier || '',
-                  deviceIds: [deviceId, ''],
-                  deviceSizes: [deviceSize, ''],
-                  qty: 1,
-                  owed: entries[entryIndex].owed || '',
-                  deposited: entries[entryIndex].deposited || '',
-                  date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
-                  isQuantityManual: false
-                };
-                entries.push(newEntry);
-                if (
-                  !entries[entryIndex].customer_id &&
-                  !entries[entryIndex].dynamic_product_id &&
-                  entries[entryIndex].deviceIds.every(id => !id.trim())
-                ) {
-                  entries.splice(entryIndex, 1);
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: entries.length - 1,
-                    deviceIndex: 1
-                  });
-                } else {
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: entries.length - 1,
-                    deviceIndex: 1
-                  });
-                }
-              } else {
-                entries[entryIndex] = {
-                  ...entries[entryIndex],
-                  dynamic_product_id: product.id.toString(),
-                  product_name: product.name,
-                  deviceIds: entries[entryIndex].deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
-                  deviceSizes: entries[entryIndex].deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
-                  qty: entries[entryIndex].isQuantityManual ? entries[entryIndex].qty : (entries[entryIndex].deviceIds.filter(id => id.trim()).length + 1 || 1),
-                  date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
-                  isQuantityManual: false
-                };
+              if (
+                !entries[entryIndex].customer_id &&
+                !entries[entryIndex].dynamic_product_id &&
+                entries[entryIndex].deviceIds.every(id => !id.trim())
+              ) {
+                entries.splice(entryIndex, 1);
                 setDebtEntries([...entries]);
                 setScannerTarget({
                   modal,
-                  entryIndex,
-                  deviceIndex: entries[entryIndex].deviceIds.length - 1
+                  entryIndex: existingEntryIndex,
+                  deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
+                });
+              } else {
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex: existingEntryIndex,
+                  deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
                 });
               }
-              return true;
-            } else if (modal === 'edit') {
-              setEditing(prev => ({
-                ...prev,
+            } else {
+              const newEntry = {
+                customer_id: entries[entryIndex].customer_id || '',
+                customer_name: entries[entryIndex].customer_name || '',
+                phone_number: entries[entryIndex].phone_number || '',
                 dynamic_product_id: product.id.toString(),
                 product_name: product.name,
-                deviceIds: prev.deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
-                deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
-                qty: prev.isQuantityManual ? prev.qty : (prev.deviceIds.filter(id => id.trim()).length + 1 || 1),
-                date: prev.date || new Date().toISOString().split('T')[0],
+                supplier: entries[entryIndex].supplier || '',
+                deviceIds: [deviceId, ''],
+                deviceSizes: [deviceSize, ''],
+                qty: 1,
+                owed: entries[entryIndex].owed || '',
+                deposited: entries[entryIndex].deposited || '',
+                date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
                 isQuantityManual: false
-              }));
-              setScannerTarget({
-                modal,
-                entryIndex,
-                deviceIndex: editing.deviceIds.length
-              });
-              return true;
+              };
+              entries.push(newEntry);
+              if (
+                !entries[entryIndex].customer_id &&
+                !entries[entryIndex].dynamic_product_id &&
+                entries[entryIndex].deviceIds.every(id => !id.trim())
+              ) {
+                entries.splice(entryIndex, 1);
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex: entries.length - 1,
+                  deviceIndex: 1
+                });
+              } else {
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex: entries.length - 1,
+                  deviceIndex: 1
+                });
+              }
             }
+            return true;
+          } else if (modal === 'edit') {
+            setEditing(prev => ({
+              ...prev,
+              dynamic_product_id: product.id.toString(),
+              product_name: product.name,
+              deviceIds: prev.deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
+              deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
+              qty: prev.isQuantityManual ? prev.qty : (prev.deviceIds.filter(id => id.trim()).length + 1 || 1),
+              date: prev.date || new Date().toISOString().split('T')[0],
+              isQuantityManual: false
+            }));
+            setScannerTarget({
+              modal,
+              entryIndex,
+              deviceIndex: editing.deviceIds.length
+            });
+            return true;
           }
         }
-
-        if (modal === 'add') {
-          entries[entryIndex].deviceIds[deviceIndex] = deviceId;
-          entries[entryIndex].deviceSizes[deviceIndex] = '';
-          if (!entries[entryIndex].isQuantityManual) {
-            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
-          }
-          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
-          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
-          setDebtEntries([...entries]);
-          setScannerTarget({
-            modal,
-            entryIndex,
-            deviceIndex: entries[entryIndex].deviceIds.length - 1
-          });
-        } else if (modal === 'edit') {
-          const newDeviceIds = [...editing.deviceIds];
-          const newDeviceSizes = [...editing.deviceSizes];
-          newDeviceIds[deviceIndex] = deviceId;
-          newDeviceSizes[deviceIndex] = '';
-          newDeviceIds.push('');
-          newDeviceSizes.push('');
-          setEditing(prev => ({
-            ...prev,
-            deviceIds: newDeviceIds,
-            deviceSizes: newDeviceSizes,
-            qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
-            date: prev.date || new Date().toISOString().split('T')[0],
-            isQuantityManual: false
-          }));
-          setScannerTarget({
-            modal,
-            entryIndex,
-            deviceIndex: newDeviceIds.length - 1
-          });
-        }
-        return false;
-      } catch (err) {
-        console.error(err);
-        addNotification('Failed to verify device ID.', 'error');
-        return false;
       }
-    },
-    [storeId, debtEntries, setDebtEntries, setScannerTarget, editing, setEditing, addNotification]
-  );
+
+      if (modal === 'add') {
+        entries[entryIndex].deviceIds[deviceIndex] = deviceId;
+        entries[entryIndex].deviceSizes[deviceIndex] = '';
+        if (!entries[entryIndex].isQuantityManual) {
+          entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+        }
+        entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+        entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+        setDebtEntries([...entries]);
+        setScannerTarget({
+          modal,
+          entryIndex,
+          deviceIndex: entries[entryIndex].deviceIds.length - 1
+        });
+      } else if (modal === 'edit') {
+        const newDeviceIds = [...editing.deviceIds];
+        const newDeviceSizes = [...editing.deviceSizes];
+        newDeviceIds[deviceIndex] = deviceId;
+        newDeviceSizes[deviceIndex] = '';
+        newDeviceIds.push('');
+        newDeviceSizes.push('');
+        setEditing(prev => ({
+          ...prev,
+          deviceIds: newDeviceIds,
+          deviceSizes: newDeviceSizes,
+          qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+          date: prev.date || new Date().toISOString().split('T')[0],
+          isQuantityManual: false
+        }));
+        setScannerTarget({
+          modal,
+          entryIndex,
+          deviceIndex: newDeviceIds.length - 1
+        });
+      }
+      return false;
+    } catch (err) {
+      console.error(err);
+      addNotification('Failed to verify device ID.', 'error');
+      return false;
+    }
+  },
+  [storeId, debtEntries, setDebtEntries, setScannerTarget, editing, setEditing, addNotification]
+);
+
+
+
+
 
   const fetchDebts = useCallback(async () => {
     if (!storeId) return;
@@ -458,25 +467,42 @@ export default function DebtsManager() {
     return filteredDevices.slice(start, end);
   }, [filteredDevices, detailPage]);
 
-  const processScannedBarcode = useCallback(
-    async (scannedCode) => {
-      const trimmedCode = scannedCode.trim();
-      if (!trimmedCode) {
-        setScannerError('Invalid barcode: Empty value');
-        addNotification('Invalid barcode: Empty value', 'error');
-        return false;
-      }
+const processScannedBarcode = useCallback(
+  async (scannedCode) => {
+    const trimmedCode = scannedCode.trim();
+    if (!trimmedCode) {
+      setScannerError('Invalid barcode: Empty value');
+      addNotification('Invalid barcode: Empty value', 'error');
+      return false;
+    }
 
+    // Prevent duplicate scans of the same barcode within 1 second
+    const currentTime = Date.now();
+    if (lastScannedCode === trimmedCode && currentTime - lastScanTime < 1000) {
+      return false;
+    }
+    setLastScannedCode(trimmedCode);
+    setLastScanTime(currentTime);
+
+    // Set scan lock to prevent concurrent scans
+    if (isScanning) {
+      return false;
+    }
+    setIsScanning(true);
+
+    try {
       if (scannerTarget) {
         const { modal, entryIndex, deviceIndex } = scannerTarget;
         let entries = [...debtEntries];
 
+        // Check for duplicate barcode in current entry
         if (entries[entryIndex].deviceIds.some((id, idx) => idx !== deviceIndex && id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
           setScannerError(`Barcode "${trimmedCode}" already exists in this debt entry`);
           addNotification(`Barcode "${trimmedCode}" already exists in this debt entry`, 'error');
           return false;
         }
 
+        // Check for duplicate barcode in other entries
         const existingEntryIndex = entries.findIndex(
           entry => entry.deviceIds.some(id => id.trim().toLowerCase() === trimmedCode.toLowerCase())
         );
@@ -486,6 +512,7 @@ export default function DebtsManager() {
           return false;
         }
 
+        // Query product by barcode
         const { data, error } = await supabase
           .from('dynamic_product')
           .select('id, name, dynamic_product_imeis, device_size')
@@ -503,24 +530,78 @@ export default function DebtsManager() {
         if (data && data.length > 0) {
           const product = data[0];
           const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
           const deviceIndexInProduct = deviceIds.indexOf(trimmedCode);
 
           if (deviceIndexInProduct !== -1) {
+            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
             const currentProductId = modal === 'add' ? entries[entryIndex].dynamic_product_id : editing.dynamic_product_id;
 
             if (currentProductId && currentProductId !== product.id.toString()) {
               const deviceFound = await checkDeviceInProduct(trimmedCode, modal, entryIndex, deviceIndex);
               if (deviceFound) {
                 setScannerError(null);
+                setScanSuccess(true);
+                setTimeout(() => setScanSuccess(false), 1000);
                 addNotification(`Scanned barcode: ${trimmedCode} (moved to correct product line)`, 'success');
                 playSuccessSound();
                 return true;
               }
               return false;
             }
+
+            // Populate product details
+            if (modal === 'add') {
+              entries[entryIndex].dynamic_product_id = product.id.toString();
+              entries[entryIndex].product_name = product.name;
+              entries[entryIndex].deviceIds[deviceIndex] = trimmedCode;
+              entries[entryIndex].deviceSizes[deviceIndex] = deviceSize;
+              if (!entries[entryIndex].isQuantityManual) {
+                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+              }
+              entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+              entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+              setDebtEntries([...entries]);
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: entries[entryIndex].deviceIds.length - 1,
+              };
+            } else if (modal === 'edit') {
+              const newDeviceIds = [...editing.deviceIds];
+              const newDeviceSizes = [...editing.deviceSizes];
+              newDeviceIds[deviceIndex] = trimmedCode;
+              newDeviceSizes[deviceIndex] = deviceSize;
+              newDeviceIds.push('');
+              newDeviceSizes.push('');
+              setEditing(prev => ({
+                ...prev,
+                dynamic_product_id: product.id.toString(),
+                product_name: product.name,
+                deviceIds: newDeviceIds,
+                deviceSizes: newDeviceSizes,
+                qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+                date: prev.date || new Date().toISOString().split('T')[0],
+                isQuantityManual: false,
+              }));
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: newDeviceIds.length - 1,
+              };
+            }
+
+            setScannerTarget(newScannerTarget);
+            setScannerError(null);
+            setScanSuccess(true);
+            setTimeout(() => setScanSuccess(false), 1000);
+            addNotification(`Scanned barcode: ${trimmedCode} (Product: ${product.name})`, 'success');
+            playSuccessSound();
+            return true;
           }
         }
 
+        // If no product found, add barcode without product details
         if (modal === 'add') {
           entries[entryIndex].deviceIds[deviceIndex] = trimmedCode;
           entries[entryIndex].deviceSizes[deviceIndex] = '';
@@ -559,24 +640,40 @@ export default function DebtsManager() {
 
         setScannerTarget(newScannerTarget);
         setScannerError(null);
+        setScanSuccess(true);
+        setTimeout(() => setScanSuccess(false), 1000);
         addNotification(`Scanned barcode: ${trimmedCode}`, 'success');
         playSuccessSound();
         return true;
       }
       return false;
-    },
-    [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, storeId, addNotification]
-  );
+    } finally {
+      setIsScanning(false); // Release scan lock
+    }
+  },
+  [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, storeId, addNotification, lastScannedCode, lastScanTime, isScanning]
+);
 
-  const handleManualInput = useCallback(
-    async () => {
-      const trimmedInput = manualInput.trim();
-      if (!trimmedInput) {
-        setScannerError('Invalid barcode: Empty value');
-        addNotification('Invalid barcode: Empty value', 'error');
-        return;
-      }
 
+
+
+
+
+const handleManualInput = useCallback(
+  async () => {
+    const trimmedInput = manualInput.trim();
+    if (!trimmedInput) {
+      setScannerError('Invalid barcode: Empty value');
+      addNotification('Invalid barcode: Empty value', 'error');
+      return;
+    }
+
+    if (isScanning) {
+      return;
+    }
+    setIsScanning(true);
+
+    try {
       if (scannerTarget) {
         const { modal, entryIndex, deviceIndex } = scannerTarget;
         let entries = [...debtEntries];
@@ -613,9 +710,11 @@ export default function DebtsManager() {
         if (data && data.length > 0) {
           const product = data[0];
           const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
           const deviceIndexInProduct = deviceIds.indexOf(trimmedInput);
 
           if (deviceIndexInProduct !== -1) {
+            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
             const currentProductId = modal === 'add' ? entries[entryIndex].dynamic_product_id : editing.dynamic_product_id;
 
             if (currentProductId && currentProductId !== product.id.toString()) {
@@ -623,6 +722,8 @@ export default function DebtsManager() {
               if (deviceFound) {
                 setManualInput('');
                 setScannerError(null);
+                setScanSuccess(true);
+                setTimeout(() => setScanSuccess(false), 1000);
                 addNotification(`Added barcode: ${trimmedInput} (moved to correct product line)`, 'success');
                 playSuccessSound();
                 if (manualInputRef.current) {
@@ -632,6 +733,58 @@ export default function DebtsManager() {
               }
               return;
             }
+
+            if (modal === 'add') {
+              entries[entryIndex].dynamic_product_id = product.id.toString();
+              entries[entryIndex].product_name = product.name;
+              entries[entryIndex].deviceIds[deviceIndex] = trimmedInput;
+              entries[entryIndex].deviceSizes[deviceIndex] = deviceSize;
+              if (!entries[entryIndex].isQuantityManual) {
+                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+              }
+              entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+              entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+              setDebtEntries([...entries]);
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: entries[entryIndex].deviceIds.length - 1,
+              };
+            } else if (modal === 'edit') {
+              const newDeviceIds = [...editing.deviceIds];
+              const newDeviceSizes = [...editing.deviceSizes];
+              newDeviceIds[deviceIndex] = trimmedInput;
+              newDeviceSizes[deviceIndex] = deviceSize;
+              newDeviceIds.push('');
+              newDeviceSizes.push('');
+              setEditing(prev => ({
+                ...prev,
+                dynamic_product_id: product.id.toString(),
+                product_name: product.name,
+                deviceIds: newDeviceIds,
+                deviceSizes: newDeviceSizes,
+                qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+                date: prev.date || new Date().toISOString().split('T')[0],
+                isQuantityManual: false,
+              }));
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: newDeviceIds.length - 1,
+              };
+            }
+
+            setScannerTarget(newScannerTarget);
+            setManualInput('');
+            setScannerError(null);
+            setScanSuccess(true);
+            setTimeout(() => setScanSuccess(false), 1000);
+            addNotification(`Added barcode: ${trimmedInput} (Product: ${product.name})`, 'success');
+            playSuccessSound();
+            if (manualInputRef.current) {
+              manualInputRef.current.focus();
+            }
+            return;
           }
         }
 
@@ -674,16 +827,24 @@ export default function DebtsManager() {
         setScannerTarget(newScannerTarget);
         setManualInput('');
         setScannerError(null);
+        setScanSuccess(true);
+        setTimeout(() => setScanSuccess(false), 1000);
         addNotification(`Added barcode: ${trimmedInput}`, 'success');
         playSuccessSound();
         if (manualInputRef.current) {
           manualInputRef.current.focus();
         }
       }
-    },
-    [manualInput, scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, manualInputRef, storeId, addNotification]
-  );
+    } finally {
+      setIsScanning(false); // Release scan lock
+    }
+  },
+  [manualInput, scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, manualInputRef, storeId, addNotification, isScanning]
+);
 
+
+
+  
   const handleManualInputKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -692,205 +853,169 @@ export default function DebtsManager() {
   };
 
   useEffect(() => {
-    if (!externalScannerMode || !scannerTarget || !showScanner) return;
+  if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
-    const handleKeypress = (e) => {
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastKeyTime;
+  const handleKeypress = (e) => {
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastKeyTime;
 
-      if (timeDiff > 50 && scannerBuffer) {
-        setScannerBuffer('');
+    if (timeDiff > 50 && scannerBuffer) {
+      setScannerBuffer('');
+    }
+
+    if (e.key === 'Enter' && scannerBuffer) {
+      if (!isScanning) {
+        processScannedBarcode(scannerBuffer).then((success) => {
+          if (success) {
+            setScannerBuffer('');
+            setManualInput('');
+            if (manualInputRef.current) {
+              manualInputRef.current.focus();
+            }
+          }
+        });
       }
+    } else if (e.key !== 'Enter') {
+      setScannerBuffer(prev => prev + e.key);
+    }
 
-      if (e.key === 'Enter' && scannerBuffer) {
-        const success = processScannedBarcode(scannerBuffer);
+    setLastKeyTime(currentTime);
+  };
+
+  document.addEventListener('keypress', handleKeypress);
+
+  return () => {
+    document.removeEventListener('keypress', handleKeypress);
+  };
+}, [externalScannerMode, scannerTarget, scannerBuffer, lastKeyTime, showScanner, processScannedBarcode, isScanning]);
+
+
+
+
+useEffect(() => {
+  if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
+
+  setScannerLoading(true);
+  const videoElement = videoRef.current;
+
+  try {
+    if (!document.getElementById('scanner')) {
+      setScannerLoading(false);
+      return;
+    }
+
+    html5QrCodeRef.current = new Html5Qrcode('scanner');
+  } catch (err) {
+    setScannerLoading(false);
+    return;
+  }
+
+  const config = {
+    fps: 30,
+    qrbox: { width: 250, height: 125 },
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.QR_CODE,
+    ],
+    aspectRatio: 1.0,
+    disableFlip: true,
+    videoConstraints: { width: 1280, height: 720, facingMode: 'environment' },
+  };
+
+  const onScanSuccess = (decodedText) => {
+    if (!isScanning) {
+      processScannedBarcode(decodedText).then((success) => {
         if (success) {
-          setScannerBuffer('');
           setManualInput('');
           if (manualInputRef.current) {
             manualInputRef.current.focus();
           }
         }
-      } else if (e.key !== 'Enter') {
-        setScannerBuffer(prev => prev + e.key);
-      }
+      });
+    }
+  };
 
-      setLastKeyTime(currentTime);
-    };
+  const onScanFailure = (error) => {
+    if (
+      error.includes('No MultiFormat Readers were able to detect the code') ||
+      error.includes('No QR code found') ||
+      error.includes('IndexSizeError')
+    ) {
+      console.debug('No barcode detected');
+    } else {
+      setScannerError(`Scan error: ${error}`);
+    }
+  };
 
-    document.addEventListener('keypress', handleKeypress);
-
-    return () => {
-      document.removeEventListener('keypress', handleKeypress);
-    };
-  }, [externalScannerMode, scannerTarget, scannerBuffer, lastKeyTime, showScanner, processScannedBarcode]);
-
-  useEffect(() => {
-    if (!showScanner || !scannerDivRef.current || !videoRef.current || externalScannerMode) return;
-
-    setScannerLoading(true);
-    const videoElement = videoRef.current;
-
-    try {
-      if (!document.getElementById('scanner')) {
-        setScannerError('Scanner container not found. Please use manual input.');
-        setScannerLoading(false);
-        addNotification('Scanner container not found. Please use manual input.', 'error');
-        return;
-      }
-
-      html5QrCodeRef.current = new Html5Qrcode('scanner');
-    } catch (err) {
-      setScannerError(`Failed to initialize scanner: ${err.message}`);
+  const startScanner = async (attempt = 1, maxAttempts = 5) => {
+    if (!videoElement || !scannerDivRef.current) {
       setScannerLoading(false);
-      addNotification('Failed to initialize scanner. Please use manual input.', 'error');
       return;
     }
-
-    const config = {
-      fps: 15,
-      qrbox: { width: 250, height: 100 },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.DATA_MATRIX,
-      ],
-      aspectRatio: 4 / 3,
-      disableFlip: true,
-      videoConstraints: {
-        facingMode: 'environment',
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-      },
-    };
-
-    const onScanSuccess = (decodedText) => {
-      const success = processScannedBarcode(decodedText);
-      if (success) {
-        setManualInput('');
-        if (manualInputRef.current) {
-          manualInputRef.current.focus();
-        }
-      }
-    };
-
-    const onScanFailure = (error) => {
-      if (
-        error.includes('No MultiFormat Readers were able to detect the code') ||
-        error.includes('No QR code found') ||
-        error.includes('IndexSizeError')
-      ) {
-        console.debug('No barcode detected');
-      } else {
-        setScannerError(`Scan error: ${error}`);
-      }
-    };
-
-    const startScanner = async (attempt = 1, maxAttempts = 5) => {
-      if (!videoElement || !scannerDivRef.current) {
-        setScannerError('Scanner elements not found');
-        setScannerLoading(false);
-        addNotification('Scanner elements not found. Please use manual input.', 'error');
-        return;
-      }
-      if (attempt > maxAttempts) {
-        setScannerError('Failed to initialize scanner after multiple attempts');
-        setScannerLoading(false);
-        addNotification('Failed to initialize scanner. Please use manual input.', 'error');
-        return;
-      }
+    if (attempt > maxAttempts) {
+      setScannerLoading(false);
+      return;
+    }
+    try {
+      let stream;
       try {
-        let stream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: config.videoConstraints,
-          });
-        } catch (err) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 } },
-          });
-        }
-        videoElement.srcObject = stream;
-        await new Promise(resolve => {
-          videoElement.onloadedmetadata = () => resolve();
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: config.videoConstraints,
         });
-        await html5QrCodeRef.current.start(
-          config.videoConstraints,
-          config,
-          onScanSuccess,
-          onScanFailure
-        );
-        setScannerLoading(false);
       } catch (err) {
-        setScannerError(`Failed to initialize scanner: ${err.message}`);
-        setScannerLoading(false);
-        if (err.name === 'NotAllowedError') {
-          addNotification('Camera access denied. Please allow camera permissions.', 'error');
-        } else if (err.name === 'NotFoundError') {
-          addNotification('No camera found. Please use manual input.', 'error');
-        } else if (err.name === 'OverconstrainedError') {
-          setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
-        } else {
-          addNotification('Failed to start camera. Please use manual input.', 'error');
-        }
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 } },
+        });
       }
-    };
-
-    Html5Qrcode.getCameras()
-      .then(cameras => {
-        if (cameras.length === 0) {
-          setScannerError('No cameras detected. Please use manual input.');
-          setScannerLoading(false);
-          addNotification('No cameras detected. Please use manual input.', 'error');
-          return;
-        }
-        startScanner();
-      })
-      .catch(err => {
-        setScannerError(`Failed to access cameras: ${err.message}`);
-        setScannerLoading(false);
-        addNotification('Failed to access cameras. Please use manual input.', 'error');
+      videoElement.srcObject = stream;
+      await new Promise(resolve => {
+        videoElement.onloadedmetadata = () => resolve();
       });
+      await html5QrCodeRef.current.start(
+        config.videoConstraints,
+        config,
+        onScanSuccess,
+        onScanFailure
+      );
+      setScannerLoading(false);
+    } catch (err) {
+      setTimeout(() => startScanner(attempt + 1, maxAttempts), 200);
+    }
+  };
 
-    return () => {
-      if (html5QrCodeRef.current &&
-          [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
-            html5QrCodeRef.current.getState()
-          )) {
-        html5QrCodeRef.current
-          .stop()
-          .then(() => console.log('Webcam scanner stopped'))
-          .catch(err => console.error('Error stopping scanner:', err));
+  Html5Qrcode.getCameras()
+    .then(cameras => {
+      if (cameras.length === 0) {
+        setScannerLoading(false);
+        return;
       }
-      if (videoElement && videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
-        videoElement.srcObject = null;
-      }
-      html5QrCodeRef.current = null;
-    };
-  }, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, addNotification]);
+      startScanner();
+    })
+    .catch(err => {
+      setScannerLoading(false);
+    });
 
-  const stopScanner = useCallback(() => {
+  return () => {
     if (html5QrCodeRef.current &&
         [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
           html5QrCodeRef.current.getState()
         )) {
       html5QrCodeRef.current
         .stop()
-        .then(() => console.log('Scanner stopped'))
+        .then(() => console.log('Webcam scanner stopped'))
         .catch(err => console.error('Error stopping scanner:', err));
     }
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+    if (videoElement && videoElement.srcObject) {
+      videoElement.srcObject.getTracks().forEach(track => track.stop());
+      videoElement.srcObject = null;
     }
     html5QrCodeRef.current = null;
-  }, []);
+  };
+}, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, isScanning]);
+
 
   useEffect(() => {
     if (showScanner && manualInputRef.current) {
@@ -1382,21 +1507,7 @@ export default function DebtsManager() {
   return (
     <div className="p-0 space-y-6 dark:bg-gray-900 dark:text-white">
       <DeviceDebtRepayment/>
-   <div className="fixed top-16 right-4 space-y-2 z-[1000]">
-  {notifications.map(notification => (
-    <div
-      key={notification.id}
-      className={`p-4 rounded shadow-lg text-white ${
-        notification.type === 'success' ? 'bg-green-600' :
-        notification.type === 'error' ? 'bg-red-600' :
-        notification.type === 'warning' ? 'bg-yellow-600' :
-        'bg-blue-600'
-      }`}
-    >
-      {notification.message}
-    </div>
-  ))}
-</div>
+
       {error && (
         <div className="p-4 mb-4 bg-red-100 text-red-700 rounded">
           {error}
@@ -1897,53 +2008,10 @@ export default function DebtsManager() {
         </div>
       )}
 
-  {showScanner && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-    <div className="bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-lg max-w-[90vw] sm:max-w-md w-full relative">
-      {/* Close Button */}
-      <button
-        type="button"
-        onClick={() => {
-          stopScanner();
-          setShowScanner(false);
-          setScannerTarget(null);
-          setScannerError(null);
-          setScannerLoading(false);
-          setManualInput('');
-          setExternalScannerMode(false);
-          setScannerBuffer('');
-        }}
-        className="absolute top-3 right-3 p-2 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
-        aria-label="Close scanner modal"
-      >
-        <FaTimes className="text-gray-800 dark:text-gray-200 w-5 h-5" />
-      </button>
-
-      {/* Notifications */}
-      <div className="fixed top-4 right-4 space-y-2 z-[1000] max-w-[80vw] sm:max-w-xs">
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className={`p-3 rounded-lg shadow-lg text-white text-sm font-medium ${
-              notification.type === 'success'
-                ? 'bg-green-600'
-                : notification.type === 'error'
-                ? 'bg-red-600'
-                : notification.type === 'warning'
-                ? 'bg-yellow-600'
-                : 'bg-blue-600'
-            }`}
-          >
-            {notification.message}
-          </div>
-        ))}
-      </div>
-
-      {/* Modal Content */}
-      <h2 className="text-lg sm:text-xl font-semibold mb-3 text-gray-900 dark:text-white">
-        Scan Barcode ID
-      </h2>
-
+ {showScanner && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
+      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Product ID</h2>
       <div className="mb-4">
         <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
           <input
@@ -1957,26 +2025,29 @@ export default function DebtsManager() {
                 manualInputRef.current.focus();
               }
             }}
-            className="h-5 w-5 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-indigo-500"
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
           />
           <span>Use External Barcode Scanner</span>
         </label>
       </div>
-
       {!externalScannerMode && (
         <>
           {scannerLoading && (
-            <div className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
-              Initializing scanner...
+            <div className="text-gray-600 dark:text-gray-400 mb-4 text-center text-sm">
+              Initializing webcam scanner...
             </div>
           )}
           {scannerError && (
-            <div className="text-red-600 dark:text-red-400 mb-4 text-sm">{scannerError}</div>
+            <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm" aria-live="polite">
+              {scannerError}
+            </div>
           )}
           <div
             id="scanner"
             ref={scannerDivRef}
-            className="relative w-full h-48 sm:h-64 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
+            className={`relative w-full h-[250px] mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
+              scanSuccess ? 'border-4 border-green-500' : ''
+            }`}
           >
             <video
               ref={videoRef}
@@ -1985,56 +2056,39 @@ export default function DebtsManager() {
               playsInline
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[200px] sm:w-[250px] h-[80px] sm:h-[100px] border-2 border-red-500 bg-transparent opacity-50"></div>
+              <div className="w-[300px] h-[150px] border-2 border-red-500 bg-transparent opacity-50"></div>
             </div>
           </div>
         </>
       )}
-
       {externalScannerMode && (
-        <div className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
-          Waiting for external scanner input... Scan a barcode to proceed.
+        <div className="mb-4">
+          <div className="text-gray-600 dark:text-gray-400 mb-4 text-center">
+            Waiting for external scanner input... Scan a barcode to proceed.
+          </div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Or Enter Product ID Manually
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              ref={manualInputRef}
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              onKeyDown={handleManualInputKeyDown}
+              placeholder="Enter Product ID"
+              className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={handleManualInput}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 w-full sm:w-auto"
+            >
+              Submit
+            </button>
+          </div>
         </div>
       )}
-
-      <div className="mb-4 px-2">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Or Enter Barcode Manually
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            ref={manualInputRef}
-            value={manualInput}
-            onChange={(e) => setManualInput(e.target.value)}
-            onKeyDown={handleManualInputKeyDown}
-            placeholder="Enter barcode"
-            className="flex-1 p-3 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
-          />
-          <button
-            type="button"
-            onClick={handleManualInput}
-            className="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 shadow-md"
-            aria-label="Submit barcode"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
       <div className="flex justify-end">
         <button
           type="button"
@@ -2047,9 +2101,9 @@ export default function DebtsManager() {
             setManualInput('');
             setExternalScannerMode(false);
             setScannerBuffer('');
+            setScanSuccess(false);
           }}
-          className="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 shadow-md"
-          aria-label="Close scanner"
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
         >
           Done
         </button>
