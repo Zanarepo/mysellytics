@@ -408,7 +408,7 @@ const playNotFoundSound = () => {
   }
 
   const config = {
-    fps: 30,
+    fps: 60,
     qrbox: { width: 250, height: 125 },
     formatsToSupport: [
       Html5QrcodeSupportedFormats.CODE_128,
@@ -1714,10 +1714,9 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       </div>
     )}
 
-    {/* Scanner Modal */}
-   {showScanner && (
+  {showScanner && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
-    <div className="bg-white dark:bg-gray-900 p-3 xs:p-4 rounded-lg shadow-lg w-full max-w-[90vw] xs:max-w-[350px] max-h-[80vh] overflow-y-auto">
+    <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
       <h2 className="text-base xs:text-lg font-bold mb-2 xs:mb-3 text-gray-800 dark:text-white">Scan Product ID</h2>
       <div className="mb-2 xs:mb-3">
         <label className="flex items-center space-x-2 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1731,7 +1730,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
         </label>
       </div>
 
-{!externalScannerMode && (
+      {!externalScannerMode && (
         <>
           {scannerLoading && (
             <div className="text-gray-600 dark:text-gray-400 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
@@ -1746,7 +1745,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
           <div
             id="scanner"
             ref={scannerDivRef}
-            className="relative w-full h-[55vw] max-h-[280px] min-h-[160px] mb-2 xs:mb-3 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
+            className="relative w-full h-[250px] mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
           >
             <video
               ref={videoRef}
@@ -1755,14 +1754,13 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
               playsInline
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[80%] max-w-[240px] h-[70px] xs:h-[80px] border-2 border-red-500 bg-transparent rounded-lg opacity-60"></div>
+              <div className="w-[300px] h-[150px] border-2 border-red-500 bg-transparent opacity-50"></div>
             </div>
           </div>
         </>
       )}
 
-
-         {externalScannerMode && (
+      {externalScannerMode && (
         <div className="text-gray-600 dark:text-gray-300 text-center mb-2 xs:mb-3 text-xs xs:text-sm">
           Waiting for external scanner input...
         </div>
@@ -1807,8 +1805,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
       </div>
     </div>
   </div>
-    )}
-
+)}
 
 
 
