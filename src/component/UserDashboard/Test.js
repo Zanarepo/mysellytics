@@ -187,202 +187,188 @@ const [isScanning, setIsScanning] = useState(false);
       throw err;
     }
   };
+const checkDeviceInProduct = useCallback(
+  async (deviceId, modal, entryIndex, deviceIndex) => {
+    if (!deviceId || typeof deviceId !== 'string' || deviceId.trim() === '') {
+      addNotification('Invalid Device ID: Empty or undefined value', 'error');
+      return false;
+    }
 
-  const checkDeviceInProduct = useCallback(
-    async (deviceId, modal, entryIndex, deviceIndex) => {
-      if (!deviceId || typeof deviceId !== 'string' || deviceId.trim() === '') {
-        addNotification('Invalid Device ID: Empty or undefined value', 'error');
-        return false;
+    try {
+      const { data, error } = await supabase
+        .from('dynamic_product')
+        .select('id, name, dynamic_product_imeis, device_size')
+        .eq('store_id', storeId)
+        .ilike('dynamic_product_imeis', `%${deviceId}%`);
+
+      if (error) {
+        throw new Error(`Error checking device ID: ${error.message}`);
       }
 
-      try {
-        const { data, error } = await supabase
-          .from('dynamic_product')
-          .select('id, name, dynamic_product_imeis, device_size')
-          .eq('store_id', storeId)
-          .ilike('dynamic_product_imeis', `%${deviceId}%`);
+      let entries = [...debtEntries];
 
-        if (error) {
-          throw new Error(`Error checking device ID: ${error.message}`);
-        }
+      if (data && data.length > 0) {
+        const product = data[0];
+        const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+        const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
+        const deviceIndexInProduct = deviceIds.indexOf(deviceId.trim());
 
-        let entries = [...debtEntries];
+        if (deviceIndexInProduct !== -1) {
+          const deviceSize = deviceSizes[deviceIndexInProduct] || '';
 
-        if (data && data.length > 0) {
-          const product = data[0];
-          const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
-          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
-          const deviceIndexInProduct = deviceIds.indexOf(deviceId.trim());
+          if (modal === 'add') {
+            const existingEntryIndex = entries.findIndex(
+              entry => entry.dynamic_product_id === product.id.toString()
+            );
 
-          if (deviceIndexInProduct !== -1) {
-            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
+            entries[entryIndex].deviceIds[deviceIndex] = '';
+            entries[entryIndex].deviceSizes[deviceIndex] = '';
+            if (!entries[entryIndex].isQuantityManual) {
+              entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+            }
 
-            if (modal === 'add') {
-              const existingEntryIndex = entries.findIndex(
-                entry => entry.dynamic_product_id === product.id.toString()
-              );
-
-              entries[entryIndex].deviceIds[deviceIndex] = '';
-              entries[entryIndex].deviceSizes[deviceIndex] = '';
-              if (!entries[entryIndex].isQuantityManual) {
-                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+            if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
+              entries[existingEntryIndex].deviceIds = [
+                ...entries[existingEntryIndex].deviceIds.filter(id => id.trim()),
+                deviceId,
+                ''
+              ];
+              entries[existingEntryIndex].deviceSizes = [
+                ...entries[existingEntryIndex].deviceSizes.filter((_, i) => entries[existingEntryIndex].deviceIds[i].trim()),
+                deviceSize,
+                ''
+              ];
+              if (!entries[existingEntryIndex].isQuantityManual) {
+                entries[existingEntryIndex].qty = entries[existingEntryIndex].deviceIds.filter(id => id.trim()).length || 1;
               }
-
-              if (existingEntryIndex !== -1 && existingEntryIndex !== entryIndex) {
-                entries[existingEntryIndex].deviceIds = [
-                  ...entries[existingEntryIndex].deviceIds.filter(id => id.trim()),
-                  deviceId,
-                  ''
-                ];
-                entries[existingEntryIndex].deviceSizes = [
-                  ...entries[existingEntryIndex].deviceSizes.filter((_, i) => entries[existingEntryIndex].deviceIds[i].trim()),
-                  deviceSize,
-                  ''
-                ];
-                if (!entries[existingEntryIndex].isQuantityManual) {
-                  entries[existingEntryIndex].qty = entries[existingEntryIndex].deviceIds.filter(id => id.trim()).length || 1;
-                }
-                if (
-                  !entries[entryIndex].customer_id &&
-                  !entries[entryIndex].dynamic_product_id &&
-                  entries[entryIndex].deviceIds.every(id => !id.trim())
-                ) {
-                  entries.splice(entryIndex, 1);
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: existingEntryIndex,
-                    deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
-                  });
-                } else {
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: existingEntryIndex,
-                    deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
-                  });
-                }
-              } else if (entries[entryIndex].dynamic_product_id && entries[entryIndex].dynamic_product_id !== product.id.toString()) {
-                const newEntry = {
-                  customer_id: entries[entryIndex].customer_id || '',
-                  customer_name: entries[entryIndex].customer_name || '',
-                  phone_number: entries[entryIndex].phone_number || '',
-                  dynamic_product_id: product.id.toString(),
-                  product_name: product.name,
-                  supplier: entries[entryIndex].supplier || '',
-                  deviceIds: [deviceId, ''],
-                  deviceSizes: [deviceSize, ''],
-                  qty: 1,
-                  owed: entries[entryIndex].owed || '',
-                  deposited: entries[entryIndex].deposited || '',
-                  date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
-                  isQuantityManual: false
-                };
-                entries.push(newEntry);
-                if (
-                  !entries[entryIndex].customer_id &&
-                  !entries[entryIndex].dynamic_product_id &&
-                  entries[entryIndex].deviceIds.every(id => !id.trim())
-                ) {
-                  entries.splice(entryIndex, 1);
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: entries.length - 1,
-                    deviceIndex: 1
-                  });
-                } else {
-                  setDebtEntries([...entries]);
-                  setScannerTarget({
-                    modal,
-                    entryIndex: entries.length - 1,
-                    deviceIndex: 1
-                  });
-                }
-              } else {
-                entries[entryIndex] = {
-                  ...entries[entryIndex],
-                  dynamic_product_id: product.id.toString(),
-                  product_name: product.name,
-                  deviceIds: entries[entryIndex].deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
-                  deviceSizes: entries[entryIndex].deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
-                  qty: entries[entryIndex].isQuantityManual ? entries[entryIndex].qty : (entries[entryIndex].deviceIds.filter(id => id.trim()).length + 1 || 1),
-                  date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
-                  isQuantityManual: false
-                };
+              if (
+                !entries[entryIndex].customer_id &&
+                !entries[entryIndex].dynamic_product_id &&
+                entries[entryIndex].deviceIds.every(id => !id.trim())
+              ) {
+                entries.splice(entryIndex, 1);
                 setDebtEntries([...entries]);
                 setScannerTarget({
                   modal,
-                  entryIndex,
-                  deviceIndex: entries[entryIndex].deviceIds.length - 1
+                  entryIndex: existingEntryIndex,
+                  deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
+                });
+              } else {
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex: existingEntryIndex,
+                  deviceIndex: entries[existingEntryIndex].deviceIds.length - 1
                 });
               }
-              return true;
-            } else if (modal === 'edit') {
-              setEditing(prev => ({
-                ...prev,
+            } else {
+              const newEntry = {
+                customer_id: entries[entryIndex].customer_id || '',
+                customer_name: entries[entryIndex].customer_name || '',
+                phone_number: entries[entryIndex].phone_number || '',
                 dynamic_product_id: product.id.toString(),
                 product_name: product.name,
-                deviceIds: prev.deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
-                deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
-                qty: prev.isQuantityManual ? prev.qty : (prev.deviceIds.filter(id => id.trim()).length + 1 || 1),
-                date: prev.date || new Date().toISOString().split('T')[0],
+                supplier: entries[entryIndex].supplier || '',
+                deviceIds: [deviceId, ''],
+                deviceSizes: [deviceSize, ''],
+                qty: 1,
+                owed: entries[entryIndex].owed || '',
+                deposited: entries[entryIndex].deposited || '',
+                date: entries[entryIndex].date || new Date().toISOString().split('T')[0],
                 isQuantityManual: false
-              }));
-              setScannerTarget({
-                modal,
-                entryIndex,
-                deviceIndex: editing.deviceIds.length
-              });
-              return true;
+              };
+              entries.push(newEntry);
+              if (
+                !entries[entryIndex].customer_id &&
+                !entries[entryIndex].dynamic_product_id &&
+                entries[entryIndex].deviceIds.every(id => !id.trim())
+              ) {
+                entries.splice(entryIndex, 1);
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex: entries.length - 1,
+                  deviceIndex: 1
+                });
+              } else {
+                setDebtEntries([...entries]);
+                setScannerTarget({
+                  modal,
+                  entryIndex: entries.length - 1,
+                  deviceIndex: 1
+                });
+              }
             }
+            return true;
+          } else if (modal === 'edit') {
+            setEditing(prev => ({
+              ...prev,
+              dynamic_product_id: product.id.toString(),
+              product_name: product.name,
+              deviceIds: prev.deviceIds.map((id, idx) => idx === deviceIndex ? deviceId : id).concat(['']),
+              deviceSizes: prev.deviceSizes.map((size, idx) => idx === deviceIndex ? deviceSize : size).concat(['']),
+              qty: prev.isQuantityManual ? prev.qty : (prev.deviceIds.filter(id => id.trim()).length + 1 || 1),
+              date: prev.date || new Date().toISOString().split('T')[0],
+              isQuantityManual: false
+            }));
+            setScannerTarget({
+              modal,
+              entryIndex,
+              deviceIndex: editing.deviceIds.length
+            });
+            return true;
           }
         }
-
-        if (modal === 'add') {
-          entries[entryIndex].deviceIds[deviceIndex] = deviceId;
-          entries[entryIndex].deviceSizes[deviceIndex] = '';
-          if (!entries[entryIndex].isQuantityManual) {
-            entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
-          }
-          entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
-          entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
-          setDebtEntries([...entries]);
-          setScannerTarget({
-            modal,
-            entryIndex,
-            deviceIndex: entries[entryIndex].deviceIds.length - 1
-          });
-        } else if (modal === 'edit') {
-          const newDeviceIds = [...editing.deviceIds];
-          const newDeviceSizes = [...editing.deviceSizes];
-          newDeviceIds[deviceIndex] = deviceId;
-          newDeviceSizes[deviceIndex] = '';
-          newDeviceIds.push('');
-          newDeviceSizes.push('');
-          setEditing(prev => ({
-            ...prev,
-            deviceIds: newDeviceIds,
-            deviceSizes: newDeviceSizes,
-            qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
-            date: prev.date || new Date().toISOString().split('T')[0],
-            isQuantityManual: false
-          }));
-          setScannerTarget({
-            modal,
-            entryIndex,
-            deviceIndex: newDeviceIds.length - 1
-          });
-        }
-        return false;
-      } catch (err) {
-        console.error(err);
-        addNotification('Failed to verify device ID.', 'error');
-        return false;
       }
-    },
-    [storeId, debtEntries, setDebtEntries, setScannerTarget, editing, setEditing, addNotification]
-  );
+
+      if (modal === 'add') {
+        entries[entryIndex].deviceIds[deviceIndex] = deviceId;
+        entries[entryIndex].deviceSizes[deviceIndex] = '';
+        if (!entries[entryIndex].isQuantityManual) {
+          entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+        }
+        entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+        entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+        setDebtEntries([...entries]);
+        setScannerTarget({
+          modal,
+          entryIndex,
+          deviceIndex: entries[entryIndex].deviceIds.length - 1
+        });
+      } else if (modal === 'edit') {
+        const newDeviceIds = [...editing.deviceIds];
+        const newDeviceSizes = [...editing.deviceSizes];
+        newDeviceIds[deviceIndex] = deviceId;
+        newDeviceSizes[deviceIndex] = '';
+        newDeviceIds.push('');
+        newDeviceSizes.push('');
+        setEditing(prev => ({
+          ...prev,
+          deviceIds: newDeviceIds,
+          deviceSizes: newDeviceSizes,
+          qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+          date: prev.date || new Date().toISOString().split('T')[0],
+          isQuantityManual: false
+        }));
+        setScannerTarget({
+          modal,
+          entryIndex,
+          deviceIndex: newDeviceIds.length - 1
+        });
+      }
+      return false;
+    } catch (err) {
+      console.error(err);
+      addNotification('Failed to verify device ID.', 'error');
+      return false;
+    }
+  },
+  [storeId, debtEntries, setDebtEntries, setScannerTarget, editing, setEditing, addNotification]
+);
+
+
+
+
 
   const fetchDebts = useCallback(async () => {
     if (!storeId) return;
@@ -544,9 +530,11 @@ const processScannedBarcode = useCallback(
         if (data && data.length > 0) {
           const product = data[0];
           const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
           const deviceIndexInProduct = deviceIds.indexOf(trimmedCode);
 
           if (deviceIndexInProduct !== -1) {
+            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
             const currentProductId = modal === 'add' ? entries[entryIndex].dynamic_product_id : editing.dynamic_product_id;
 
             if (currentProductId && currentProductId !== product.id.toString()) {
@@ -557,15 +545,63 @@ const processScannedBarcode = useCallback(
                 setTimeout(() => setScanSuccess(false), 1000);
                 addNotification(`Scanned barcode: ${trimmedCode} (moved to correct product line)`, 'success');
                 playSuccessSound();
-                stopScanner(); // Stop scanner immediately
                 return true;
               }
               return false;
             }
+
+            // Populate product details
+            if (modal === 'add') {
+              entries[entryIndex].dynamic_product_id = product.id.toString();
+              entries[entryIndex].product_name = product.name;
+              entries[entryIndex].deviceIds[deviceIndex] = trimmedCode;
+              entries[entryIndex].deviceSizes[deviceIndex] = deviceSize;
+              if (!entries[entryIndex].isQuantityManual) {
+                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+              }
+              entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+              entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+              setDebtEntries([...entries]);
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: entries[entryIndex].deviceIds.length - 1,
+              };
+            } else if (modal === 'edit') {
+              const newDeviceIds = [...editing.deviceIds];
+              const newDeviceSizes = [...editing.deviceSizes];
+              newDeviceIds[deviceIndex] = trimmedCode;
+              newDeviceSizes[deviceIndex] = deviceSize;
+              newDeviceIds.push('');
+              newDeviceSizes.push('');
+              setEditing(prev => ({
+                ...prev,
+                dynamic_product_id: product.id.toString(),
+                product_name: product.name,
+                deviceIds: newDeviceIds,
+                deviceSizes: newDeviceSizes,
+                qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+                date: prev.date || new Date().toISOString().split('T')[0],
+                isQuantityManual: false,
+              }));
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: newDeviceIds.length - 1,
+              };
+            }
+
+            setScannerTarget(newScannerTarget);
+            setScannerError(null);
+            setScanSuccess(true);
+            setTimeout(() => setScanSuccess(false), 1000);
+            addNotification(`Scanned barcode: ${trimmedCode} (Product: ${product.name})`, 'success');
+            playSuccessSound();
+            return true;
           }
         }
 
-        // Update debt entry or editing state
+        // If no product found, add barcode without product details
         if (modal === 'add') {
           entries[entryIndex].deviceIds[deviceIndex] = trimmedCode;
           entries[entryIndex].deviceSizes[deviceIndex] = '';
@@ -608,7 +644,6 @@ const processScannedBarcode = useCallback(
         setTimeout(() => setScanSuccess(false), 1000);
         addNotification(`Scanned barcode: ${trimmedCode}`, 'success');
         playSuccessSound();
-        stopScanner(); // Stop scanner immediately
         return true;
       }
       return false;
@@ -616,8 +651,13 @@ const processScannedBarcode = useCallback(
       setIsScanning(false); // Release scan lock
     }
   },
-  [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, stopScanner, storeId, addNotification, lastScannedCode, lastScanTime, isScanning]
+  [scannerTarget, debtEntries, editing, checkDeviceInProduct, setDebtEntries, setEditing, setScannerTarget, setScannerError, playSuccessSound, storeId, addNotification, lastScannedCode, lastScanTime, isScanning]
 );
+
+
+
+
+
 
 const handleManualInput = useCallback(
   async () => {
@@ -670,9 +710,11 @@ const handleManualInput = useCallback(
         if (data && data.length > 0) {
           const product = data[0];
           const deviceIds = product.dynamic_product_imeis ? product.dynamic_product_imeis.split(',').map(id => id.trim()) : [];
+          const deviceSizes = product.device_size ? product.device_size.split(',').map(size => size.trim()) : [];
           const deviceIndexInProduct = deviceIds.indexOf(trimmedInput);
 
           if (deviceIndexInProduct !== -1) {
+            const deviceSize = deviceSizes[deviceIndexInProduct] || '';
             const currentProductId = modal === 'add' ? entries[entryIndex].dynamic_product_id : editing.dynamic_product_id;
 
             if (currentProductId && currentProductId !== product.id.toString()) {
@@ -691,6 +733,58 @@ const handleManualInput = useCallback(
               }
               return;
             }
+
+            if (modal === 'add') {
+              entries[entryIndex].dynamic_product_id = product.id.toString();
+              entries[entryIndex].product_name = product.name;
+              entries[entryIndex].deviceIds[deviceIndex] = trimmedInput;
+              entries[entryIndex].deviceSizes[deviceIndex] = deviceSize;
+              if (!entries[entryIndex].isQuantityManual) {
+                entries[entryIndex].qty = entries[entryIndex].deviceIds.filter(id => id.trim()).length || 1;
+              }
+              entries[entryIndex].deviceIds = [...entries[entryIndex].deviceIds, ''];
+              entries[entryIndex].deviceSizes = [...entries[entryIndex].deviceSizes, ''];
+              setDebtEntries([...entries]);
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: entries[entryIndex].deviceIds.length - 1,
+              };
+            } else if (modal === 'edit') {
+              const newDeviceIds = [...editing.deviceIds];
+              const newDeviceSizes = [...editing.deviceSizes];
+              newDeviceIds[deviceIndex] = trimmedInput;
+              newDeviceSizes[deviceIndex] = deviceSize;
+              newDeviceIds.push('');
+              newDeviceSizes.push('');
+              setEditing(prev => ({
+                ...prev,
+                dynamic_product_id: product.id.toString(),
+                product_name: product.name,
+                deviceIds: newDeviceIds,
+                deviceSizes: newDeviceSizes,
+                qty: prev.isQuantityManual ? prev.qty : (newDeviceIds.filter(id => id.trim()).length || 1),
+                date: prev.date || new Date().toISOString().split('T')[0],
+                isQuantityManual: false,
+              }));
+              newScannerTarget = {
+                modal,
+                entryIndex,
+                deviceIndex: newDeviceIds.length - 1,
+              };
+            }
+
+            setScannerTarget(newScannerTarget);
+            setManualInput('');
+            setScannerError(null);
+            setScanSuccess(true);
+            setTimeout(() => setScanSuccess(false), 1000);
+            addNotification(`Added barcode: ${trimmedInput} (Product: ${product.name})`, 'success');
+            playSuccessSound();
+            if (manualInputRef.current) {
+              manualInputRef.current.focus();
+            }
+            return;
           }
         }
 
@@ -750,8 +844,6 @@ const handleManualInput = useCallback(
 
 
 
-
-
   
   const handleManualInputKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -760,7 +852,7 @@ const handleManualInput = useCallback(
     }
   };
 
- useEffect(() => {
+  useEffect(() => {
   if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
   const handleKeypress = (e) => {
@@ -894,19 +986,17 @@ useEffect(() => {
     }
   };
 
-  if (!scanSuccess) {
-    Html5Qrcode.getCameras()
-      .then(cameras => {
-        if (cameras.length === 0) {
-          setScannerLoading(false);
-          return;
-        }
-        startScanner();
-      })
-      .catch(err => {
+  Html5Qrcode.getCameras()
+    .then(cameras => {
+      if (cameras.length === 0) {
         setScannerLoading(false);
-      });
-  }
+        return;
+      }
+      startScanner();
+    })
+    .catch(err => {
+      setScannerLoading(false);
+    });
 
   return () => {
     if (html5QrCodeRef.current &&
@@ -924,9 +1014,7 @@ useEffect(() => {
     }
     html5QrCodeRef.current = null;
   };
-}, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, scanSuccess, isScanning]);
-
-
+}, [showScanner, scannerTarget, externalScannerMode, processScannedBarcode, isScanning]);
 
 
   useEffect(() => {
