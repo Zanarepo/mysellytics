@@ -1627,7 +1627,7 @@ useEffect(() => {
       </div>
     ))}
   </div>
-<div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white mt-4 sm:mt-8">
+<div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4">
   <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
     {editing.id ? 'Edit Debt' : 'Add Debt'}
   </h2>

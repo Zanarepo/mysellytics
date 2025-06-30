@@ -914,8 +914,7 @@ function DynamicProducts() {
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
     <form
       onSubmit={createProducts}
-      className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white"
-    >
+ className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4">
       <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
         Add Products
       </h2>

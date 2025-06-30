@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FaPlus,
-  FaTrashAlt,
+
   FaFileCsv,
   FaFilePdf,
+
   FaCamera,
 } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
@@ -68,6 +69,8 @@ const playSuccessSound = () => {
   const [scannerLoading, setScannerLoading] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [externalScannerMode, setExternalScannerMode] = useState(false);
+  const lastScanTimeRef = useRef(0);
+const lastScannedCodeRef = useRef(null);
  
 
   // Refs
@@ -76,6 +79,40 @@ const playSuccessSound = () => {
   const scannerDivRef = useRef(null);
   const html5QrCodeRef = useRef(null);
 
+
+
+const stopScanner = useCallback(async () => {
+  if (html5QrCodeRef.current) {
+    const currentState = html5QrCodeRef.current.getState();
+    if (
+      [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(currentState)
+    ) {
+      try {
+        // Wait briefly to ensure any ongoing transitions complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await html5QrCodeRef.current.stop();
+        console.log('Scanner stopped successfully');
+        html5QrCodeRef.current = null;
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      }
+    } else {
+      console.log('Scanner not in active state:', currentState);
+      html5QrCodeRef.current = null;
+    }
+  }
+  if (videoRef.current && videoRef.current.srcObject) {
+    const tracks = videoRef.current.srcObject.getTracks();
+    tracks.forEach((track) => track.stop());
+    videoRef.current.srcObject = null;
+    videoRef.current = null; // Reset video element
+  }
+  setScannerError(null);
+  setScannerLoading(false);
+}, []);
+
+
+  
   // Computed Values
   const paginatedSales = useMemo(() => {
     if (viewMode !== 'list') return [];
@@ -189,75 +226,191 @@ const checkSoldDevices = useCallback(async (deviceIds, productId, lineIdx) => {
   ];
 
   // Scanner: External Scanner Input
-  useEffect(() => {
-    if (!externalScannerMode || !scannerTarget) return;
+ useEffect(() => {
+  if (!externalScannerMode || !scannerTarget || !showScanner) return;
 
-    let buffer = '';
-    let lastKeyTime = 0;
+  let buffer = '';
+  let lastKeyTime = 0;
 
-    const handleKeypress = (e) => {
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastKeyTime;
+  const handleKeypress = async (e) => {
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastKeyTime;
 
-      if (timeDiff > 50 && buffer) {
-        buffer = '';
+    if (timeDiff > 50 && buffer) {
+      buffer = '';
+    }
+
+    if (e.key === 'Enter' && buffer) {
+      const scannedDeviceId = buffer.trim();
+      if (!scannedDeviceId) {
+        toast.error('Scanned Product ID cannot be empty');
+        setScannerError('Scanned Product ID cannot be empty');
+        return;
       }
 
-      if (e.key === 'Enter' && buffer) {
-        const scannedDeviceId = buffer.trim();
-        if (!scannedDeviceId) {
-          toast.error('Scanned Product ID cannot be empty');
-          setScannerError('Scanned Product ID cannot be empty');
+      // Check if device ID is already sold
+      const { data: soldData, error: soldError } = await supabase
+        .from('dynamic_sales')
+        .select('device_id')
+        .eq('device_id', scannedDeviceId)
+        .eq('store_id', storeId)
+        .single();
+      if (soldError && soldError.code !== 'PGRST116') {
+        console.error('Error checking sold status:', soldError);
+        toast.error('Failed to validate Product ID');
+        setScannerError('Failed to validate Product ID');
+        return;
+      }
+      if (soldData) {
+        console.log('Device ID is sold:', scannedDeviceId);
+        toast.error(`Product ID "${scannedDeviceId}" has already been sold`);
+        setScannerError(`Product ID "${scannedDeviceId}" has already been sold`);
+        return;
+      }
+
+      // Query product details
+      const { data: productData, error } = await supabase
+        .from('dynamic_product')
+        .select('id, name, selling_price, dynamic_product_imeis, device_size')
+        .eq('store_id', storeId)
+        .ilike('dynamic_product_imeis', `%${scannedDeviceId}%`)
+        .single();
+
+      if (error || !productData) {
+        console.error('Supabase Query Error:', error);
+        toast.error(`Product ID "${scannedDeviceId}" not found`);
+        setScannerError(`Product ID "${scannedDeviceId}" not found`);
+        return;
+      }
+
+      console.log('Found Product:', productData);
+
+      const deviceIds = productData.dynamic_product_imeis ? productData.dynamic_product_imeis.split(',').map(id => id.trim()).filter(id => id) : [];
+      const deviceSizes = productData.device_size ? productData.device_size.split(',').map(size => size.trim()).filter(size => size) : [];
+      const idIndex = deviceIds.indexOf(scannedDeviceId);
+
+      const { modal, lineIdx, deviceIdx } = scannerTarget;
+      let newDeviceIdx;
+
+      if (modal === 'add') {
+        const ls = [...lines];
+        const existingLineIdx = ls.findIndex(line => {
+          const product = products.find(p => p.id === line.dynamic_product_id);
+          return product && product.name === productData.name;
+        });
+
+        if (existingLineIdx !== -1) {
+          if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+            toast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
+            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+            return;
+          }
+          ls[existingLineIdx].deviceIds.push(scannedDeviceId);
+          ls[existingLineIdx].deviceSizes.push(idIndex !== -1 ? deviceSizes[idIndex] || '' : '');
+          if (!ls[existingLineIdx].isQuantityManual) {
+            ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
+          }
+          const mergedLines = ls.filter((line, idx) => {
+            if (idx === existingLineIdx) return true;
+            const product = products.find(p => p.id === line.dynamic_product_id);
+            if (product && product.name === productData.name) {
+              ls[existingLineIdx].deviceIds.push(...line.deviceIds.filter(id => id.trim()));
+              ls[existingLineIdx].deviceSizes.push(...line.deviceSizes);
+              if (!ls[existingLineIdx].isQuantityManual) {
+                ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
+              }
+              return false;
+            }
+            return true;
+          });
+          console.log('Updated Lines (Existing Product):', mergedLines);
+          setLines(mergedLines);
+          newDeviceIdx = ls[existingLineIdx].deviceIds.length - 1;
+          checkSoldDevices(deviceIds, productData.id, existingLineIdx);
+          setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
+        } else {
+          if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
+            if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+              toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
+              setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+              return;
+            }
+            ls[lineIdx] = {
+              ...ls[lineIdx],
+              dynamic_product_id: Number(productData.id),
+              unit_price: Number(productData.selling_price),
+              deviceIds: [scannedDeviceId],
+              deviceSizes: [idIndex !== -1 ? deviceSizes[idIndex] || '' : ''],
+              quantity: ls[lineIdx].isQuantityManual ? ls[lineIdx].quantity : 1,
+            };
+            console.log('Updated Lines (Current Line):', ls);
+            setLines(ls);
+            newDeviceIdx = 0;
+            checkSoldDevices(deviceIds, productData.id, lineIdx);
+            setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
+          } else {
+            if (ls.some(line => line.deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase()))) {
+              toast.error(`Product ID "${scannedDeviceId}" already exists in another product`);
+              setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+              return;
+            }
+            const newLine = {
+              dynamic_product_id: Number(productData.id),
+              quantity: 1,
+              unit_price: Number(productData.selling_price),
+              deviceIds: [scannedDeviceId],
+              deviceSizes: [idIndex !== -1 ? deviceSizes[idIndex] || '' : ''],
+              isQuantityManual: false,
+            };
+            ls.push(newLine);
+            console.log('Added New Line:', ls);
+            setLines(ls);
+            newDeviceIdx = 0;
+            checkSoldDevices(deviceIds, productData.id, ls.length - 1);
+            setScannerTarget({ modal, lineIdx: ls.length - 1, deviceIdx: newDeviceIdx });
+          }
+        }
+      } else if (modal === 'edit') {
+        if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+          toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+          setScannerError(`Product ID "${scannedDeviceId}" already exists`);
           return;
         }
-
-        const { modal, lineIdx, deviceIdx } = scannerTarget;
-        if (modal === 'add') {
-          const ls = [...lines];
-          if (ls[lineIdx].deviceIds.includes(scannedDeviceId)) {
-            toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
-            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-            return;
-          }
-          ls[lineIdx].deviceIds[deviceIdx] = scannedDeviceId;
-          if (!ls[lineIdx].isQuantityManual) {
-            ls[lineIdx].quantity = ls[lineIdx].deviceIds.filter(id => id.trim()).length || 1;
-          }
-          setLines(ls);
-        } else if (modal === 'edit') {
-          if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim() === scannedDeviceId)) {
-            toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
-            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-            return;
-          }
-          const newDeviceIds = [...saleForm.deviceIds];
-          newDeviceIds[deviceIdx] = scannedDeviceId;
-          setSaleForm((prev) => ({
-            ...prev,
-            deviceIds: newDeviceIds,
-            quantity: prev.isQuantityManual ? prev.quantity : (newDeviceIds.filter(id => id.trim()).length || 1),
-          }));
-        }
-
-        setScannerTarget(null);
-        setShowScanner(false);
-        setScannerError(null);
-        setScannerLoading(false);
-        toast.success(`Scanned Product ID: ${scannedDeviceId}`);
-        buffer = '';
-      } else if (e.key !== 'Enter') {
-        buffer += e.key;
+        const updatedForm = {
+          ...saleForm,
+          dynamic_product_id: Number(productData.id),
+          unit_price: Number(productData.selling_price),
+          deviceIds: [...saleForm.deviceIds.slice(0, deviceIdx), scannedDeviceId, ...saleForm.deviceIds.slice(deviceIdx + 1)],
+          deviceSizes: [...saleForm.deviceSizes.slice(0, deviceIdx), (idIndex !== -1 ? deviceSizes[idIndex] || '' : ''), ...saleForm.deviceSizes.slice(deviceIdx + 1)],
+          quantity: saleForm.isQuantityManual ? saleForm.quantity : (saleForm.deviceIds.filter(id => id.trim()).length || 1),
+        };
+        console.log('Updated Sale Form:', updatedForm);
+        setSaleForm(updatedForm);
+        newDeviceIdx = deviceIdx;
+        checkSoldDevices(deviceIds, productData.id, 0);
+        setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
       }
 
-      lastKeyTime = currentTime;
-    };
+      setScannerError(null);
+      setScannerLoading(false);
+      setManualInput('');
+      toast.success(`Scanned Product ID: ${scannedDeviceId}`);
+      buffer = '';
+    } else if (e.key !== 'Enter') {
+      buffer += e.key;
+    }
 
-    document.addEventListener('keypress', handleKeypress);
+    lastKeyTime = currentTime;
+  };
 
-    return () => {
-      document.removeEventListener('keypress', handleKeypress);
-    };
-  }, [externalScannerMode, scannerTarget, lines, saleForm]);
+  document.addEventListener('keypress', handleKeypress);
+
+  return () => {
+    document.removeEventListener('keypress', handleKeypress);
+  };
+}, [externalScannerMode, scannerTarget, showScanner, lines, saleForm, products, inventory, storeId, checkSoldDevices]);
+
+
 
   // Scanner: Webcam Scanner
 
@@ -284,25 +437,31 @@ const checkSoldDevices = useCallback(async (deviceIds, productId, lineIdx) => {
       return;
     }
 
+const config = {
+  fps: 60, // High FPS for instant detection
+  qrbox: { width: 250, height: 125 }, // Smaller qrbox for faster focus
+  formatsToSupport: [
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.QR_CODE,
+  ],
+  aspectRatio: 1.0, // Square for better alignment
+  disableFlip: true,
+  videoConstraints: { width: 1280, height: 720, facingMode: 'environment' }, // Higher resolution
+};
 
-
-
-    const config = {
-      fps: 15,
-      qrbox: { width: 250, height: 100 },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.QR_CODE,
-      ],
-      aspectRatio: 4 / 3,
-      disableFlip: true,
-      videoConstraints: { width: 640, height: 480, facingMode: 'environment' },
-    };
 
 const onScanSuccess = async (scannedDeviceId) => {
+  const currentTime = Date.now();
+  // Debounce: Ignore scans within 500ms or of the same barcode
+  if (currentTime - lastScanTimeRef.current < 500 || lastScannedCodeRef.current === scannedDeviceId) {
+    return false;
+  }
+  lastScanTimeRef.current = currentTime;
+  lastScannedCodeRef.current = scannedDeviceId;
+
   playSuccessSound();
   if (!scannedDeviceId) {
     toast.error('Scanned Product ID cannot be empty');
@@ -311,6 +470,25 @@ const onScanSuccess = async (scannedDeviceId) => {
   }
 
   console.log('Scanned Device ID:', scannedDeviceId);
+
+  // Check for duplicate in current sale
+  if (scannerTarget) {
+    const { modal, deviceIdx } = scannerTarget;
+    if (modal === 'add') {
+      const ls = [...lines];
+      if (ls.some(line => line.deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase()))) {
+        toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+        return false;
+      }
+    } else if (modal === 'edit') {
+      if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
+        toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
+        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
+        return false;
+      }
+    }
+  }
 
   // Check if device ID is already sold
   const { data: soldData, error: soldError } = await supabase
@@ -365,11 +543,6 @@ const onScanSuccess = async (scannedDeviceId) => {
       });
 
       if (existingLineIdx !== -1) {
-        if (ls[existingLineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-          toast.error(`Product ID "${scannedDeviceId}" already exists in this product`);
-          setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-          return false;
-        }
         ls[existingLineIdx].deviceIds.push(scannedDeviceId);
         ls[existingLineIdx].deviceSizes.push(idIndex !== -1 ? deviceSizes[idIndex] || '' : '');
         if (!ls[existingLineIdx].isQuantityManual) {
@@ -395,11 +568,6 @@ const onScanSuccess = async (scannedDeviceId) => {
         setScannerTarget({ modal, lineIdx: existingLineIdx, deviceIdx: newDeviceIdx });
       } else {
         if (!ls[lineIdx].dynamic_product_id || ls[lineIdx].deviceIds.every(id => !id.trim())) {
-          if (ls[lineIdx].deviceIds.some(id => id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-            toast.error(`Product ID "${scannedDeviceId}" already exists in this line`);
-            setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-            return false;
-          }
           ls[lineIdx] = {
             ...ls[lineIdx],
             dynamic_product_id: Number(productData.id),
@@ -431,11 +599,6 @@ const onScanSuccess = async (scannedDeviceId) => {
         }
       }
     } else if (modal === 'edit') {
-      if (saleForm.deviceIds.some((id, i) => i !== deviceIdx && id.trim().toLowerCase() === scannedDeviceId.toLowerCase())) {
-        toast.error(`Product ID "${scannedDeviceId}" already exists in this sale`);
-        setScannerError(`Product ID "${scannedDeviceId}" already exists`);
-        return false;
-      }
       const updatedForm = {
         ...saleForm,
         dynamic_product_id: Number(productData.id),
@@ -457,9 +620,9 @@ const onScanSuccess = async (scannedDeviceId) => {
   }
   console.error('No scanner target set');
   toast.error('No scanner target set');
+  setScannerError('No scanner target set');
   return false;
 };
-
 
 
 
@@ -550,27 +713,13 @@ return () => {
     }
     html5QrCodeRef.current = null;
   };
- }, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, checkSoldDevices, storeId, products]);
+ }, [showScanner, scannerTarget, lines, saleForm, externalScannerMode, checkSoldDevices,stopScanner, storeId, products]);
 
 
 
-  const stopScanner = useCallback(() => {
-    if (html5QrCodeRef.current &&
-        [Html5QrcodeScannerState.SCANNING, Html5QrcodeScannerState.PAUSED].includes(
-          html5QrCodeRef.current.getState()
-        )) {
-      html5QrCodeRef.current
-        .stop()
-        .then(() => console.log('Scanner stopped'))
-        .catch((err) => console.error('Error stopping scanner:', err));
-    }
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    html5QrCodeRef.current = null;
-  }, []);
 
+
+  
   const openScanner = (modal, lineIdx, deviceIdx) => {
     setScannerTarget({ modal, lineIdx, deviceIdx });
     setShowScanner(true);
@@ -579,7 +728,6 @@ return () => {
     setManualInput('');
     setExternalScannerMode(false);
   };
-
 const handleManualInput = async () => {
   const trimmedInput = manualInput.trim();
   if (!trimmedInput) {
@@ -651,21 +799,19 @@ const handleManualInput = async () => {
           setManualInput('');
           return;
         }
-        ls[existingLineIdx].deviceIds = ls[existingLineIdx].deviceIds.filter(id => id.trim());
-        ls[existingLineIdx].deviceSizes = ls[existingLineIdx].deviceSizes.slice(0, ls[existingLineIdx].deviceIds.length);
         ls[existingLineIdx].deviceIds.push(trimmedInput);
         ls[existingLineIdx].deviceSizes.push(idIndex !== -1 ? deviceSizes[idIndex] || '' : '');
         if (!ls[existingLineIdx].isQuantityManual) {
-          ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.length || 1;
+          ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
         }
         const mergedLines = ls.filter((line, idx) => {
           if (idx === existingLineIdx) return true;
           const product = products.find(p => p.id === line.dynamic_product_id);
           if (product && product.name === productData.name) {
             ls[existingLineIdx].deviceIds.push(...line.deviceIds.filter(id => id.trim()));
-            ls[existingLineIdx].deviceSizes.push(...line.deviceSizes.slice(0, line.deviceIds.filter(id => id.trim()).length));
+            ls[existingLineIdx].deviceSizes.push(...line.deviceSizes);
             if (!ls[existingLineIdx].isQuantityManual) {
-              ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.length || 1;
+              ls[existingLineIdx].quantity = ls[existingLineIdx].deviceIds.filter(id => id.trim()).length || 1;
             }
             return false;
           }
@@ -698,6 +844,12 @@ const handleManualInput = async () => {
           checkSoldDevices(deviceIds, productData.id, lineIdx);
           setScannerTarget({ modal, lineIdx, deviceIdx: newDeviceIdx });
         } else {
+          if (ls.some(line => line.deviceIds.some(id => id.trim().toLowerCase() === trimmedInput.toLowerCase()))) {
+            toast.error(`Product ID "${trimmedInput}" already exists in another product`);
+            setScannerError(`Product ID "${trimmedInput}" already exists`);
+            setManualInput('');
+            return;
+          }
           const newLine = {
             dynamic_product_id: Number(productData.id),
             quantity: 1,
@@ -1447,6 +1599,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
             />
           )}
         </div>
+        
         <button
   onClick={() => setShowAdd(true)}
   className="flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full sm:w-auto new-sale-button"
@@ -1456,329 +1609,416 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
 
       </div>
 
-      {/* Add Modal */}
-  {showAdd && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
+   {/* Add Sale Modal */}
+{showAdd && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center sm:items-start justify-center p-4 z-50 overflow-auto mt-0 sm:mt-16">
     <form
       onSubmit={createSale}
-      className="bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto mt-28"
+       className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4"
     >
-      <h2 className="text-xl sm:text-2xl font-bold mb-4">Add Sale</h2>
-
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+        Add Sale
+      </h2>
       {lines.map((line, lineIdx) => (
-        <div key={lineIdx} className="mb-6 border-b pb-4 dark:border-gray-700">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 mb-4">
-            <div className="sm:col-span-4">
-              <label className="block mb-1 text-sm font-medium">Product</label>
-              <select
-                name="dynamic_product_id"
-                value={line.dynamic_product_id}
-                onChange={(e) => handleLineChange(lineIdx, 'dynamic_product_id', e.target.value)}
-                required
-                className="w-full p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Select product…</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block mb-1 text-sm font-medium">Quantity</label>
-              <input
-                type="number"
-                min="1"
-                name="quantity"
-                value={line.quantity}
-                onChange={(e) => handleLineChange(lineIdx, 'quantity', e.target.value)}
-                className="w-full p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block mb-1 text-sm font-medium">Unit Price</label>
-              <input
-                type="number"
-                step="0.01"
-                name="unit_price"
-                value={line.unit_price}
-                onChange={(e) => handleLineChange(lineIdx, 'unit_price', e.target.value)}
-                className="w-full p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="sm:col-span-3 flex items-end">
+        <div key={lineIdx} className="border border-gray-200 dark:border-gray-700 p-3 sm:p-4 rounded-lg space-y-3 dark:bg-gray-800">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-200">
+              Sale Item {lineIdx + 1}
+            </h3>
+            {lines.length > 1 && (
               <button
                 type="button"
                 onClick={() => removeLine(lineIdx)}
-                className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50"
+                className="p-1.5 sm:p-2 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                aria-label={`Remove sale item ${lineIdx + 1}`}
                 disabled={lines.length === 1}
               >
-                <FaTrashAlt />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-2">
-            <label className="block mb-1 text-sm font-medium">Product IDs and Sizes (Optional)</label>
-            {line.deviceIds.map((id, deviceIdx) => (
-              <div key={deviceIdx} className="flex flex-col sm:flex-row gap-2 mb-2">
-                <select
-                  value={id}
-                  onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
-                  className="flex-1 p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                <svg
+                  className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <option value="">Select Product ID (Optional)</option>
-                  {(availableDeviceIds[lineIdx]?.deviceIds || []).map((deviceId) => (
-                    <option key={deviceId} value={deviceId}>{deviceId}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={id}
-                  onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
-                  onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
-                    }
-                  }}
-                  placeholder="Or enter product ID manually"
-                  className="flex-1 p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <input
-                  type="text"
-                  value={line.deviceSizes[deviceIdx] || ''}
-                  onChange={(e) => handleLineChange(lineIdx, 'deviceSizes', e.target.value, deviceIdx)}
-                  placeholder="Enter Product/Goods/Device Size (Optional)"
-                  className="flex-1 p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <div class="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => openScanner('add', lineIdx, deviceIdx)}
-                    className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                    title="Scan Barcode"
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {[
+              { name: 'dynamic_product_id', label: 'Product', type: 'select', required: true },
+              { name: 'quantity', label: 'Quantity', type: 'number', min: 1, required: true },
+              { name: 'unit_price', label: 'Unit Price', type: 'number', step: '0.01', required: true },
+            ].map(field => (
+              <label key={field.name} className="block">
+                <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                  {field.label}
+                </span>
+                {field.type === 'select' ? (
+                  <select
+                    name={field.name}
+                    value={line[field.name] || ''}
+                    onChange={(e) => handleLineChange(lineIdx, field.name, e.target.value)}
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                    required={field.required}
                   >
-                    <FaCamera />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeDeviceId(lineIdx, deviceIdx)}
-                    className="p-2 text-red-600 hover:text-red-800"
-                  >
-                    <FaTrashAlt />
-                  </button>
-                </div>
-              </div>
+                    <option value="">Select {field.label.toLowerCase()}…</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type}
+                    name={field.name}
+                    value={line[field.name] || ''}
+                    onChange={(e) => handleLineChange(lineIdx, field.name, e.target.value)}
+                    min={field.min}
+                    step={field.step}
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                    required={field.required}
+                  />
+                )}
+              </label>
             ))}
-            <button
-              type="button"
-              onClick={(e) => addDeviceId(e, lineIdx)}
-              className="flex items-center gap-1 text-green-600 hover:text-green-800 mt-2"
-            >
-              <FaPlus /> Add Product ID & Size
-            </button>
+            <label className="block">
+              <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                Product IDs and Sizes (Optional)
+              </span>
+              {line.deviceIds.map((id, deviceIdx) => (
+                <div key={deviceIdx} className="flex flex-col gap-3 sm:gap-4 mt-2">
+                  <select
+                    value={id}
+                    onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                  >
+                    <option value="">Select Product ID (Optional)</option>
+                    {(availableDeviceIds[lineIdx]?.deviceIds || []).map((deviceId) => (
+                      <option key={deviceId} value={deviceId}>{deviceId}</option>
+                    ))}
+                  </select>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <input
+                      type="text"
+                      value={id}
+                      onChange={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx)}
+                      onBlur={(e) => handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleLineChange(lineIdx, 'deviceIds', e.target.value, deviceIdx, true);
+                        }
+                      }}
+                      placeholder="Or enter product ID manually"
+                      className="flex-1 p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                    />
+                    <div className="flex gap-2 sm:gap-3 mt-1 sm:mt-0">
+                      <button
+                        type="button"
+                        onClick={() => openScanner('add', lineIdx, deviceIdx)}
+                        className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+                        aria-label={`Scan barcode for product ID ${deviceIdx + 1}`}
+                      >
+                        <FaCamera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeDeviceId(lineIdx, deviceIdx)}
+                        className="p-2 sm:p-2.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                        aria-label={`Remove product ID ${deviceIdx + 1}`}
+                      >
+                        <svg
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={line.deviceSizes[deviceIdx] || ''}
+                    onChange={(e) => handleLineChange(lineIdx, 'deviceSizes', e.target.value, deviceIdx)}
+                    placeholder="Enter Product/Goods/Device Size (Optional)"
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={(e) => addDeviceId(e, lineIdx)}
+                className="mt-2 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-semibold"
+                aria-label={`Add product ID and size for sale item ${lineIdx + 1}`}
+              >
+                + Add Product ID & Size
+              </button>
+            </label>
+            <label className="block">
+              <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                Payment Method
+              </span>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                required
+              >
+                <option value="">Select payment method…</option>
+                <option>Cash</option>
+                <option>Bank Transfer</option>
+                <option>Card</option>
+                <option>Wallet</option>
+              </select>
+            </label>
           </div>
         </div>
       ))}
-
-      <button
-        type="button"
-        onClick={addLine}
-        className="flex items-center gap-1 text-green-600 hover:text-green-800 mb-4"
-      >
-        <FaPlus /> Add Item
-      </button>
-
-      <div className="mb-4">
-        <label className="block mb-1 text-sm font-medium">Payment Method</label>
-        <select
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-          className="w-full p-2 border rounded dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          required
-        >
-          <option value="">Select payment method…</option>
-          <option>Cash</option>
-          <option>Bank Transfer</option>
-          <option>Card</option>
-          <option>Wallet</option>
-        </select>
-      </div>
-
-      <div className="mb-4 text-lg font-semibold">Total: ₦{totalAmount.toFixed(2)}</div>
-
-      <div className="flex flex-col sm:flex-row justify-end gap-2">
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-200">
+          Total: ₦{totalAmount.toFixed(2)}
+        </div>
         <button
           type="button"
-          onClick={() => {
-            stopScanner();
-            setShowAdd(false);
-          }}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+          onClick={addLine}
+          className="p-2 sm:p-3 bg-green-600 text-white rounded-full shadow-sm hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-200 w-full sm:w-auto flex items-center justify-center gap-2"
+          aria-label="Add another sale item"
         >
-          Cancel
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="text-sm sm:text-base">Add Item</span>
         </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-        >
-          Save Sale
-        </button>
+       <div className="flex justify-end gap-2 sm:gap-3">
+  <button
+    type="button"
+    onClick={() => {
+      stopScanner();
+      setShowAdd(false);
+    }}
+    className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+            aria-label="Cancel sale form"
+  >
+    <svg
+      className="w-4 h-4 sm:w-5 sm:h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </button>
+  <button
+    type="submit"
+    className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-200 w-full sm:w-auto flex items-center justify-center gap-2"
+    aria-label="Save sale"
+  >
+    <svg
+      className="w-4 h-4 sm:w-5 sm:h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+    </svg>
+  </button>
+</div>
       </div>
     </form>
   </div>
 )}
 
-
-      {/* Edit Modal */}
- {editing && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto mt-16">
+{/* Edit Sale Modal */}
+{/* Edit Sale Modal */}
+{editing && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center sm:items-start justify-center p-4 z-50 overflow-auto mt-0 sm:mt-16">
     <form
       onSubmit={(e) => {
         e.preventDefault();
         saveEdit();
       }}
-      className="bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto mt-16"
+      className="bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[85vh] overflow-y-auto space-y-4"
     >
-      <h2 className="text-lg sm:text-xl font-bold mb-4">
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
         Edit Sale #{editing}
       </h2>
-
-      <div className="mb-4">
-        <label className="block mb-1 text-sm font-medium">Product</label>
-        <select
-          name="dynamic_product_id"
-          value={saleForm.dynamic_product_id || ''}
-          onChange={(e) => handleEditChange('dynamic_product_id', e.target.value)}
-          className="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-          required
-        >
-          <option value="">Select product…</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {['quantity', 'unit_price', 'deviceIds', 'deviceSizes', 'payment_method'].map((field) => (
-        <div className="mb-4" key={field}>
-          <label className="block mb-1 text-sm font-medium capitalize">
-            {field.replace('Ids', ' IDs').replace('Sizes', ' Sizes').replace('_', ' ')}
-          </label>
-
-          {field === 'payment_method' ? (
-            <select
-              name={field}
-              value={saleForm[field] || ''}
-              onChange={(e) => handleEditChange(field, e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-              required
-            >
-              <option value="">Select payment method…</option>
-              <option>Cash</option>
-              <option>Bank Transfer</option>
-              <option>Card</option>
-              <option>Wallet</option>
-            </select>
-          ) : field === 'deviceIds' || field === 'deviceSizes' ? (
-            <div>
-              {saleForm.deviceIds.map((id, deviceIdx) => (
-                <div key={`edit-device-${deviceIdx}`} className="flex flex-col sm:flex-row items-stretch gap-2 mb-2">
-                  <select
-                    value={id}
-                    onChange={(e) => handleEditChange('deviceIds', e.target.value, deviceIdx)}
-                    className="flex-1 p-2 border rounded dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  >
-                    <option value="">Select Product ID (Optional)</option>
-                    {(availableDeviceIds[0]?.deviceIds || []).map((deviceId) => (
-                      <option key={deviceId} value={deviceId}>{deviceId}</option>
+      <div className="flex flex-col gap-3 sm:gap-4">
+        {[
+          { name: 'dynamic_product_id', label: 'Product', type: 'select', required: true },
+          { name: 'quantity', label: 'Quantity', type: 'number', min: 1, required: true },
+          { name: 'unit_price', label: 'Unit Price', type: 'number', step: '0.01', required: true },
+          { name: 'payment_method', label: 'Payment Method', type: 'select', required: true },
+        ].map(field => (
+          <label key={field.name} className="block">
+            <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+              {field.label}
+            </span>
+            {field.type === 'select' ? (
+              <select
+                name={field.name}
+                value={saleForm[field.name] || ''}
+                onChange={(e) => handleEditChange(field.name, e.target.value)}
+                className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                required={field.required}
+              >
+                {field.name === 'dynamic_product_id' ? (
+                  <>
+                    <option value="">Select product…</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={id}
-                    onChange={(e) => handleEditChange('deviceIds', e.target.value, deviceIdx)}
-                    placeholder="Or enter Product ID manually"
-                    className="flex-1 p-2 border rounded dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                  <input
-                    type="text"
-                    value={saleForm.deviceSizes[deviceIdx] || ''}
-                    onChange={(e) => handleEditChange('deviceSizes', e.target.value, deviceIdx)}
-                    placeholder="Enter Product size (Optional)"
-                    className="flex-1 p-2 border rounded dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                  <div className="flex gap-2">
-                    {field === 'deviceIds' && (
-                      <button
-                        type="button"
-                        onClick={() => openScanner('edit', 0, deviceIdx)}
-                        className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                        title="Scan Barcode"
-                      >
-                        <FaCamera />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeEditDeviceId(deviceIdx)}
-                      className="p-2 text-red-600 hover:text-red-800"
+                  </>
+                ) : (
+                  <>
+                    <option value="">Select payment method…</option>
+                    <option>Cash</option>
+                    <option>Bank Transfer</option>
+                    <option>Card</option>
+                    <option>Wallet</option>
+                  </>
+                )}
+              </select>
+            ) : (
+              <input
+                type={field.type}
+                name={field.name}
+                value={saleForm[field.name] || ''}
+                onChange={(e) => handleEditChange(field.name, e.target.value)}
+                min={field.min}
+                step={field.step}
+                className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                required={field.required}
+              />
+            )}
+          </label>
+        ))}
+        <label className="block">
+          <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            Product IDs and Sizes (Optional)
+          </span>
+          {saleForm.deviceIds.map((id, deviceIdx) => (
+            <div key={`edit-device-${deviceIdx}`} className="flex flex-col gap-3 sm:gap-4 mt-2">
+              <select
+                value={id}
+                onChange={(e) => handleEditChange('deviceIds', e.target.value, deviceIdx)}
+                className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+              >
+                <option value="">Select Product ID (Optional)</option>
+                {(availableDeviceIds[0]?.deviceIds || []).map((deviceId) => (
+                  <option key={deviceId} value={deviceId}>{deviceId}</option>
+                ))}
+              </select>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <input
+                  type="text"
+                  value={id}
+                  onChange={(e) => handleEditChange('deviceIds', e.target.value, deviceIdx)}
+                  placeholder="Or enter Product ID manually"
+                  className="flex-1 p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+                />
+                <div className="flex gap-2 sm:gap-3 mt-1 sm:mt-0">
+                  <button
+                    type="button"
+                    onClick={() => openScanner('edit', 0, deviceIdx)}
+                    className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+                    aria-label={`Scan barcode for product ID ${deviceIdx + 1}`}
+                  >
+                    <FaCamera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeEditDeviceId(deviceIdx)}
+                    className="p-2 sm:p-2.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                    aria-label={`Remove product ID ${deviceIdx + 1}`}
+                  >
+                    <svg
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <FaTrashAlt />
-                    </button>
-                  </div>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-              ))}
-              {field === 'deviceIds' && (
-                <button
-                  type="button"
-                  onClick={(e) => addEditDeviceId(e)}
-                  className="flex items-center gap-1 text-green-600 hover:text-green-800 text-sm mt-1"
-                >
-                  <FaPlus /> Add Product ID & Size
-                </button>
-              )}
+              </div>
+              <input
+                type="text"
+                value={saleForm.deviceSizes[deviceIdx] || ''}
+                onChange={(e) => handleEditChange('deviceSizes', e.target.value, deviceIdx)}
+                placeholder="Enter Product size (Optional)"
+                className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+              />
             </div>
-          ) : (
-            <input
-              type="number"
-              step={field === 'unit_price' ? '0.01' : undefined}
-              name={field}
-              value={saleForm[field] || ''}
-              onChange={(e) => handleEditChange(field, e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-              required
-            />
-          )}
-        </div>
-      ))}
-
-      <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
+          ))}
+          <button
+            type="button"
+            onClick={(e) => addEditDeviceId(e)}
+            className="mt-2 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-semibold"
+            aria-label="Add product ID and size"
+          >
+            + Add Product ID & Size
+          </button>
+        </label>
+      </div>
+      <div className="flex justify-end gap-2 sm:gap-3 mt-4">
         <button
           type="button"
-          onClick={() => {
-            stopScanner();
+          onClick={async () => {
+            await stopScanner();
+            setShowScanner(false);
+            setScannerTarget(null);
+            setScannerError(null);
+            setScannerLoading(false);
+            setManualInput('');
+            setExternalScannerMode(false);
             setEditing(null);
           }}
-          className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-sm"
+          className="p-2 sm:p-2.5 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200 min-w-[40px] sm:min-w-[48px] flex items-center justify-center"
+          aria-label="Cancel edit sale form"
         >
-          Cancel
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
         <button
           type="submit"
-          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+          className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200 min-w-[40px] sm:min-w-[48px] flex items-center justify-center"
+          aria-label="Save edit sale"
         >
-          Save
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
         </button>
       </div>
     </form>
   </div>
 )}
-
-
-
       {showDetailModal && (
   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4 z-50">
     <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -1906,21 +2146,21 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
 </div>
 
 <div className="flex justify-end">
-  <button
-    type="button"
-    onClick={() => {
-      setShowScanner(false);
-      setScannerTarget(null);
-      setScannerError(null);
-      setScannerLoading(false);
-      setManualInput('');
-      setExternalScannerMode(false);
-      stopScanner();
-    }}
-    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
-  >
-    Cancel
-  </button>
+<button
+  type="button"
+  onClick={() => {
+    setShowScanner(false);
+    setScannerTarget(null);
+    setScannerError(null);
+    setScannerLoading(false);
+    setManualInput('');
+    setExternalScannerMode(false);
+    stopScanner();
+  }}
+  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+>
+  Done
+</button>
 </div>
 
           </div>
@@ -1966,7 +2206,7 @@ const handleLineChange = async (lineIdx, field, value, deviceIdx = null, isBlur 
                      )}
                    </td>
                    <td className="px-4 py-2 text-sm">{new Date(s.sold_at).toLocaleString()}</td>
-                  
+                   
                  </tr>
                ))}
              </tbody>

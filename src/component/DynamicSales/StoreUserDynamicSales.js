@@ -1626,7 +1626,7 @@ const totalPages = useMemo(() => {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
-          <span className="text-sm sm:text-base">Cancel</span>
+          <span className="text-sm sm:text-base"></span>
         </button>
         <button
           type="submit"
@@ -1642,7 +1642,7 @@ const totalPages = useMemo(() => {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
           </svg>
-          <span className="text-sm sm:text-base">Save Sale</span>
+          <span className="text-sm sm:text-base"></span>
         </button>
       </div>
     </form>
@@ -1909,7 +1909,7 @@ const totalPages = useMemo(() => {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                <span className="text-sm sm:text-base">Cancel</span>
+                <span className="text-sm sm:text-base"></span>
               </button>
             </div>
           </div>
