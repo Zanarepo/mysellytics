@@ -436,21 +436,21 @@ const totalPages = useMemo(() => {
       return;
     }
 
-    const config = {
-      fps: 30,
-      qrbox: { width: 280, height: 160 },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.QR_CODE,
-      ],
-      aspectRatio: 1.0,
-      disableFlip: true,
-      videoConstraints: { width: 1280, height: 720, facingMode: 'environment' },
-    };
-
+ const config = {
+   fps: 60, // High FPS for instant detection
+   qrbox: { width: 250, height: 125 }, // Smaller qrbox for faster focus
+   formatsToSupport: [
+     Html5QrcodeSupportedFormats.CODE_128,
+     Html5QrcodeSupportedFormats.CODE_39,
+     Html5QrcodeSupportedFormats.EAN_13,
+     Html5QrcodeSupportedFormats.UPC_A,
+     Html5QrcodeSupportedFormats.QR_CODE,
+   ],
+   aspectRatio: 1.0, // Square for better alignment
+   disableFlip: true,
+   videoConstraints: { width: 1280, height: 720, facingMode: 'environment' }, // Higher resolution
+ };
+ 
     const onScanSuccess = async (scannedDeviceId) => {
       if (!scannedDeviceId) {
         playNotFoundSound();
@@ -1467,7 +1467,7 @@ const totalPages = useMemo(() => {
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
     <form
       onSubmit={createSale}
-      className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4"
+       className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4"
     >
       <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">Record Sale</h2>
       {lines.map((line, lineIdx) => (
