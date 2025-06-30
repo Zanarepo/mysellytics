@@ -435,10 +435,9 @@ const totalPages = useMemo(() => {
       debouncedToast.error('Failed to initialize scanner. Please use manual input.');
       return;
     }
-
-    const config = {
-      fps: 30,
-      qrbox: { width: 280, height: 160 },
+ const config = {
+      fps: 60,
+      qrbox: { width: 250, height: 125 },
       formatsToSupport: [
         Html5QrcodeSupportedFormats.CODE_128,
         Html5QrcodeSupportedFormats.CODE_39,
@@ -1803,12 +1802,12 @@ const totalPages = useMemo(() => {
 {/* Scanner Modal */}
 {showScanner && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
-    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[85vh] overflow-y-auto space-y-4">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white">
       <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
         Scan Product ID
       </h2>
-      <div className="flex flex-col gap-3 sm:gap-4">
-        <label className="flex items-center gap-3 text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
+      <div className="space-y-4">
+        <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
           <input
             type="checkbox"
             checked={externalScannerMode}
