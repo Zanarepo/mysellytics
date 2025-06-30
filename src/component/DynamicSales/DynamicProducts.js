@@ -13,19 +13,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import { motion } from 'framer-motion';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode';
 
-// Success sound for scan feedback
-const playSuccessSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
-};
-
-
-// New not found sound
-const playNotFoundSound = () => {
-  const audio = new Audio('https://freesound.org/data/previews/171/17167_2437358-lq.mp3');
-  audio.play().catch((err) => console.error('Audio play error:', err));
-};
-
 
 
 const tooltipVariants = {
@@ -92,6 +79,37 @@ export default function DynamicProducts() {
       content: products.length > 0 ? 'Click to edit product details.' : 'Start by adding your first product!',
     },
   ];
+
+
+
+
+useEffect(() => {
+  const successAudio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+  const notFoundAudio = new Audio('https://freesound.org/data/previews/171/17167_2437358-lq.mp3');
+  
+  // Preload by setting volume to 0 and playing briefly
+  successAudio.volume = 0;
+  notFoundAudio.volume = 0;
+  successAudio.play().catch(err => console.error('Preload success audio error:', err));
+  notFoundAudio.play().catch(err => console.error('Preload not found audio error:', err));
+  successAudio.pause();
+  notFoundAudio.pause();
+  successAudio.volume = 1;
+  notFoundAudio.volume = 1;
+}, []);
+
+// Modified playSuccessSound function
+const playSuccessSound = () => {
+  const audio = new Audio('https://freesound.org/data/previews/171/171671_2437358-lq.mp3');
+  audio.play().catch((err) => console.error('Audio play error:', err));
+};
+
+// Modified playNotFoundSound function
+const playNotFoundSound = () => {
+  const audio = new Audio('https://freesound.org/data/previews/171/17167_2437358-lq.mp3');
+  audio.play().catch((err) => console.error('Audio play error:', err));
+};
+
 
   // Check if onboarding has been completed
   useEffect(() => {
@@ -286,23 +304,21 @@ export default function DynamicProducts() {
       return;
     }
 
-    const config = {
-      fps: 30,
-      qrbox: { width: 300, height: 150 },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.UPC_A,
-      ],
-      aspectRatio: 16 / 9,
-      disableFlip: true,
-      videoConstraints: {
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        focusMode: 'continuous',
-      },
-    };
-
+   const config = {
+     fps: 60, // High FPS for instant detection
+     qrbox: { width: 250, height: 125 }, // Smaller qrbox for faster focus
+     formatsToSupport: [
+       Html5QrcodeSupportedFormats.CODE_128,
+       Html5QrcodeSupportedFormats.CODE_39,
+       Html5QrcodeSupportedFormats.EAN_13,
+       Html5QrcodeSupportedFormats.UPC_A,
+       Html5QrcodeSupportedFormats.QR_CODE,
+     ],
+     aspectRatio: 1.0, // Square for better alignment
+     disableFlip: true,
+     videoConstraints: { width: 1280, height: 720, facingMode: 'environment' }, // Higher resolution
+   };
+   
     const onScanSuccess = (decodedText) => {
       const success = processScannedBarcode(decodedText);
       if (success) {
@@ -867,99 +883,141 @@ const onScanFailure = (error) => {
           <FaPlus /> Products
         </button>
       </div>
-
-      {/* Add Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 p-4 overflow-y-auto pt-24">
-          <div className="w-full max-w-3xl mx-auto">
-            <form
-              onSubmit={createProducts}
-              className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full dark:text-white"
-            >
-              <h2 className="text-2xl font-bold mb-6">Add Products</h2>
-              {addForm.map((product, index) => (
-                <div key={index} className="mb-4 p-4 border rounded relative">
-                  <h3 className="text-lg font-semibold mb-2">Product {index + 1}</h3>
-                  {addForm.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeProduct(index)}
-                      className="absolute top-4 right-4 text-red-500 hover:text-red-700"
-                      title="Remove this product"
-                    >
-                      <FaTrashAlt />
-                    </button>
-                  )}
-                  {[
-                    { name: 'name', label: 'Name' },
-                    { name: 'description', label: 'Description' },
-                    { name: 'purchase_price', label: 'Total Purchase Price' },
-                    { name: 'purchase_qty', label: 'Quantity Purchased' },
-                    { name: 'selling_price', label: 'Selling Price' },
-                    { name: 'suppliers_name', label: 'Supplier Name' },
-                    { name: 'device_id', label: 'Barcode' },
-                  ].map(field => (
-                    <div key={field.name} className="mb-2">
-                      <label className="block mb-1">{field.label}</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type={field.name.includes('price') || field.name.includes('qty') ? 'number' : 'text'}
-                          step={field.name.includes('price') ? '0.01' : undefined}
-                          name={field.name}
-                          value={product[field.name]}
-                          onChange={(e) => handleAddChange(e, index)}
-                          required={['name', 'purchase_qty'].includes(field.name)}
-                          className={`w-full p-2 border rounded dark:bg-gray-900 dark:text-white ${
-                            field.name === 'device_id' && product.device_id.trim() &&
-                            addForm.some((p, i) => i !== index && p.device_id.trim().toLowerCase() === product.device_id.trim().toLowerCase())
-                              ? 'border-red-500'
-                              : ''
-                          }`}
-                        />
-                        {field.name === 'device_id' && (
-                          <button
-                            type="button"
-                            onClick={() => openScanner('add', index)}
-                            className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                            title="Scan Barcode"
-                          >
-                            <FaCamera />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addAnotherProduct}
-                className="mb-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                Add Another Product
-              </button>
-              <div className="w-full flex justify-center gap-2 mt-6">
+{/* Add Modal */}
+{showAdd && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white">
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+        Add Products
+      </h2>
+      <form onSubmit={createProducts} className="space-y-4">
+        {addForm.map((product, index) => (
+          <div key={index} className="border border-gray-200 dark:border-gray-700 p-3 sm:p-4 rounded-lg space-y-3 dark:bg-gray-800">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-200">
+                Product {index + 1}
+              </h3>
+              {addForm.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowAdd(false);
-                    stopScanner();
-                  }}
-                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  onClick={() => removeProduct(index)}
+                  className="p-1.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                  aria-label="Remove product"
                 >
-                  Cancel
+                  <svg
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
-                  Add Products
-                </button>
-              </div>
-            </form>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              {[
+                { name: 'name', label: 'Name' },
+                { name: 'description', label: 'Description' },
+                { name: 'purchase_price', label: 'Total Purchase Price' },
+                { name: 'purchase_qty', label: 'Quantity Purchased' },
+                { name: 'selling_price', label: 'Selling Price' },
+                { name: 'suppliers_name', label: 'Supplier Name' },
+                { name: 'device_id', label: 'Barcode' },
+              ].map(field => (
+                <label key={field.name} className="block">
+                  <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                    {field.label}
+                  </span>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type={field.name.includes('price') || field.name.includes('qty') ? 'number' : 'text'}
+                      step={field.name.includes('price') ? '0.01' : undefined}
+                      name={field.name}
+                      value={product[field.name]}
+                      onChange={(e) => handleAddChange(e, index)}
+                      required={['name', 'purchase_qty'].includes(field.name)}
+                      className={`flex-1 p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px] ${
+                        field.name === 'device_id' && product.device_id.trim() &&
+                        addForm.some((p, i) => i !== index && p.device_id.trim().toLowerCase() === product.device_id.trim().toLowerCase())
+                          ? 'border-red-500'
+                          : ''
+                      }`}
+                    />
+                    {field.name === 'device_id' && (
+                      <button
+                        type="button"
+                        onClick={() => openScanner('add', index)}
+                        className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+                        aria-label="Scan barcode for device ID"
+                      >
+                        <FaCamera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                      </button>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
+        ))}
+        <button
+          type="button"
+          onClick={addAnotherProduct}
+          className="p-2 sm:p-3 bg-green-600 text-white rounded-full shadow-sm hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-200 w-full sm:w-auto flex items-center justify-center gap-2"
+          aria-label="Add another product"
+        >
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="text-sm sm:text-base">Add Another Product</span>
+        </button>
+        <div className="flex justify-end gap-2 sm:gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowAdd(false);
+              stopScanner();
+            }}
+            className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+            aria-label="Cancel product form"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <button
+            type="submit"
+            className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+            aria-label="Create products"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
         </div>
-      )}
+      </form>
+    </div>
+  </div>
+)}
 
       {/* Table */}
       <div className="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow dark:text-white">
@@ -1044,68 +1102,97 @@ const onScanFailure = (error) => {
           <FaFilePdf /> PDF
         </button>
       </div>
-
-      {/* Edit Modal */}
-      {editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[90vh] mt-32">
-            <h2 className="text-xl font-bold mb-4">Edit {editing.name}</h2>
-            {[
-              { name: 'name', label: 'Name' },
-              { name: 'description', label: 'Description' },
-              { name: 'purchase_price', label: 'Total Purchase Price' },
-              { name: 'purchase_qty', label: 'Qty Purchased (Restock)' },
-              { name: 'selling_price', label: 'Selling Price' },
-              { name: 'suppliers_name', label: 'Supplier Name' },
-              { name: 'device_id', label: 'Barcode' },
-            ].map(field => (
-              <div className="mb-3" key={field.name}>
-                <label className="block mb-1">{field.label}</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type={field.name.includes('price') || field.name.includes('qty') ? 'number' : 'text'}
-                    step={field.name.includes('price') ? '0.01' : undefined}
-                    name={field.name}
-                    value={form[field.name]}
-                    onChange={handleFormChange}
-                    required={['name', 'purchase_qty'].includes(field.name)}
-                    className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white"
-                  />
-                  {field.name === 'device_id' && (
-                    <button
-                      type="button"
-                      onClick={() => openScanner('edit', 0)}
-                      className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                      title="Scan Barcode"
-                    >
-                      <FaCamera />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => {
-                setEditing(null);
-                stopScanner();
-              }} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                Cancel
-              </button>
-              <button onClick={saveEdit} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-                Save
-              </button>
+{/* Edit Modal */}
+{editing && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white">
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+        Edit {editing.name}
+      </h2>
+      <div className="grid grid-cols-1 gap-3 sm:gap-4">
+        {[
+          { name: 'name', label: 'Name' },
+          { name: 'description', label: 'Description' },
+          { name: 'purchase_price', label: 'Total Purchase Price' },
+          { name: 'purchase_qty', label: 'Qty Purchased (Restock)' },
+          { name: 'selling_price', label: 'Selling Price' },
+          { name: 'suppliers_name', label: 'Supplier Name' },
+          { name: 'device_id', label: 'Barcode' },
+        ].map(field => (
+          <label key={field.name} className="block">
+            <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+              {field.label}
+            </span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <input
+                type={field.name.includes('price') || field.name.includes('qty') ? 'number' : 'text'}
+                step={field.name.includes('price') ? '0.01' : undefined}
+                name={field.name}
+                value={form[field.name]}
+                onChange={handleFormChange}
+                required={['name', 'purchase_qty'].includes(field.name)}
+                className="flex-1 p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm min-w-[100px]"
+              />
+              {field.name === 'device_id' && (
+                <button
+                  type="button"
+                  onClick={() => openScanner('edit', 0)}
+                  className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+                  aria-label="Scan barcode for device ID"
+                >
+                  <FaCamera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                </button>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          </label>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2 sm:gap-3 mt-4">
+        <button
+          onClick={() => {
+            setEditing(null);
+            stopScanner();
+          }}
+          className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+          aria-label="Cancel edit form"
+        >
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <button
+          onClick={saveEdit}
+          className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+          aria-label="Save product"
+        >
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Scanner Modal */}
     {showScanner && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
-    <div className="bg-white dark:bg-gray-900 p-3 sm:p-4 rounded-lg shadow-lg w-full max-w-[95vw] xs:max-w-[360px] max-h-[85vh] overflow-y-auto">
-      <h2 className="text-base xs:text-lg sm:text-xl font-bold mb-3 text-gray-800 dark:text-white">Scan Product ID</h2>
-      <div className="mb-3">
-        <label className="flex items-center space-x-2 text-xs xs:text-sm font-medium text-gray-700 dark:text-gray-300">
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+     <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
+      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Product ID</h2>
+      <div className="mb-4">
+        <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
           <input
             type="checkbox"
             checked={externalScannerMode}

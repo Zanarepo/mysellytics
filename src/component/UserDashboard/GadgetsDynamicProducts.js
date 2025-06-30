@@ -933,157 +933,197 @@ function DynamicProducts() {
           <span className="hidden sm:inline">Add</span>
         </button>
       </div>
-
-      {showAdd && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <form
-            onSubmit={createProducts}
-            className="bg-white dark:bg-gray-900 w-full max-w-5xl sm:rounded-lg shadow-lg space-y-6 p-4 sm:p-6 max-h-[90vh] overflow-y-auto mt-28"
-          >
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Add Products</h2>
-
-            {addForm.map((p, pi) => (
-              <div
-                key={pi}
-                className="relative bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
-              >
-                {addForm.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeProductForm(pi)}
-                    className="absolute top-4 right-4 text-red-500 hover:text-red-700 text-lg focus:outline-none"
-                    title="Remove this product"
-                  >
-                    <FaTrashAlt />
-                  </button>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="Product Name"
-                    value={p.name}
-                    onChange={(e) => handleAddChange(pi, 'name', e.target.value)}
-                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Supplier Name"
-                    value={p.suppliers_name}
-                    onChange={(e) => handleAddChange(pi, 'suppliers_name', e.target.value)}
-                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <textarea
-                    placeholder="Description"
-                    value={p.description}
-                    onChange={(e) => handleAddChange(pi, 'description', e.target.value)}
-                    className="p-2 border rounded w-full md:col-span-2 resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    rows={3}
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Purchase Price"
-                    value={p.purchase_price}
-                    onChange={(e) => handleAddChange(pi, 'purchase_price', e.target.value)}
-                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Selling Price"
-                    value={p.selling_price}
-                    onChange={(e) => handleAddChange(pi, 'selling_price', e.target.value)}
-                    className="p-2 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="mt-4">
-                  <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Product IDs and Sizes
-                  </label>
-                  {p.deviceIds.map((id, i) => (
-                    <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 mt-2">
-                      <input
-                        value={id}
-                        onChange={(e) => handleAddId(pi, i, e.target.value)}
-                        placeholder="Product/Device/Goods ID"
-                        className={`w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                          id.trim() &&
-                          p.deviceIds.some((otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase())
-                            ? 'border-red-500'
-                            : ''
-                        }`}
-                      />
-                      <input
-                        value={p.deviceSizes[i] || ''}
-                        onChange={(e) => handleAddSize(pi, i, e.target.value)}
-                        placeholder="Size (e.g., 128GB, Small, Large)"
-                        className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openScanner('add', pi, i)}
-                          className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                          title="Scan Barcode"
-                        >
-                          <FaCamera />
-                        </button>
-                        {p.deviceIds.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeIdField(pi, i)}
-                            className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                            title="Remove ID"
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => addIdField(pi)}
-                    className="mt-2 text-indigo-600 hover:underline text-sm dark:text-indigo-400"
-                  >
-                    + Add Product ID
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mt-4 px-2 sm:px-0">
+{showAdd && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+    <form
+      onSubmit={createProducts}
+      className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white"
+    >
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+        Add Products
+      </h2>
+      {addForm.map((p, pi) => (
+        <div
+          key={pi}
+          className="border border-gray-200 dark:border-gray-700 p-3 sm:p-4 rounded-lg space-y-3 dark:bg-gray-800"
+        >
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-200">
+              Product {pi + 1}
+            </h3>
+            {addForm.length > 1 && (
               <button
                 type="button"
-                onClick={addAnotherProduct}
-                className="text-indigo-600 hover:underline text-sm dark:text-indigo-400 text-left sm:text-center"
+                onClick={() => removeProductForm(pi)}
+                className="p-1.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                aria-label="Remove product"
               >
-                + Add Another Product
+                <svg
+                  className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={cancelAdd}
-                  className="w-full sm:w-auto px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-full sm:w-auto px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </form>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:gap-4">
+            {[
+              { name: 'name', label: 'Product Name', type: 'text', required: true },
+              { name: 'suppliers_name', label: 'Supplier Name', type: 'text' },
+              { name: 'description', label: 'Description', type: 'textarea' },
+              { name: 'purchase_price', label: 'Purchase Price', type: 'number', step: '0.01' },
+              { name: 'selling_price', label: 'Selling Price', type: 'number', step: '0.01' },
+            ].map(field => (
+              <label key={field.name} className="block">
+                <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                  {field.label}
+                </span>
+                {field.type === 'textarea' ? (
+                  <textarea
+                    placeholder={field.label}
+                    value={p[field.name]}
+                    onChange={(e) => handleAddChange(pi, field.name, e.target.value)}
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
+                    rows={3}
+                    required={field.required}
+                  />
+                ) : (
+                  <input
+                    type={field.type}
+                    placeholder={field.label}
+                    value={p[field.name]}
+                    onChange={(e) => handleAddChange(pi, field.name, e.target.value)}
+                    step={field.step}
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    required={field.required}
+                  />
+                )}
+              </label>
+            ))}
+            <label className="block">
+              <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                Product IDs and Sizes
+              </span>
+              {p.deviceIds.map((id, i) => (
+                <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-2">
+                  <input
+                    value={id}
+                    onChange={(e) => handleAddId(pi, i, e.target.value)}
+                    placeholder="Product/Device/Goods ID"
+                    className={`w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm ${
+                      id.trim() &&
+                      p.deviceIds.some((otherId, j) => j !== i && otherId.trim().toLowerCase() === id.trim().toLowerCase())
+                        ? 'border-red-500'
+                        : ''
+                    }`}
+                  />
+                  <input
+                    value={p.deviceSizes[i] || ''}
+                    onChange={(e) => handleAddSize(pi, i, e.target.value)}
+                    placeholder="Size (e.g., 128GB, Small, Large)"
+                    className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openScanner('add', pi, i)}
+                      className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+                      aria-label="Scan barcode for product ID"
+                    >
+                      <FaCamera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                    </button>
+                    {p.deviceIds.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeIdField(pi, i)}
+                        className="p-2 sm:p-2.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                        aria-label="Remove ID"
+                      >
+                        <svg
+                          className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => addIdField(pi)}
+                className="mt-2 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm"
+                aria-label="Add product ID"
+              >
+                + Add Product ID
+              </button>
+            </label>
+          </div>
         </div>
-      )}
-
+      ))}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mt-4">
+        <button
+          type="button"
+          onClick={addAnotherProduct}
+          className="p-2 sm:p-3 bg-green-600 text-white rounded-full shadow-sm hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-200 w-full sm:w-auto flex items-center justify-center gap-2"
+          aria-label="Add another product"
+        >
+          <svg
+            className="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="text-sm sm:text-base">Add Another Product</span>
+        </button>
+        <div className="flex justify-end gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={cancelAdd}
+            className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+            aria-label="Cancel product form"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <button
+            type="submit"
+            className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+            aria-label="Save products"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+)}
       <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded shadow">
         <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
           <thead className="bg-gray-100 dark:bg-gray-700 text-xs uppercase text-gray-600 dark:text-gray-400">
@@ -1411,12 +1451,15 @@ function DynamicProducts() {
           </div>
         </div>
       )}
-{showScanner && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-white dark:bg-gray-900 p-6 rounded max-w-lg w-full">
-      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Scan Product ID</h2>
-      <div className="mb-4">
-        <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+
+ {showScanner && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white">
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+        Scan Product ID
+      </h2>
+      <div className="space-y-4">
+        <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
           <input
             type="checkbox"
             checked={externalScannerMode}
@@ -1428,88 +1471,108 @@ function DynamicProducts() {
                 manualInputRef.current.focus();
               }
             }}
-            className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded dark:bg-gray-900 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500"
           />
           <span>Use External Barcode Scanner</span>
         </label>
-      </div>
-      {!externalScannerMode && (
-        <>
-          {scannerLoading && (
-            <div className="text-gray-600 dark:text-gray-400 mb-4 text-center text-sm">
-              Initializing webcam scanner...
-            </div>
-          )}
-          {scannerError && (
-            <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm" aria-live="polite">
-              {scannerError}
-            </div>
-          )}
-          <div
-            id="scanner"
-            ref={scannerDivRef}
-            className={`relative w-full h-[250px] mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
-              scanSuccess ? 'border-4 border-green-500' : ''
-            }`}
-          >
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              autoPlay
-              playsInline
-            />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[300px] h-[150px] border-2 border-red-500 bg-transparent opacity-50"></div>
-            </div>
-          </div>
-        </>
-      )}
-      {externalScannerMode && (
-        <div className="mb-4">
-          <div className="text-gray-600 dark:text-gray-400 mb-4 text-center">
-            Waiting for external scanner input... Scan a barcode to proceed.
-          </div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Or Enter Product ID Manually
-          </label>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              ref={manualInputRef}
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-              onKeyDown={handleManualInputKeyDown}
-              placeholder="Enter Product ID"
-              className="w-full sm:flex-1 p-2 border rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              type="button"
-              onClick={handleManualInput}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 w-full sm:w-auto"
+        {!externalScannerMode && (
+          <>
+            {scannerLoading && (
+              <div className="text-gray-600 dark:text-gray-400 text-center text-xs sm:text-sm">
+                Initializing webcam scanner...
+              </div>
+            )}
+            {scannerError && (
+              <div className="text-red-600 dark:text-red-400 text-center text-xs sm:text-sm" aria-live="polite">
+                {scannerError}
+              </div>
+            )}
+            <div
+              id="scanner"
+              ref={scannerDivRef}
+              className={`relative w-full h-[250px] bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ${
+                scanSuccess ? 'border-4 border-green-500' : ''
+              }`}
             >
-              Submit
-            </button>
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                autoPlay
+                playsInline
+              />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-[300px] h-[150px] border-2 border-red-500 bg-transparent opacity-50"></div>
+              </div>
+            </div>
+          </>
+        )}
+        {externalScannerMode && (
+          <div className="space-y-3">
+            <div className="text-gray-600 dark:text-gray-400 text-center text-xs sm:text-sm">
+              Waiting for external scanner input... Scan a barcode to proceed.
+            </div>
+            <label className="block">
+              <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                Or Enter Product ID Manually
+              </span>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <input
+                  type="text"
+                  ref={manualInputRef}
+                  value={manualInput}
+                  onChange={(e) => setManualInput(e.target.value)}
+                  onKeyDown={handleManualInputKeyDown}
+                  placeholder="Enter Product ID"
+                  className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleManualInput}
+                  className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200 w-full sm:w-auto"
+                  aria-label="Submit manual input"
+                >
+                  <svg
+                    className="w-4 h-4 sm:w-5 sm:h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </label>
           </div>
+        )}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              stopScanner();
+              setShowScanner(false);
+              setScannerTarget(null);
+              setScannerError(null);
+              setScannerLoading(false);
+              setManualInput('');
+              setExternalScannerMode(false);
+              setScannerBuffer('');
+              setScanSuccess(false);
+            }}
+            className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+            aria-label="Close scanner"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      )}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => {
-            stopScanner();
-            setShowScanner(false);
-            setScannerTarget(null);
-            setScannerError(null);
-            setScannerLoading(false);
-            setManualInput('');
-            setExternalScannerMode(false);
-            setScannerBuffer('');
-            setScanSuccess(false);
-          }}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
-        >
-          Done
-        </button>
       </div>
     </div>
   </div>

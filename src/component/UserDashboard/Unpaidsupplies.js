@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from "../../supabaseClient";
-import { FaTrashAlt, FaPlus, FaBell } from 'react-icons/fa';
+import { FaTrashAlt } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import DynamicDebtRepayment from './DynamicDebtRepayment'
@@ -383,20 +383,47 @@ export default function DebtsManager() {
         </div>
 
         {/* Add Debt and Reminder Buttons */}
-        <div className="mb-4 flex gap-3">
-          <button
-            onClick={() => setEditing({})}
-            className="px-4 py-2 bg-indigo-600 text-white rounded flex items-center gap-2"
-          >
-            <FaPlus /> Debt
-          </button>
-          <button
-            onClick={() => setShowReminderForm(true)}
-            className="px-4 py-2 bg-yellow-600 text-white rounded flex items-center gap-2"
-          >
-            <FaBell /> Set Debt Reminders
-          </button>
-        </div>
+        <div className="mb-4 flex gap-2 sm:gap-3">
+  <button
+    type="button"
+    onClick={() => setEditing({})}
+    className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200 flex items-center justify-center gap-2"
+    aria-label="Add new debt"
+  >
+    <svg
+      className="w-4 h-4 sm:w-5 sm:h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+    </svg>
+    <span className="text-sm sm:text-base">Debt</span>
+  </button>
+  <button
+    type="button"
+    onClick={() => setShowReminderForm(true)}
+    className="p-2 sm:p-3 bg-yellow-600 text-white rounded-full shadow-sm hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 transition-colors duration-200 flex items-center justify-center gap-2"
+    aria-label="Set debt reminders"
+  >
+    <svg
+      className="w-4 h-4 sm:w-5 sm:h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V3a2 2 0 10-4 0v2.083A6 6 0 004 11v3.159c0 .538-.214 1.055-.595 1.436L2 17h5m4 0v1a3 3 0 11-6 0v-1m6 0H9"
+      />
+    </svg>
+    <span className="text-sm sm:text-base">Set Debt Reminders</span>
+  </button>
+</div>
 
         {/* Debts Table */}
         <div ref={debtsRef} className="overflow-x-auto">
@@ -451,154 +478,148 @@ export default function DebtsManager() {
         </div>
       </div>
 
-      {/* Add/Edit Debt Modal */}
-      {editing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6 dark:bg-gray-900 dark:text-white">
-            <h2 className="text-xl font-bold text-center mt-10">{editing.id ? 'Edit Debt' : 'Add Debt'}</h2>
 
-            {/* Debt Entries */}
-            {debtEntries.map((entry, index) => (
-              <div key={index} className="border p-4 rounded-lg space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold">Debt Entry {index + 1}</h3>
-                  {debtEntries.length > 1 && (
-                    <button
-                      onClick={() => removeDebtEntry(index)}
-                      className="text-red-600 hover:text-red-800"
+
+{editing && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 space-y-4 dark:bg-gray-900 dark:text-white">
+      <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
+        {editing.id ? 'Edit Debt' : 'Add Debt'}
+      </h2>
+      <form onSubmit={saveDebts} className="space-y-4">
+        {debtEntries.map((entry, index) => (
+          <div key={index} className="border border-gray-200 dark:border-gray-700 p-3 sm:p-4 rounded-lg space-y-3 dark:bg-gray-800">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-200">
+                Debt Entry {index + 1}
+              </h3>
+              {debtEntries.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeDebtEntry(index)}
+                  className="p-1.5 bg-red-600 text-white rounded-full shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors duration-200"
+                  aria-label="Remove debt entry"
+                >
+                  <svg
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              {[
+                { name: 'customer_id', label: 'Customer', type: 'select' },
+                { name: 'dynamic_product_id', label: 'Product', type: 'select' },
+                { name: 'supplier', label: 'Supplier', type: 'text' },
+                { name: 'qty', label: 'Quantity', type: 'number', min: 1 },
+                { name: 'owed', label: 'Owed', type: 'number', step: '0.01', min: 0 },
+                { name: 'deposited', label: 'Deposited', type: 'number', step: '0.01', min: 0 },
+                { name: 'date', label: 'Date', type: 'date' },
+              ].map(field => (
+                <label key={field.name} className="block">
+                  <span className="font-semibold block mb-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                    {field.label}
+                  </span>
+                  {field.type === 'select' ? (
+                    <select
+                      name={field.name}
+                      value={entry[field.name]}
+                      onChange={e => handleDebtChange(index, e)}
+                      className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+                      required={['customer_id', 'dynamic_product_id', 'qty', 'owed', 'date'].includes(field.name)}
                     >
-                      Remove
-                    </button>
+                      <option value="">Select {field.label}</option>
+                      {field.name === 'customer_id'
+                        ? customers.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.fullname}
+                            </option>
+                          ))
+                        : products.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.type}
+                      name={field.name}
+                      value={entry[field.name]}
+                      onChange={e => handleDebtChange(index, e)}
+                      min={field.min}
+                      step={field.step}
+                      className="w-full p-2 sm:p-3 border rounded-lg dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-sm"
+                      required={['customer_id', 'dynamic_product_id', 'qty', 'owed', 'date'].includes(field.name)}
+                    />
                   )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Customer</span>
-                    <select
-                      name="customer_id"
-                      value={entry.customer_id}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Customer</option>
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.fullname} 
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Product</span>
-                    <select
-                      name="dynamic_product_id"
-                      value={entry.dynamic_product_id}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Product</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Supplier</span>
-                    <input
-                      name="supplier"
-                      value={entry.supplier}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                    />
-                  </label>
-
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Quantity</span>
-                    <input
-                      type="number"
-                      name="qty"
-                      value={entry.qty}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                      min="1"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Owed</span>
-                    <input
-                      type="number"
-                      name="owed"
-                      value={entry.owed}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                      min="0"
-                      step="0.01"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Deposited</span>
-                    <input
-                      type="number"
-                      name="deposited"
-                      value={entry.deposited}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      min="0"
-                      step="0.01"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="font-semibold block mb-1">Date</span>
-                    <input
-                      type="date"
-                      name="date"
-                      value={entry.date}
-                      onChange={e => handleDebtChange(index, e)}
-                      className="border p-2 w-full rounded dark:bg-gray-900 dark:text-white"
-                      required
-                    />
-                  </label>
-                </div>
-              </div>
-            ))}
-
-            {!editing.id && (
-              <button
-                onClick={addDebtEntry}
-                className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2"
-              >
-                <FaPlus /> Add Another Debt
-              </button>
-            )}
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 bg-gray-500 text-white rounded">
-                Cancel
-              </button>
-              <button
-                onClick={saveDebts}
-                className="px-4 py-2 bg-indigo-600 text-white rounded"
-              >
-                {editing.id ? 'Save Debt' : 'Create Debt'}
-              </button>
+                </label>
+              ))}
             </div>
           </div>
+        ))}
+        {!editing.id && (
+          <button
+            type="button"
+            onClick={addDebtEntry}
+            className="p-2 sm:p-3 bg-green-600 text-white rounded-full shadow-sm hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-200 w-full sm:w-auto flex items-center justify-center gap-2"
+            aria-label="Add another debt entry"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="text-sm sm:text-base">Add Another Debt</span>
+          </button>
+        )}
+        <div className="flex justify-end gap-2 sm:gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setEditing(null)}
+            className="p-2 sm:p-3 bg-gray-500 text-white rounded-full shadow-sm hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+            aria-label="Cancel debt form"
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <button
+            type="submit"
+            className="p-2 sm:p-3 bg-indigo-600 text-white rounded-full shadow-sm hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
+            aria-label={editing.id ? 'Save debt' : 'Create debt'}
+          >
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
         </div>
-      )}
-
+      </form>
+    </div>
+  </div>
+)}
       {/* Reminder Form Modal */}
       {showReminderForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
