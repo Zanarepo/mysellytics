@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from '../../supabaseClient';
 
-
 function RestockAlerts() {
   const [forecasts, setForecasts] = useState([]);
   const [, setStoreId] = useState(null);
@@ -66,7 +65,7 @@ function RestockAlerts() {
               event: "INSERT",
               schema: "public",
               table: "forecasts",
-              filter: `store_id=eq.${storeId}`
+              filter: `store_id=eq.${storeId}`,
             },
             (payload) => {
               setForecasts((prev) => {
@@ -100,24 +99,23 @@ function RestockAlerts() {
 
   if (error) {
     return (
-      <div className="p-4 text-center text-red-600 text-sm md:text-base">
+      <div className="p-4 text-center text-red-600 dark:text-red-400 text-sm md:text-base">
         Error: {error}
       </div>
     );
   }
 
   return (
-    <div className="p-0 sm:p-6 md:p-8 lg:p-0 max-w-7xl mx-auto">
-      
-      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-gray-800">
+    <div className="p-0 sm:p-6 md:p-8 lg:p-0 max-w-7xl mx-auto dark:bg-gray-900">
+      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-gray-800 dark:text-white">
         Restocking Recommendations for {storeName || "Store"}
       </h2>
       {forecasts.length ? (
         <div className="space-y-6">
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-600 to-indigo-600 text-white">
+            <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
                 <tr>
                   <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Product</th>
                   <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Predicted Demand</th>
@@ -130,17 +128,19 @@ function RestockAlerts() {
                 {currentForecasts.map((f, i) => (
                   <tr
                     key={`${f.dynamic_product_id}-${f.store_id}-${f.forecast_period}-${i}`}
-                    className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"} hover:bg-gray-100 transition-colors`}
+                    className={`border-b border-gray-200 dark:border-gray-700 ${
+                      i % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
+                    } hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
                   >
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700">{f.product_name}</td>
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700">{f.predicted_demand} units</td>
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700">{f.current_stock} units</td>
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700">{f.forecast_period}</td>
+                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{f.product_name}</td>
+                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{f.predicted_demand} units</td>
+                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{f.current_stock} units</td>
+                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{f.forecast_period}</td>
                     <td
                       className={`py-3 px-4 text-xs sm:text-sm font-medium ${
                         f.recommendation === "Restock recommended"
-                          ? "text-yellow-600 bg-yellow-100 rounded-full px-2 py-1 inline-block"
-                          : "text-green-600 bg-green-100 rounded-full px-2 py-1 inline-block"
+                          ? "text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-300 rounded-full px-2 py-1 inline-block"
+                          : "text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300 rounded-full px-2 py-1 inline-block"
                       }`}
                     >
                       {f.recommendation}
@@ -153,7 +153,7 @@ function RestockAlerts() {
 
           {/* Pagination */}
           <div className="flex justify-between items-center mt-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, forecasts.length)} of {forecasts.length} entries
             </div>
             <div className="flex space-x-2">
@@ -162,8 +162,8 @@ function RestockAlerts() {
                 disabled={currentPage === 1}
                 className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
                   currentPage === 1
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-600"
+                    ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
                 }`}
               >
                 Previous
@@ -174,8 +174,8 @@ function RestockAlerts() {
                   onClick={() => paginate(i + 1)}
                   className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
                     currentPage === i + 1
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   }`}
                 >
                   {i + 1}
@@ -186,8 +186,8 @@ function RestockAlerts() {
                 disabled={currentPage === totalPages}
                 className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
                   currentPage === totalPages
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-600"
+                    ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
                 }`}
               >
                 Next
@@ -196,7 +196,7 @@ function RestockAlerts() {
           </div>
         </div>
       ) : (
-        <p className="text-gray-600 text-center text-sm md:text-base">
+        <p className="text-gray-600 dark:text-gray-300 text-center text-sm md:text-base">
           No restocking recommendations available.
         </p>
       )}

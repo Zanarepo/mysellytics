@@ -9,8 +9,9 @@ import CAQ from './LandingPageFeatures/CAQ';
 import PricingPlanLandingPage from './Payments/PricingPlanLandingPage';
 import { motion } from 'framer-motion';
 import WhatsAppChatPopup from './UserDashboard/WhatsAppChatPopup';
-import Partners from './LandingPageFeatures/Partners';
+//import Partners from './LandingPageFeatures/Partners';
 import HappyCustomer from './LandingPageFeatures/HappyCustomer';
+import AIPoweredFeatures from './LandingPageFeatures/AIPoweredFeatures';
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 40 },
@@ -95,6 +96,7 @@ export default function LandingPage() {
           />
         </motion.div>
       </section>
+      <AIPoweredFeatures/>
 
       {/* Other Sections */}
       <motion.section
@@ -193,7 +195,7 @@ export default function LandingPage() {
         variants={sectionVariants}
         className="w-full py-16 px-4 sm:px-6 md:px-8"
       >
-        <Partners />
+       {/** <Partners />*/} 
       </motion.section>
     </div>
   );

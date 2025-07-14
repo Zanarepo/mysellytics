@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { supabase } from '../../supabaseClient';
 import Papa from 'papaparse';
 
@@ -6,7 +7,7 @@ function UnifiedTheftDetection() {
   const [inventory, setInventory] = useState([]);
   const [products, setProducts] = useState([]);
   const [theftIncidents, setTheftIncidents] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]); // Array of { productId, productName, physicalCount, availableQty }
+  const [selectedProducts, setSelectedProducts] = useState([]);
   const [theftMessage, setTheftMessage] = useState("");
   const [storeName, setStoreName] = useState(null);
   const [error, setError] = useState(null);
@@ -14,7 +15,8 @@ function UnifiedTheftDetection() {
   const [isChecking, setIsChecking] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [mode, setMode] = useState("manual"); // "manual" or "csv"
+  const [mode, setMode] = useState("manual");
+  const fileInputRef = useRef(null); // Ref for file input
   const incidentsPerPage = 10;
   const storeId = localStorage.getItem("store_id") || null;
 
@@ -35,9 +37,8 @@ function UnifiedTheftDetection() {
           .single();
         if (storeError) throw new Error("Error fetching store name: " + storeError.message);
         setStoreName(storeData.shop_name);
-        console.log("Store name fetched:", storeData.shop_name);
 
-        // Fetch inventory for store
+        // Fetch inventory
         const { data: inventoryData, error: inventoryError } = await supabase
           .from("dynamic_inventory")
           .select("dynamic_product_id, available_qty, updated_at")
@@ -45,9 +46,8 @@ function UnifiedTheftDetection() {
           .order("updated_at", { ascending: false });
         if (inventoryError) throw new Error("Error fetching inventory: " + inventoryError.message);
         setInventory(inventoryData);
-        console.log("Inventory fetched:", inventoryData);
 
-        // Fetch products for this store
+        // Fetch products
         const productIds = [...new Set(inventoryData.map(item => item.dynamic_product_id))];
         const { data: productData, error: productError } = await supabase
           .from("dynamic_product")
@@ -56,9 +56,8 @@ function UnifiedTheftDetection() {
           .order("name", { ascending: true });
         if (productError) throw new Error("Error fetching products: " + productError.message);
         setProducts(productData);
-        console.log("Products fetched:", productData);
 
-        // Fetch theft incidents from Supabase
+        // Fetch theft incidents
         const { data: theftData, error: theftError } = await supabase
           .from("theft_incidents")
           .select("*")
@@ -66,11 +65,10 @@ function UnifiedTheftDetection() {
           .order("created_at", { ascending: false });
         if (theftError) throw new Error("Error fetching theft incidents: " + theftError.message);
         setTheftIncidents(theftData);
-        console.log("Theft incidents fetched:", theftData);
 
         setLoading(false);
 
-        // Real-time subscription for theft incidents
+        // Real-time subscription
         const subscription = supabase
           .channel("theft_incidents")
           .on(
@@ -83,11 +81,7 @@ function UnifiedTheftDetection() {
             },
             (payload) => {
               setTheftIncidents((prev) => {
-                if (prev.some(incident => incident.id === payload.new.id)) {
-                  console.log("Duplicate incident skipped:", payload.new.id);
-                  return prev;
-                }
-                console.log("New theft incident added:", payload.new);
+                if (prev.some(incident => incident.id === payload.new.id)) return prev;
                 return [
                   { ...payload.new, product_name: payload.new.product_name || `Product ID: ${payload.new.dynamic_product_id}` },
                   ...prev,
@@ -101,7 +95,6 @@ function UnifiedTheftDetection() {
       } catch (err) {
         setError("Unexpected error: " + err.message);
         setLoading(false);
-        console.error("Fetch error:", err);
       }
     };
     fetchData();
@@ -123,7 +116,12 @@ function UnifiedTheftDetection() {
     const productName = product ? product.name : `Product ID: ${productId}`;
     setSelectedProducts([...selectedProducts, { productId, productName, physicalCount: "", availableQty }]);
     setTheftMessage("");
-    console.log("Added product ID:", productId, "Available qty:", availableQty);
+  };
+
+  const handleClearAllProducts = () => {
+    setSelectedProducts([]);
+    setTheftMessage("");
+    if (fileInputRef.current) fileInputRef.current.value = ""; // Clear file input
   };
 
   const handleDownloadTemplate = () => {
@@ -137,7 +135,6 @@ function UnifiedTheftDetection() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    console.log("CSV template downloaded");
   };
 
   const handleFileUpload = (event) => {
@@ -163,7 +160,7 @@ function UnifiedTheftDetection() {
             continue;
           }
 
-          // Identify product by dynamic_product_id or product_name
+          // Identify product
           if (row.dynamic_product_id) {
             productId = parseInt(row.dynamic_product_id);
             const product = products.find(p => p.id === productId);
@@ -187,7 +184,7 @@ function UnifiedTheftDetection() {
             continue;
           }
 
-          // Prevent duplicate products
+          // Prevent duplicates
           if (seenProductIds.has(productId)) {
             setTheftMessage(`Duplicate product ID ${productId} in CSV.`);
             continue;
@@ -207,11 +204,12 @@ function UnifiedTheftDetection() {
 
         setSelectedProducts(parsedProducts);
         setTheftMessage(parsedProducts.length > 0 ? "CSV uploaded successfully." : "No valid products found in CSV.");
-        console.log("Parsed CSV products:", parsedProducts);
+        if (parsedProducts.length > 0 && fileInputRef.current) {
+          fileInputRef.current.value = ""; // Clear file input
+        }
       },
       error: (err) => {
         setTheftMessage(`Failed to parse CSV: ${err.message}`);
-        console.error("CSV parse error:", err);
       }
     });
   };
@@ -246,6 +244,7 @@ function UnifiedTheftDetection() {
 
     setIsChecking(true);
     let messages = [];
+    let theftDetected = false;
 
     for (const { productId, productName, physicalCount, availableQty } of selectedProducts) {
       if (availableQty === null) {
@@ -255,8 +254,9 @@ function UnifiedTheftDetection() {
 
       const physicalCountNum = parseInt(physicalCount);
       if (physicalCountNum < availableQty) {
+        theftDetected = true;
         const discrepancy = availableQty - physicalCountNum;
-        messages.push(`Theft detected for ${productName}: ${discrepancy} units missing`);
+        messages.push(`Theft/Missing Product for ${productName}: ${discrepancy} units missing`);
 
         const theftIncident = {
           dynamic_product_id: parseInt(productId),
@@ -274,17 +274,20 @@ function UnifiedTheftDetection() {
             .from("theft_incidents")
             .insert(theftIncident);
           if (error) throw new Error(`Failed to insert theft incident for ${productName}: ${error.message}`);
-          console.log("Theft incident inserted:", theftIncident);
         } catch (err) {
           messages.push(`Theft detected for ${productName}: ${discrepancy} units missing, but failed to save: ${err.message}`);
-          console.error("Insert error:", err);
         }
       }
     }
 
+    if (!theftDetected && messages.length === 0) {
+      messages.push("No theft or missing products detected.");
+    }
+
     setTheftMessage(messages.join(" | "));
     setIsChecking(false);
-    setSelectedProducts([]); // Clear form after check
+    setSelectedProducts([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDeleteIncident = async (incidentId) => {
@@ -295,10 +298,8 @@ function UnifiedTheftDetection() {
         .eq("id", incidentId);
       if (error) throw new Error("Failed to delete theft incident: " + error.message);
       setTheftIncidents((prev) => prev.filter(incident => incident.id !== incidentId));
-      console.log("Theft incident deleted:", incidentId);
     } catch (err) {
       setTheftMessage(`Failed to delete incident: ${err.message}`);
-      console.error("Delete error:", err);
     }
   };
 
@@ -312,28 +313,29 @@ function UnifiedTheftDetection() {
     setCurrentPage(pageNumber);
   };
 
-  if (loading) return <div className="text-center py-4 text-gray-600">Loading...</div>;
-  if (error) return <div className="text-center py-4 text-red-600">{error}</div>;
+  if (loading) return <div className="text-center py-4 text-gray-600 dark:text-gray-300">Loading...</div>;
+  if (error) return <div className="text-center py-4 text-red-600 dark:text-red-400">{error}</div>;
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full min-h-screen bg-white mt-16">
-      <h2 className="text-xl sm:text-2xl font-bold mb-4 text-indigo-600">
-        Theft Detection for {storeName || "Store"}
+    <div className="p-4 sm:p-6 md:p-8 w-full min-h-screen bg-white dark:bg-gray-900 mt-4">
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 text-indigo-600 dark:text-indigo-400">
+         {storeName || "Store"} Audit
       </h2>
 
       {/* Mode Toggle */}
       <div className="mb-4">
-        <div className="flex space-x-4 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => {
               setMode("manual");
               setSelectedProducts([]);
               setTheftMessage("");
+              if (fileInputRef.current) fileInputRef.current.value = "";
             }}
             className={`px-4 py-2 text-sm font-medium ${
               mode === "manual"
-                ? "border-b-2 border-indigo-600 text-indigo-600"
-                : "text-gray-600 hover:text-indigo-600"
+                ? "border-b-2 border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
             }`}
           >
             Manual Entry
@@ -343,11 +345,12 @@ function UnifiedTheftDetection() {
               setMode("csv");
               setSelectedProducts([]);
               setTheftMessage("");
+              if (fileInputRef.current) fileInputRef.current.value = "";
             }}
             className={`px-4 py-2 text-sm font-medium ${
               mode === "csv"
-                ? "border-b-2 border-indigo-600 text-indigo-600"
-                : "text-gray-600 hover:text-indigo-600"
+                ? "border-b-2 border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
             }`}
           >
             CSV Upload
@@ -359,7 +362,7 @@ function UnifiedTheftDetection() {
       {mode === "manual" && (
         <button
           onClick={() => setShowForm(!showForm)}
-          className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors"
+          className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-sm transition-colors"
         >
           {showForm ? "Hide Form" : "Show Form"}
         </button>
@@ -367,16 +370,16 @@ function UnifiedTheftDetection() {
 
       {/* Form Section */}
       {((mode === "manual" && showForm) || mode === "csv") && (
-        <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">
-            {mode === "manual" ? "Check for Theft" : "Upload CSV for Theft Check"}
+        <div className="mb-6 bg-white dark:bg-gray-900 p-4 rounded-lg shadow-md dark:border dark:border-gray-700">
+          <h3 className="text-lg sm:text-sm font-semibold text-gray-800 dark:text-white mb-2">
+            {mode === "manual" ? "Audit Product" : "Upload CSV for Audit/Theft Check"}
           </h3>
           {mode === "manual" ? (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Add Product</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Add Product</label>
               <select
                 onChange={(e) => handleAddProduct(e.target.value)}
-                className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                className="w-full sm:w-1/2 p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-900 dark:text-white text-sm"
                 value=""
               >
                 <option value="">Select a product</option>
@@ -393,58 +396,65 @@ function UnifiedTheftDetection() {
             <div className="mb-4">
               <button
                 onClick={handleDownloadTemplate}
-                className="mb-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors"
+                className="mb-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-sm transition-colors"
               >
                 Download CSV Template
               </button>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Upload CSV File</label>
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">Upload CSV File</label>
               <input
                 type="file"
                 accept=".csv"
                 onChange={handleFileUpload}
-                className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                ref={fileInputRef}
+                className="w-full sm:w-1/2 p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-900 dark:text-white text-sm"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 CSV should contain headers: product_name and physical_count
               </p>
             </div>
           )}
           {selectedProducts.length > 0 && (
             <div className="space-y-4">
+              <button
+                onClick={handleClearAllProducts}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600 text-sm transition-colors"
+              >
+                Clear All Products
+              </button>
               {selectedProducts.map((sp) => (
                 <div key={sp.productId} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product</label>
                     <input
                       type="text"
                       value={sp.productName}
                       readOnly
-                      className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 text-sm"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Available Quantity</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Available Quantity</label>
                     <input
                       type="text"
                       value={sp.availableQty !== null ? sp.availableQty : "No inventory data"}
                       readOnly
-                      className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 text-sm"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white text-sm"
                     />
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Physical Count</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Physical Count</label>
                       <input
                         type="number"
                         value={sp.physicalCount}
                         onChange={(e) => handlePhysicalCountChange(sp.productId, e.target.value)}
                         placeholder="Enter physical count"
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white text-sm"
                       />
                     </div>
                     <button
                       onClick={() => handleRemoveProduct(sp.productId)}
-                      className="px-4 py-2  text-red-600 rounded hover:text-red-900 text-xs"
+                      className="px-4 py-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs"
                     >
                       Remove
                     </button>
@@ -453,14 +463,14 @@ function UnifiedTheftDetection() {
               ))}
             </div>
           )}
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
             <button
               onClick={handleCheckTheft}
               disabled={isChecking}
               className={`w-full sm:w-auto px-4 py-2 flex items-center justify-center rounded-lg text-sm transition-colors ${
                 isChecking
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+                  ? "bg-gray-400 dark:bg-gray-600 cursor-not-allowed"
+                  : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
               }`}
             >
               {isChecking ? (
@@ -491,7 +501,7 @@ function UnifiedTheftDetection() {
           {theftMessage && (
             <p
               className={`mt-4 text-sm font-medium ${
-                theftMessage.includes("Theft detected") ? "text-red-600" : "text-gray-600"
+                theftMessage.includes("Theft detected") ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-300"
               }`}
             >
               {theftMessage}
@@ -501,53 +511,55 @@ function UnifiedTheftDetection() {
       )}
 
       {/* Theft Incidents Table */}
-       <div className="p-0 sm:p-6 md:p-8 lg:p-0 max-w-7xl mx-auto">
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Theft Incidents</h3>
+      <div className="p-0 sm:p-6 md:p-8 max-w-7xl mx-auto">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white mb-2">Theft/Missing Product</h3>
         {theftIncidents.length ? (
           <>
-            <table className="min-w-full bg-white border border-gray-200">
-              <thead className="bg-indigo-600 text-white">
-                <tr>
-                  <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Product</th>
-                  <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Missing Units</th>
-            
-                  <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Date</th>
-                  <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentIncidents.map((t) => (
-                  <tr
-                    key={t.id}
-                    className={`border-b ${t.id % 2 === 0 ? "bg-gray-50" : "bg-white"} hover:bg-indigo-50 transition-colors`}
-                  >
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">{t.product_name}</td>
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">{Math.abs(t.inventory_change)} units</td>
-                  
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">
-                      {new Date(t.timestamp).toLocaleDateString()}
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">
-                      <button
-                        onClick={() => handleDeleteIncident(t.id)}
-                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                      >
-                        Delete
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
+                  <tr>
+                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Product</th>
+                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Missing Units</th>
+                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Date</th>
+                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {currentIncidents.map((t) => (
+                    <tr
+                      key={t.id}
+                      className={`border-b border-gray-200 dark:border-gray-700 ${
+                        t.id % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
+                      } hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors`}
+                    >
+                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{t.product_name}</td>
+                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{Math.abs(t.inventory_change)} units</td>
+                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">
+                        {new Date(t.timestamp).toLocaleDateString()}
+                      </td>
+                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm">
+                        <button
+                          onClick={() => handleDeleteIncident(t.id)}
+                          className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {/* Pagination Controls */}
-            <div className="mt-4 flex justify-center space-x-2">
+            <div className="mt-4 flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-2">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 className={`px-3 py-1 rounded text-sm ${
                   currentPage === 1
-                    ? "bg-gray-300 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    ? "bg-gray-300 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
                 }`}
               >
                 Previous
@@ -558,8 +570,8 @@ function UnifiedTheftDetection() {
                   onClick={() => handlePageChange(page)}
                   className={`px-3 py-1 rounded text-sm ${
                     currentPage === page
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-200 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   }`}
                 >
                   {page}
@@ -570,8 +582,8 @@ function UnifiedTheftDetection() {
                 disabled={currentPage === totalPages}
                 className={`px-3 py-1 rounded text-sm ${
                   currentPage === totalPages
-                    ? "bg-gray-300 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    ? "bg-gray-300 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
                 }`}
               >
                 Next
@@ -579,7 +591,7 @@ function UnifiedTheftDetection() {
             </div>
           </>
         ) : (
-          <p className="text-gray-600 text-center text-sm sm:text-base">
+          <p className="text-gray-600 dark:text-gray-300 text-center text-sm sm:text-base">
             No theft incidents detected for {storeName || "this store"}.
           </p>
         )}

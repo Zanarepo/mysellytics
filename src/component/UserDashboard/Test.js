@@ -1,269 +1,116 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  FaMoneyBillWave,
-  FaUser,
-  FaBars,
-  FaTimes,
-  FaQrcode,
-  FaBarcode,
-  FaIdBadge,
-  FaBell,
-  FaCrown,
-  FaHome,
-} from 'react-icons/fa';
-import UserOnboardingTour from './UserOnboardingTour';
-import Employees from './Employees';
-import Profile from './Profile';
-import Variex from './Variex';
-import VsalesSummary from '../Ops/VsalesSummary';
-import WhatsapUsers from './WhatsapUsers';
-import Notifications from './Notifications';
-import PricingFeatures from '../Payments/PricingFeatures';
-import ERetailStores from './ERetailStores';
-import Test from './Test';
-import AIpowerInsights from './AIpowerInsights';
+import { FiBarChart, FiShoppingBag, FiStar, FiAlertTriangle, FiLock } from 'react-icons/fi';
+import { motion } from 'framer-motion';
 
-const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('Fix Scan');
-  const [darkMode, setDarkMode] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Default open on desktop
-  const [isTourOpen, setIsTourOpen] = useState(false);
-  const navigate = useNavigate();
-
-  // Check if tour has been shown before
-  useEffect(() => {
-    const hasSeenTour = localStorage.getItem('hasSeenTour');
-    if (!hasSeenTour) {
-      setIsTourOpen(true);
-    }
-  }, []);
-
-  // Toggle dark mode
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
-
-  // Close tour and mark as seen
-  const handleTourClose = () => {
-    setIsTourOpen(false);
-    localStorage.setItem('hasSeenTour', 'true');
-  };
-
-  // Render main content based on active tab
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'Flex Scan':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <Variex />
-          </div>
-        );
-      case 'Fix Scan':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <ERetailStores />
-          </div>
-        );
-case 'Sales Summary':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <VsalesSummary />
-          </div>
-        );
-        
-     
-      case 'AI Insights':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            < AIpowerInsights />
-          </div>
-        );
-      case 'Notifications':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <Notifications />
-          </div>
-        );
-      case 'Employees':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <Employees />
-          </div>
-        );
-      case 'Upgrade':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <PricingFeatures />
-          </div>
-        );
-      case 'Profile':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <Profile />
-          </div>
-        );
-      case 'Test':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <Test />
-          </div>
-        );
-      default:
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 p-4">
-            Dashboard Content
-          </div>
-        );
-    }
-  };
-
-
-  // Handle navigation click: update active tab and close sidebar on mobile
-  const handleNavClick = (tab) => {
-    if (tab === 'Home') {
-      navigate('/');
-    } else {
-      setActiveTab(tab);
-      setSidebarOpen(false); // Close sidebar on mobile
-    }
-  };
-
-  // Toggle sidebar
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      <WhatsapUsers />
-      {/* Onboarding Tour */}
-      <UserOnboardingTour
-        isOpen={isTourOpen}
-        onClose={handleTourClose}
-        setActiveTab={setActiveTab}
-      />
-      {/* Sidebar */}
-      <aside
-        className={`fixed md:static top-0 left-0 h-full transition-all duration-300 bg-gray-100 dark:bg-gray-900 z-40 ${
-          sidebarOpen ? 'w-64' : 'w-0 md:w-16'
-        } ${sidebarOpen ? 'block' : 'hidden md:block'}`}
-      >
-        <div className="p-4 md:p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className={`text-xl font-bold text-indigo-800 dark:text-white ${sidebarOpen ? 'block' : 'hidden'}`}>
-              Menu
-            </h2>
-            {/* Mobile Close Button */}
-            <button
-              onClick={toggleSidebar}
-              className="text-indigo-800 dark:text-indigo-200 md:hidden"
-              aria-label="Close sidebar"
-            >
-              <FaTimes size={24} />
-            </button>
-          </div>
-          <nav className="pt-4">
-            <ul className="space-y-2">
-              {[
-                { name: 'Home', icon: FaHome, aria: 'Home: Go to the landing page' },
-                { name: 'Flex Scan', icon: FaBarcode, aria: 'Flex Scan: Access your store management tools' },
-                { name: 'Fix Scan', icon: FaQrcode, aria: 'Fix Scan: View and edit your profile' },
-                { name: 'AI Insights', icon: FaMoneyBillWave, aria: 'AI Insights: Get AI-driven insights for your store' },
-                { name: 'Sales Summary', icon: FaMoneyBillWave, aria: 'Sales Dashboard: View and analyze sales data' },
-                { name: 'Notifications', icon: FaBell, aria: 'Notifications: Stay updated with store-related notifications' },
-                { name: 'Employees', icon: FaIdBadge, aria: 'Employees: Manage store employees' },
-                { name: 'Upgrade', icon: FaCrown, aria: 'Upgrade: Upgrade your plan for more features' },
-                { name: 'Profile', icon: FaUser, aria: 'Profile: View and edit your profile' },
-              ].map((item) => (
-                <li
-                  key={item.name}
-                  data-tour={item.name.toLowerCase().replace(' ', '-')}
-                  onClick={() => handleNavClick(item.name)}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-600 transition ${
-                    activeTab === item.name ? 'bg-indigo-200 dark:bg-indigo-600' : ''
-                  }`}
-                  aria-label={item.aria}
-                >
-                  <item.icon className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                  <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
-                    {item.name}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-        <div className="flex-1 flex flex-col justify-between">
-          {/* Dark/Light Mode Toggle */}
-          <div
-            data-tour="dark-mode"
-            className={`p-4 md:p-6 mt-auto flex items-center justify-between ${sidebarOpen ? 'block' : 'hidden md:flex'}`}
-          >
-            <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
-              {darkMode ? 'Dark Mode' : 'Light Mode'}
-            </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={darkMode}
-                onChange={() => setDarkMode(!darkMode)}
-              />
-              <div className="w-11 h-6 bg-indigo-800 dark:bg-gray-600 rounded-full transition-colors duration-300">
-                <span
-                  className={`absolute left-1 top-1 bg-white dark:bg-indigo-200 w-4 h-4 rounded-full transition-transform duration-300 ${
-                    darkMode ? 'translate-x-5' : ''
-                  }`}
-                ></span>
-              </div>
-            </label>
-          </div>
-        </div>
-      </aside>
-
-      {/* Floating Toggle Button (Desktop Only) */}
-      <button
-        onClick={toggleSidebar}
-        className={`fixed top-4 md:top-4 transition-all duration-300 z-50 rounded-full p-2 bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 md:block hidden ${
-          sidebarOpen ? 'left-64' : 'left-4'
-        }`}
-        aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-      >
-        {sidebarOpen ? <FaTimes size={20} /> : <FaBars size={20} />}
-      </button>
-
-      {/* Main Content */}
-      <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-          sidebarOpen ? 'md:ml-64' : 'md:ml-0'
-        }`}
-      >
-        {/* Mobile Header */}
-        <header className="flex md:hidden items-center justify-between p-4 bg-white dark:bg-gray-800">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-indigo-800 dark:text-indigo-200"
-            aria-label="Open sidebar"
-          >
-            <FaBars size={24} />
-          </button>
-          <h1 className="text-xl font-bold text-indigo-800 dark:text-indigo-200">
-            {activeTab}
-          </h1>
-          <button
-            onClick={() => {
-              localStorage.removeItem('hasSeenTour');
-              setIsTourOpen(true);
-            }}
-            className="text-indigo-800 dark:text-indigo-200 text-sm"
-          >
-          </button>
-        </header>
-        <main className="flex-1 overflow-y-auto p-4">{renderContent()}</main>
-      </div>
-    </div>
-  );
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, delay: i * 0.1 },
+  }),
 };
 
-export default Dashboard;
+const iconVariants = {
+  rest: { scale: 1 },
+  hover: { scale: 1.2, transition: { type: 'spring', stiffness: 300 } },
+};
+
+function Test() {
+  const features = [
+    {
+      icon: FiBarChart,
+      title: "Sales Trend Analysis",
+      description: "See clear, interactive sales trends and forecasts to maximize sales.",
+    },
+   
+    {
+      icon: FiShoppingBag,
+      title: "Market Demand Insights",
+      description: "Match inventory to customer demand to seize market opportunities.",
+    },
+    {
+      icon: FiStar,
+      title: "Smart Restock Recommendations",
+      description: "Let AI suggest optimal restock amounts to save time and costs.",
+    },
+    {
+      icon: FiAlertTriangle,
+      title: "Anomaly Detection",
+      description: "Catch unusual sales patterns fast to spot errors or issues.",
+    },
+    {
+      icon: FiLock,
+      title: "Theft/Audit Checks",
+      description: "Keep inventory safe with smart audit to track and reconcile products.",
+    },
+  ];
+
+  return (
+    <section className="min-h-screen w-full px-4 py-16 bg-gradient-to-b from-indigo-50 to-indigo-200 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden flex items-center justify-center">
+      {/* Wavy Top Border */}
+      <svg className="absolute top-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
+        <path
+          d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
+          fill="url(#gradient)"
+          className="dark:fill-gray-800"
+        />
+        <defs>
+          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
+            <stop offset="100%" style={{ stopColor: '#c7d2fe', stopOpacity: 1 }} />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      {/* Wavy Bottom Border */}
+      <svg className="absolute bottom-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
+        <path
+          d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
+          fill="url(#gradient)"
+          className="dark:fill-gray-800"
+        />
+      </svg>
+
+      <div className="w-full px-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-center text-indigo-900 dark:text-white mb-4 font-sans">
+          Sellytics — AI-Powered Retail Insights
+        </h2>
+        <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-12 font-sans">
+          Running a retail business is tough. Sellytics uses AI-powered analytics to simplify decisions, optimize operations, and boost your bottom line.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {features.map((feature, index) => (
+            <motion.div
+              key={index}
+              className="bg-white/70 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 shadow-lg flex items-start space-x-4 hover:shadow-xl transition-transform duration-300"
+              initial="hidden"
+              animate="visible"
+              custom={index}
+              variants={cardVariants}
+              whileHover={{ scale: 1.05, translateY: -5 }}
+            >
+              <motion.div
+                className="text-indigo-600 dark:text-indigo-400 mt-1"
+                variants={iconVariants}
+                initial="rest"
+                whileHover="hover"
+              >
+                <feature.icon size={28} />
+              </motion.div>
+              <div>
+                <h3 className="text-xl font-bold text-indigo-900 dark:text-white font-sans">
+                  {feature.title}
+                </h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-300 font-medium font-sans text-sm sm:text-base">
+                  {feature.description}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default Test;

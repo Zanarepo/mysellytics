@@ -64,7 +64,7 @@ function AnomalyAlerts() {
               event: "INSERT",
               schema: "public",
               table: "anomalies",
-              filter: `store_id=eq.${storeId}`
+              filter: `store_id=eq.${storeId}`,
             },
             async (payload) => {
               const newAnomaly = payload.new;
@@ -103,15 +103,15 @@ function AnomalyAlerts() {
 
   if (error) {
     return (
-      <div className="p-4 sm:p-6 text-center text-red-600 text-sm sm:text-base">
+      <div className="p-4 sm:p-6 text-center text-red-600 dark:text-red-400 text-sm sm:text-base">
         Error: {error}
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full">
-      <h2 className="text-xl sm:text-2xl font-bold mb-4 text-indigo-600">
+    <div className="p-4 sm:p-6 md:p-8 w-full dark:bg-gray-900">
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 text-indigo-600 dark:text-indigo-400">
         Sales Anomalies for {storeName || "Store"}
       </h2>
 
@@ -119,18 +119,18 @@ function AnomalyAlerts() {
       <div className="mb-6">
         <button
           onClick={() => setShowExplanations(!showExplanations)}
-          className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base"
+          className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700 transition-colors text-sm sm:text-base"
         >
           {showExplanations ? "Hide Explanations" : "Show Explanations"}
         </button>
         {showExplanations && (
-          <div className="bg-white p-4 rounded-lg shadow-md">
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Understanding Anomalies</h3>
-            <p className="text-sm sm:text-base text-gray-600 mb-2">
-              <span className="font-medium text-red-600">High Anomaly:</span> A sale significantly larger than usual. This could mean a successful promotion, bulk order, or possible data error. <span className="font-medium">Action:</span> Check for promotions or verify data accuracy.
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md dark:border dark:border-gray-700">
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white mb-2">Understanding Anomalies</h3>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-2">
+              <span className="font-medium text-red-600 dark:text-red-400">High Anomaly:</span> A sale significantly larger than usual. This could mean a successful promotion, bulk order, or possible data error. <span className="font-medium">Action:</span> Check for promotions or verify data accuracy.
             </p>
-            <p className="text-sm sm:text-base text-gray-600">
-              <span className="font-medium text-indigo-600">Low Anomaly:</span> A sale much smaller than expected. This might indicate a stockout, low demand, or data issue. <span className="font-medium">Action:</span> Review inventory or marketing strategies.
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+              <span className="font-medium text-indigo-600 dark:text-indigo-400">Low Anomaly:</span> A sale much smaller than expected. This might indicate a stockout, low demand, or data issue. <span className="font-medium">Action:</span> Review inventory or marketing strategies.
             </p>
           </div>
         )}
@@ -140,8 +140,8 @@ function AnomalyAlerts() {
       {anomalies.length ? (
         <div className="p-0 sm:p-6 md:p-8 max-w-7xl mx-auto">
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200">
-              <thead className="bg-indigo-600 text-white">
+            <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
                 <tr>
                   <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Product</th>
                   <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Quantity</th>
@@ -153,16 +153,18 @@ function AnomalyAlerts() {
                 {currentAnomalies.map((a, i) => (
                   <tr
                     key={`${a.dynamic_product_id}-${a.store_id}-${a.quantity}-${a.sold_at}-${a.anomaly_type}-${i}`}
-                    className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"} hover:bg-indigo-50 transition-colors`}
+                    className={`border-b border-gray-200 dark:border-gray-700 ${
+                      i % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
+                    } hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors`}
                   >
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">{a.dynamic_product.name}</td>
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">{a.quantity} units</td>
-                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700">
+                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{a.dynamic_product.name}</td>
+                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{a.quantity} units</td>
+                    <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">
                       {new Date(a.sold_at).toLocaleDateString()}
                     </td>
                     <td
                       className={`py-2 px-3 sm:px-4 text-xs sm:text-sm font-medium ${
-                        a.anomaly_type === "High" ? "text-red-600" : "text-indigo-600"
+                        a.anomaly_type === "High" ? "text-red-600 dark:text-red-400" : "text-indigo-600 dark:text-indigo-400"
                       }`}
                     >
                       {a.anomaly_type}
@@ -175,7 +177,7 @@ function AnomalyAlerts() {
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
-            <div className="text-xs sm:text-sm text-gray-600">
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
               Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, anomalies.length)} of {anomalies.length} anomalies
             </div>
             <div className="flex space-x-2">
@@ -184,8 +186,8 @@ function AnomalyAlerts() {
                 disabled={currentPage === 1}
                 className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm ${
                   currentPage === 1
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
                 }`}
               >
                 Previous
@@ -196,8 +198,8 @@ function AnomalyAlerts() {
                   onClick={() => paginate(i + 1)}
                   className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm ${
                     currentPage === i + 1
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   }`}
                 >
                   {i + 1}
@@ -208,8 +210,8 @@ function AnomalyAlerts() {
                 disabled={currentPage === totalPages}
                 className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm ${
                   currentPage === totalPages
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
                 }`}
               >
                 Next
@@ -218,7 +220,7 @@ function AnomalyAlerts() {
           </div>
         </div>
       ) : (
-        <p className="text-gray-600 text-center text-sm sm:text-base">
+        <p className="text-gray-600 dark:text-gray-300 text-center text-sm sm:text-base">
           No sales anomalies detected for {storeName || "this store"}.
         </p>
       )}

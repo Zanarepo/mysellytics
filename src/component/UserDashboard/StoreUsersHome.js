@@ -11,6 +11,7 @@ import {
   FaBell,
   FaIdBadge,
   FaHome,
+  FaRobot,
 } from 'react-icons/fa';
 import StoreUsersTour from './StoreUsersTour';
 import WhatsapUsers from './WhatsapUsers';
@@ -20,6 +21,7 @@ import StoresSalesSummary from '../Ops/StoresSalesSummary';
 import Notifications from './Notifications';
 import StoreUsersVariex from './StoreUsersVariex';
 import UsersERetailStores from './UsersERetailStores';
+import  AIpowerInsights from './AIpowerInsights';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('Fix Scan');
@@ -54,6 +56,13 @@ const Dashboard = () => {
         return (
           <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
             <StoresSalesSummary />
+          </div>
+        );
+
+      case 'AI Insights':
+        return (      
+          <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
+            <AIpowerInsights />
           </div>
         );
       case 'Flex Scan':
@@ -142,6 +151,7 @@ const Dashboard = () => {
                 { name: 'Home', icon: FaHome, aria: 'Home: Go to the landing page' },
                 { name: 'Flex Scan', icon: FaBarcode, aria: 'Flex Scan: Access your store management tools', dataTour: 'toolkits' },
                 { name: 'Fix Scan', icon: FaQrcode, aria: 'Fix Scan: Fixed barcode scanning', dataTour: 'Fix Scan' },
+                { name: 'AI Insights', icon: FaRobot, aria: 'AI Insights: Get AI-powered insights for your store', dataTour: 'AI Insights' },
                 { name: 'Sales Summary', icon: FaMoneyBillWave, aria: 'Sales Dashboard: View and analyze sales data', dataTour: 'sales-summary' },
                 { name: 'Notifications', icon: FaBell, aria: 'Notifications: Stay updated with store-related notifications', dataTour: 'notifications' },
                 { name: 'Colleagues', icon: FaIdBadge, aria: 'Colleagues: Manage your colleagues', dataTour: 'colleagues' },

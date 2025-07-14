@@ -53,7 +53,7 @@ export default function Insights() {
   const tool = tools.find(t => t.key === activeTool);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl mx-auto mt-8">
+    <div className="min-h-screen bg-white dark:bg-gray-900 p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl mx-auto">
       <header className="text-center mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-indigo-800 dark:text-white">
           Insights for {shopName}

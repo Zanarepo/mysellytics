@@ -48,7 +48,7 @@ export default function HowItWorks() {
   return (
     <motion.section
       id="how-it-works"
-      className="py-20 md:py-16 px-6 md:px-20 bg-gradient-to-b from-indigo-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden"
+      className="py-20 md:py-8 px-6 md:px-20 bg-gradient-to-b from-indigo-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden"
       initial="hidden"
       animate="visible"
       variants={sectionVariants}
