@@ -11,6 +11,7 @@ import {
   FaBell,
   FaCrown,
   FaHome,
+  FaRobot,
 } from 'react-icons/fa';
 import UserOnboardingTour from './UserOnboardingTour';
 import Employees from './Employees';
@@ -21,11 +22,12 @@ import WhatsapUsers from './WhatsapUsers';
 import Notifications from './Notifications';
 import PricingFeatures from '../Payments/PricingFeatures';
 import ERetailStores from './ERetailStores';
+import AIpowerInsights from './AIpowerInsights';
 import Test from './Test';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('Fix Scan');
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Default open on desktop
   const [isTourOpen, setIsTourOpen] = useState(false);
   const navigate = useNavigate();
@@ -70,6 +72,14 @@ const Dashboard = () => {
             <VsalesSummary />
           </div>
         );
+
+      case 'AI Insights':
+        return (
+          <div className="w-full bg-white dark:bg-gray-900 p-4">
+            <AIpowerInsights />
+          </div>
+        );
+
       case 'Notifications':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
@@ -160,6 +170,7 @@ const Dashboard = () => {
                 { name: 'Home', icon: FaHome, aria: 'Home: Go to the landing page' },
                 { name: 'Flex Scan', icon: FaBarcode, aria: 'Flex Scan: Access your store management tools' },
                 { name: 'Fix Scan', icon: FaQrcode, aria: 'Fix Scan: View and edit your profile' },
+                { name: 'AI Insights', icon: FaRobot, aria: 'AI Insights: Explore AI-driven insights for your store' },
                 { name: 'Sales Summary', icon: FaMoneyBillWave, aria: 'Sales Dashboard: View and analyze sales data' },
                 { name: 'Notifications', icon: FaBell, aria: 'Notifications: Stay updated with store-related notifications' },
                 { name: 'Employees', icon: FaIdBadge, aria: 'Employees: Manage store employees' },

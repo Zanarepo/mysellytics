@@ -34,9 +34,9 @@ export default function FeaturesGrid() {
   ];
 
   return (
-    <section className="py-16 px-4 bg-gradient-to-b from-indigo-50 to-indigo-200 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden">
+    <section className="min-h-screen w-full px-4 py-16 bg-gradient-to-b from-indigo-50 to-indigo-200 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden flex items-center justify-center">
       {/* Wavy Top Border */}
-      <svg className="absolute top-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
+      <svg className="absolute top-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
         <path
           d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
           fill="url(#gradient)"
@@ -51,7 +51,7 @@ export default function FeaturesGrid() {
       </svg>
 
       {/* Wavy Bottom Border */}
-      <svg className="absolute bottom-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
+      <svg className="absolute bottom-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
         <path
           d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
           fill="url(#gradient)"
@@ -59,7 +59,8 @@ export default function FeaturesGrid() {
         />
       </svg>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full px-4">
+
         <h2 className="text-3xl md:text-4xl font-bold text-center text-indigo-900 dark:text-white mb-12 font-sans">
           All-in-One Business Toolkit
         </h2>

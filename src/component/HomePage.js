@@ -8,9 +8,9 @@ import WhosIsSellyticsFor from './LandingPageFeatures/WhosIsSellyticsFor';
 import CAQ from './LandingPageFeatures/CAQ';
 import PricingPlanLandingPage from './Payments/PricingPlanLandingPage';
 import { motion } from 'framer-motion';
-import WhatsAppChatPopup from './UserDashboard/WhatsAppChatPopup'
+import WhatsAppChatPopup from './UserDashboard/WhatsAppChatPopup';
 import Partners from './LandingPageFeatures/Partners';
-import HappyCustomer  from './LandingPageFeatures/HappyCustomer';
+import HappyCustomer from './LandingPageFeatures/HappyCustomer';
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 40 },
@@ -29,12 +29,12 @@ const buttonVariants = {
 
 export default function LandingPage() {
   return (
-    <>
+    <div className="w-full flex flex-col">
       {/* Hero Section */}
-      <WhatsAppChatPopup/>
-      <section className="min-h-screen flex flex-col-reverse md:flex-row items-center justify-between bg-gradient-to-b from-indigo-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-6 md:px-24 py-20 md:py-24 gap-12 relative overflow-hidden mt-10">
+      <WhatsAppChatPopup />
+      <section className="min-h-screen w-full flex flex-col-reverse md:flex-row items-center justify-between bg-gradient-to-b from-indigo-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4 sm:px-6 md:px-8 py-20 md:py-24 gap-12 relative overflow-hidden">
         {/* Wavy Bottom Border */}
-        <svg className="absolute bottom-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
+        <svg className="absolute bottom-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
           <path
             d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
             fill="url(#gradient)"
@@ -49,7 +49,7 @@ export default function LandingPage() {
         </svg>
 
         <motion.div
-          className="max-w-2xl bg-white/70 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 shadow-lg"
+          className="w-full max-w-3xl bg-white/70 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-lg"
           initial="hidden"
           animate="visible"
           variants={{
@@ -96,58 +96,105 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-
-
-      {/* Other Sections (Unchanged) */}
-      <motion.section id="features" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20">
+      {/* Other Sections */}
+      <motion.section
+        id="features"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8"
+      >
         <Features />
       </motion.section>
 
-      <motion.section id="how-it-works" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20">
+      <motion.section
+        id="how-it-works"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8"
+      >
         <HowItWorks />
       </motion.section>
 
-
-
-
-
-      <motion.section id="pricing" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20 bg-gray-50 dark:bg-gray-800">
+      <motion.section
+        id="pricing"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8 bg-gray-50 dark:bg-gray-800"
+      >
         <PricingPlanLandingPage />
       </motion.section>
 
-      <motion.section id="use-cases" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20">
+      <motion.section
+        id="use-cases"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8"
+      >
         <UseCases />
       </motion.section>
 
-      <motion.section id="who-is-it-for" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20 bg-gray-50 dark:bg-gray-800">
+      <motion.section
+        id="who-is-it-for"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8 bg-gray-50 dark:bg-gray-800"
+      >
         <WhosIsSellyticsFor />
       </motion.section>
 
-     
-      <motion.section id="reviews" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20 bg-gray-50 dark:bg-gray-800">
+      <motion.section
+        id="reviews"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8 bg-gray-50 dark:bg-gray-800"
+      >
         <Reviews />
       </motion.section>
 
-
-     
-      <motion.section id="" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20">
+      <motion.section
+        id="happy-customer"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8"
+      >
         <HappyCustomer />
       </motion.section>
 
-
-
-       <motion.section id="faq" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20">
+      <motion.section
+        id="faq"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8"
+      >
         <CAQ />
       </motion.section>
 
-      <motion.section id="partners" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={sectionVariants} className="py-16 px-6 md:px-20">
-        <Partners/>
+      <motion.section
+        id="partners"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={sectionVariants}
+        className="w-full py-16 px-4 sm:px-6 md:px-8"
+      >
+        <Partners />
       </motion.section>
-
-
-    </>
-
-
-
+    </div>
   );
 }

@@ -16,7 +16,7 @@ import {
 
 // Constants
 const CURRENCY_SYMBOLS = ["$", "€", "£", "¥", "₦"];
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 50;
 const DATE_FORMAT = "yyyy-MM-dd";
 
 // Utility Functions
@@ -177,7 +177,7 @@ export default function SalesDashboard() {
       <div className="flex justify-center p-0 ">
         <button
           onClick={() => setIsVisible(true)}
-          className="px-6 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          className="px-6 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 dark:bg-gray-900 dark:text-white"
         >
           Show Sales Summary
         </button>
@@ -187,9 +187,9 @@ export default function SalesDashboard() {
 
   // Main dashboard UI
   return (
-    <div className="max-w-5xl mx-auto p-0 space-y-6 dark:bg-gray-800 dark:text-white mt-48">
+    <div className="max-w-5xl mx-auto p-0 space-y-6 dark:bg-gray-800 dark:text-white">
       {/* Close Button */}
-      <div className="flex justify-end">
+      <div className="flex justify-end dark:bg-gray-900 dark:text-white">
         <button
           onClick={() => setIsVisible(false)}
           className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-900 dark:text-white"
@@ -199,11 +199,11 @@ export default function SalesDashboard() {
       </div>
 
       {/* Title */}
-      <h1 className="text-2xl font-bold text-center mb-4">Sales Summary</h1>
+      <h1 className="text-2xl font-bold text-center mb-4 dark:bg-gray-900 dark:text-white">Sales Summary</h1>
 
       {/* Date Presets */}
-      <div className="space-y-4 mb-4">
-        <div className="flex space-x-2 overflow-x-auto pb-2">
+      <div className="space-y-4 mb-4 dark:bg-gray-900 dark:text-white">
+        <div className="flex space-x-2 overflow-x-auto pb-2 ">
           {[
             { label: "Today", key: "today" },
             { label: "Last 7 Days", key: "7days" },
@@ -213,7 +213,7 @@ export default function SalesDashboard() {
             <button
               key={key}
               onClick={() => applyDatePreset(key)}
-              className="px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap"
+              className="px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap dark:bg-gray-900 dark:text-white"
             >
               {label}
             </button>
@@ -221,7 +221,7 @@ export default function SalesDashboard() {
         </div>
 
         {/* Date Range Inputs */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 ">
           <input
             type="date"
             value={startDate}
@@ -247,12 +247,12 @@ export default function SalesDashboard() {
       </div>
 
       {/* Total Revenue */}
-      <div className="text-right font-semibold mb-4">
+      <div className="text-right font-semibold mb-4 dark:bg-gray-900 dark:text-white">
         Total Revenue: {formatCurrency(totalRevenue, currency)}
       </div>
 
       {/* Search and Currency Selector */}
-      <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4 dark:bg-gray-900 dark:text-white">
         <input
           type="text"
           placeholder="Search product..."
@@ -288,7 +288,7 @@ export default function SalesDashboard() {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:bg-gray-900 dark:text-white">
             {paginatedData.length > 0 ? (
               paginatedData.map((item) => (
                 <tr key={item.productName}>
@@ -301,7 +301,7 @@ export default function SalesDashboard() {
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="p-4 text-center text-gray-500">
+                <td colSpan={3} className="p-4 text-center text-gray-500 ">
                   No sales in this range.
                 </td>
               </tr>
@@ -311,11 +311,11 @@ export default function SalesDashboard() {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-center gap-2 mb-6">
+      <div className="flex justify-center gap-2 mb-6 dark:bg-gray-900 dark:text-white">
         <button
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
           disabled={currentPage === 1}
-          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 dark:bg-gray-900 dark:text-white"
         >
           Prev
         </button>
@@ -325,7 +325,7 @@ export default function SalesDashboard() {
             onClick={() => setCurrentPage(index + 1)}
             className={`px-3 py-1 rounded ${
               currentPage === index + 1
-                ? "bg-indigo-600 text-white"
+                ? "bg-indigo-600 text-white "
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
           >
@@ -335,17 +335,17 @@ export default function SalesDashboard() {
         <button
           onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pageCount))}
           disabled={currentPage === pageCount}
-          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 dark:bg-gray-900 dark:text-white "
         >
           Next
         </button>
       </div>
 
       {/* Export and Chart Toggle Buttons */}
-      <div className="flex justify-center gap-4 mb-6">
+      <div className="flex justify-center gap-4 mb-6 dark:bg-gray-900 dark:text-white">
         <button
           onClick={downloadCSV}
-          className="px-4 py-2 bg-green-600 text-white rounded"
+          className="px-4 py-2 bg-green-600 text-white rounded "
         >
           CSV
         </button>
@@ -365,13 +365,13 @@ export default function SalesDashboard() {
 
       {/* Chart Modal */}
       {showChart && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 ">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl ">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Sales Summary Chart</h3>
               <button
                 onClick={() => setShowChart(false)}
-                className="text-gray-700 text-2xl leading-none"
+                className="text-gray-700 text-2xl leading-none "
               >
                 ×
               </button>
