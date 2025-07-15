@@ -204,9 +204,9 @@ const AccessSwitcher = () => {
     return null;
   }
 
-  return (
+return (
     <motion.div
-      className="w-full px-4 py-2 bg-white dark:bg-gray-900 backdrop-blur-md flex flex-wrap justify-center items-center gap-2 sm:gap-3"
+      className="w-full px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900 backdrop-blur-md flex flex-nowrap overflow-x-auto justify-center items-center gap-1 sm:gap-3 scrollbar-hidden"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
@@ -215,13 +215,13 @@ const AccessSwitcher = () => {
         <motion.button
           key={`${opt.type}-${opt.storeId || opt.ownerId || opt.userId || opt.adminId}-${index}`}
           onClick={() => pickAccess(opt, accessOptions)}
-          className="flex items-center px-3 py-1 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white rounded-xl hover:shadow-indigo-500/30 transition-all duration-300 text-xs sm:text-sm min-w-[120px]"
+          className="flex items-center px-2 py-1 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white rounded-xl hover:shadow-indigo-500/30 transition-all duration-300 text-xs sm:text-sm min-w-[80px] sm:min-w-[120px]"
           variants={buttonVariants}
           initial="rest"
           whileHover="hover"
           aria-label={`Switch to ${opt.label}`}
         >
-          <span className="mr-2">{opt.icon}</span>
+          <span className="mr-1 sm:mr-2">{opt.icon}</span>
           <span>{opt.label}</span>
         </motion.button>
       ))}
@@ -241,6 +241,5 @@ const AccessSwitcher = () => {
       />
     </motion.div>
   );
-};
-
+}
 export default AccessSwitcher;

@@ -3,22 +3,22 @@ import { motion } from 'framer-motion';
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, staggerChildren: 0.2 } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } },
 };
 
 const accordionVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
 const answerVariants = {
   collapsed: { opacity: 0, height: 0, marginTop: 0 },
-  expanded: { opacity: 1, height: 'auto', marginTop: '1rem', transition: { duration: 0.3 } },
+  expanded: { opacity: 1, height: 'auto', marginTop: '0.5rem', transition: { duration: 0.3 } },
 };
 
 const iconVariants = {
-  collapsed: { rotate: 0 },
-  expanded: { rotate: 45, transition: { type: 'spring', stiffness: 300 } },
+  collapsed: { rotate: 0, scale: 1 },
+  expanded: { rotate: 45, scale: 1.1, transition: { type: 'spring', stiffness: 300 } },
 };
 
 const FAQItem = ({ question, answer, index }) => {
@@ -26,23 +26,25 @@ const FAQItem = ({ question, answer, index }) => {
 
   return (
     <motion.div
-      className="mb-6 bg-white/70 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl shadow-md overflow-hidden"
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700"
       initial="hidden"
       animate="visible"
       variants={accordionVariants}
     >
       <button
         type="button"
-        className="w-full text-left flex justify-between items-center p-6 bg-gradient-to-r from-white/80 to-indigo-50/80 dark:from-gray-800/80 dark:to-gray-900/80 hover:from-indigo-100/80 hover:to-indigo-200/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:scale-[1.02]"
+        className="w-full text-left flex justify-between items-center p-3 sm:p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:scale-[1.02]"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         aria-controls={`faq-answer-${index}`}
+        aria-label={`Toggle ${question}`}
+        tabIndex={0}
       >
-        <span className="text-lg md:text-xl font-semibold text-indigo-900 dark:text-white font-sans">
+        <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white font-sans">
           {question}
         </span>
         <motion.span
-          className="text-2xl text-indigo-600 dark:text-indigo-400"
+          className="text-lg sm:text-xl text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-300"
           variants={iconVariants}
           animate={expanded ? 'expanded' : 'collapsed'}
         >
@@ -57,7 +59,7 @@ const FAQItem = ({ question, answer, index }) => {
         aria-hidden={!expanded}
         layout
       >
-        <p className="p-6 text-gray-600 dark:text-gray-300 text-base md:text-lg font-medium font-sans">
+        <p className="p-3 sm:p-4 text-xs sm:text-base text-gray-600 dark:text-gray-400 font-medium font-sans">
           {answer}
         </p>
       </motion.div>
@@ -65,12 +67,12 @@ const FAQItem = ({ question, answer, index }) => {
         <path
           d="M0,12 C240,24 480,0 720,12 C960,24 1200,0 1440,12 L1440,24 L0,24 Z"
           fill="url(#gradient)"
-          className="dark:fill-gray-800"
+          className="dark:fill-gray-900"
         />
         <defs>
           <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#c7d2fe', stopOpacity: 1 }} />
+            <stop offset="0%" style={{ stopColor: '#f3f4f6', stopOpacity: 1 }} />
+            <stop offset="100%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
           </linearGradient>
         </defs>
       </svg>
@@ -183,49 +185,47 @@ const FAQ = () => {
   ];
 
   return (
+
+    
     <motion.section
-      className="py-20 bg-gradient-to-b from-indigo-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden"
+      className="py-12 sm:py-16 bg-white dark:bg-gray-900 relative overflow-hidden"
       initial="hidden"
       animate="visible"
       variants={sectionVariants}
     >
-      {/* Wavy Top Border */}
-      <svg className="absolute top-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
-        <path
-          d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
-          fill="url(#gradient)"
-          className="dark:fill-gray-800"
-        />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#c7d2fe', stopOpacity: 1 }} />
-          </linearGradient>
-        </defs>
-      </svg>
-
-      {/* Wavy Bottom Border */}
-      <svg className="absolute bottom-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
-        <path
-          d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
-          fill="url(#gradient)"
-          className="dark:fill-gray-800"
-        />
-      </svg>
-
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <motion.h2
-          className="text-3xl md:text-4xl font-bold text-center text-indigo-900 dark:text-white mb-12 font-sans"
+          className="text-2xl sm:text-4xl font-bold text-center text-gray-900 dark:text-white mb-8 sm:mb-12 font-sans"
           variants={sectionVariants}
+          style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Commonly Asked Questions (CAQs)
         </motion.h2>
-        <div className="space-y-4">
+        <div className="space-y-4 sm:space-y-6">
           {faqs.map((faq, index) => (
             <FAQItem key={index} question={faq.question} answer={faq.answer} index={index} />
           ))}
         </div>
       </div>
+
+      {/* Indigo-600 Wavy Bottom Decoration */}
+      <svg
+        className="absolute bottom-0 left-0 w-full h-16 sm:h-24"
+        viewBox="0 0 1440 100"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0,100 C360,0 1080,200 1440,0 L1440,100 L0,100 Z"
+          fill="#4f46e5"
+          className="dark:fill-gray-800"
+        />
+      </svg>
+
+
+
+
+
+
     </motion.section>
   );
 };

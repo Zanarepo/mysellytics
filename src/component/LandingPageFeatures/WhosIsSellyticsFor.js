@@ -50,31 +50,49 @@ export default function WhoIsSellyticsFor() {
       role="region"
       aria-labelledby="who-is-sellytics-for-title"
     >
+      {/* Animated SVG Background */}
+      <svg
+        className="absolute top-0 left-0 w-full h-full z-0 opacity-20 animate-pulse"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <radialGradient id="marketflow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#c7d2fe" />
+            <stop offset="100%" stopColor="transparent" />
+          </radialGradient>
+        </defs>
+        {[...Array(60)].map((_, i) => (
+          <circle
+            key={i}
+            cx={Math.random() * 100}
+            cy={Math.random() * 100}
+            r={Math.random() * 1.5 + 0.2}
+            fill="url(#marketflow)"
+          />
+        ))}
+      </svg>
+
       {/* Wavy Top Border */}
-      <svg className="absolute top-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
+      <svg className="absolute top-0 w-full z-10" viewBox="0 0 1440 100" preserveAspectRatio="none">
         <path
           d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
-          fill="url(#gradient)"
+          fill="#4f46e5"
           className="dark:fill-gray-800"
         />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#c7d2fe', stopOpacity: 1 }} />
-          </linearGradient>
-        </defs>
       </svg>
 
       {/* Wavy Bottom Border */}
-      <svg className="absolute bottom-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
+      <svg className="absolute bottom-0 w-full z-10" viewBox="0 0 1440 100" preserveAspectRatio="none">
         <path
           d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
-          fill="url(#gradient)"
+          fill="#4f46e5"
           className="dark:fill-gray-800"
         />
       </svg>
 
-      <div className="container mx-auto max-w-6xl relative z-10">
+      <div className="container mx-auto max-w-6xl relative z-20">
         <motion.h2
           id="who-is-sellytics-for-title"
           className="text-3xl md:text-4xl font-extrabold text-center text-indigo-900 dark:text-white mb-12 font-sans relative before:absolute before:bottom-[-8px] before:left-1/2 before:-translate-x-1/2 before:w-24 before:h-1 before:bg-gradient-to-r before:from-indigo-500 before:to-indigo-700"
@@ -91,7 +109,6 @@ export default function WhoIsSellyticsFor() {
               whileHover={{ scale: 1.05, y: -10 }}
               aria-label={`${item.title} Audience`}
             >
-              {/* Hover Badge */}
               <span className="absolute top-4 right-4 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                 {item.badge}
               </span>

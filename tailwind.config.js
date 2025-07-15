@@ -1,11 +1,25 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'class', // enable dark mode via a class on an ancestor element (e.g., <html>)
+  darkMode: 'class',
   content: [
-    "./src/**/*.{html,js,jsx,ts,tsx}" // This will include all your React components and HTML files in the src folder
+    "./src/**/*.{html,js,jsx,ts,tsx}"
   ],
   theme: {
-    extend: {},
+    extend: {
+      animation: {
+        moveStars: 'moveStars 60s linear infinite',
+      },
+      keyframes: {
+        moveStars: {
+          '0%': {
+            backgroundPosition: '0 0',
+          },
+          '100%': {
+            backgroundPosition: '1000px 1000px',
+          },
+        },
+      },
+    },
   },
   plugins: [],
-}
+};
