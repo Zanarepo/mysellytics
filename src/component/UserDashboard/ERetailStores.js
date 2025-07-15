@@ -1,7 +1,5 @@
-// DynamicDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
- 
 import {
   FaRegMoneyBillAlt,
   FaMoneyCheckAlt,
@@ -14,120 +12,87 @@ import {
   FaUndoAlt,
   FaBoxOpen,
   FaSearch
-
-
 } from 'react-icons/fa';
-
 import DynamicInventory from '../DynamicSales/DynamicInventory';
-import ExpenseTracker   from './ExpenseTracker';
-import Customers        from './Customers';
-import DebtTracker from './DebtTracker'
+import ExpenseTracker from './ExpenseTracker';
+import Customers from './Customers';
+import DebtTracker from './DebtTracker';
 import DeviceDynamicSales from '../DynamicSales/DeviceDynamicSales';
-//import DynamicReceipts from '../VariexContents/DynamicReceipts';
 import DynamicReturnedItems from '../VariexContents/DynamicReturnedItems';
 import GadgetsUnpaidSupplies from '../UserDashboard/GadgetsUnpaidSupplies';
 import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
 import LatestReceipts from '../VariexContents/LatestReceipts';
-
-
-
-
-
-
-import DashboardAccess from '../Ops/DashboardAccess'
+import DashboardAccess from '../Ops/DashboardAccess';
 import GadgetsDynamicProducts from './GadgetsDynamicProducts';
-
-
 
 const tools = [
   {
     key: 'sales',
     label: 'Sales Tracker',
-    icon: <FaChartLine className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaChartLine className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Add your sales and see how your business is doing',
     component: <DeviceDynamicSales />,
   },
-  
-
-{
+  {
     key: 'Products Tracker',
     label: 'Products & Pricing Tracker',
-    icon: <FaBoxes className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaBoxes className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Add and manage your store’s products, prices, and stock here',
     component: <GadgetsDynamicProducts />,
   },
-
-
-
   {
     key: 'inventory',
     label: 'Manage Inventory (Goods)',
-    icon: <FaTasks className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaTasks className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Keep an eye on how much goods you have sold and what is left in your store.',
     component: <DynamicInventory />,
   },
-
   {
     key: 'receipts',
     label: 'Sales Receipts',
-    icon: <FaReceipt className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaReceipt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Monitor and track sales.',
-    component: <LatestReceipts/>,
+    component: <LatestReceipts />,
   },
-
-
   {
     key: 'returns',
-    label: ' Returned Items Tracker',
-    icon: < FaUndoAlt className="text-5xl sm:text-6xl text-indigo-600" />,
+    label: 'Returned Items Tracker',
+    icon: <FaUndoAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Track returned items from customers.',
-    component: <DynamicReturnedItems/>,
+    component: <DynamicReturnedItems />,
   },
-
-
   {
     key: 'expenses',
     label: 'Expenses Tracker',
-    icon: <FaRegMoneyBillAlt className="text-5xl sm:text-6xl text-indigo-600" />,
-    desc: 'Keep track of your stores spending..',
+    icon: <FaRegMoneyBillAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    desc: 'Keep track of your stores spending.',
     component: <ExpenseTracker />,
   },
-
   {
     key: 'unpaid supplies',
     label: 'Unpaid Supplies',
-    icon: <FaBoxOpen className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaBoxOpen className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'See who took goods on credit and hasn’t paid yet',
-    component: <GadgetsUnpaidSupplies/>,
+    component: <GadgetsUnpaidSupplies />,
   },
-
-
   {
     key: 'debts',
     label: 'Debtors',
-    icon: <FaMoneyCheckAlt className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaMoneyCheckAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Track debtors.',
-    component: <DebtTracker/>,
+    component: <DebtTracker />,
   },
-
-
   {
     key: 'Suppliers',
     label: 'Suppliers & Product Tracker',
-    icon: <FaSearch className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaSearch className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Track product & suppliers.',
-    component: <DynamicSuppliersTracker/>,
+    component: <DynamicSuppliersTracker />,
   },
-
-
-
-
-  
-
   {
     key: 'customers',
     label: 'Customer Manager',
-    icon: <FaUsers className="text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaUsers className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Manage your customers.',
     component: <Customers />,
   },
@@ -155,57 +120,48 @@ export default function DynamicDashboard() {
   const tool = tools.find(t => t.key === activeTool);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 p-0">
+    <div className="min-h-screen bg-white dark:bg-gray-900 w-full">
       <DashboardAccess />
-  
-      <header className="text-center mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-indigo-800 dark:text-white">
+      <header className="text-center mb-4 sm:mb-6">
+        <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-white">
           Welcome, {shopName}!
         </h1>
-
-            
-<div className="mb-6">
-     {/* Back & Tool Info <VariexFeature /> */} 
-      </div>
-      
         {!activeTool && (
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <p className="text-gray-600 dark:text-gray-400 mt-2 text-xs sm:text-sm">
             Choose a tool to continue.
           </p>
         )}
       </header>
 
-      {/* Back & Tool Info */}
       {activeTool && (
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <button
             onClick={() => setActiveTool(null)}
-            className="flex items-center text-indigo-600 hover:text-indigo-800 mb-4"
+            className="flex items-center text-indigo-600 hover:text-indigo-800 mb-4 text-xs sm:text-base"
           >
             <FaArrowLeft className="mr-2" /> Back
           </button>
-          <h2 className="text-xl sm:text-2xl font-semibold text-indigo-700 dark:text-indigo-200">
+          <h2 className="text-lg sm:text-2xl font-semibold text-indigo-700 dark:text-indigo-200">
             {tool.label}
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">{tool.desc}</p>
+          <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">{tool.desc}</p>
         </div>
       )}
 
-      {/* Grid or Content */}
       {activeTool ? (
         <div className="w-full">
           {tool.component}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
           {tools.map(t => (
             <button
               key={t.key}
               onClick={() => setActiveTool(t.key)}
-              className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 p-6 rounded-xl shadow hover:shadow-lg transition h-48"
+              className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 p-2 sm:p-6 rounded-xl shadow hover:shadow-lg transition h-32 sm:h-48"
             >
               {t.icon}
-              <span className="mt-3 text-sm sm:text-base font-medium text-indigo-800 dark:text-white">
+              <span className="mt-2 text-xs sm:text-base font-medium text-indigo-800 dark:text-white">
                 {t.label}
               </span>
             </button>

@@ -160,7 +160,7 @@ function RestockAlerts() {
               <button
                 onClick={() => paginate(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+                className={`px-2 py-0.5 rounded-lg text-xs ${
                   currentPage === 1
                     ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
@@ -168,11 +168,11 @@ function RestockAlerts() {
               >
                 Previous
               </button>
-              {[...Array(totalPages)].map((_, i) => (
+               {[...Array(totalPages)].map((_, i) => (
                 <button
                   key={i + 1}
                   onClick={() => paginate(i + 1)}
-                  className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+                  className={`px-2 py-0.5 rounded-lg text-xs ${
                     currentPage === i + 1
                       ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -181,10 +181,10 @@ function RestockAlerts() {
                   {i + 1}
                 </button>
               ))}
-              <button
+               <button
                 onClick={() => paginate(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+                className={`px-2 py-0.5 rounded-lg text-xs ${
                   currentPage === totalPages
                     ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"

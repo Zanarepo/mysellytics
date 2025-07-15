@@ -124,68 +124,68 @@ function RestockRecommendations() {
   }
 
   return (
-    <div className="p-0 sm:p-2 md:p-8 lg:p-0 max-w-7xl mx-auto dark:bg-gray-900">
-      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-gray-800 dark:text-white">
-        Market Demands Recommendations for {storeName || "Store"}
-      </h2>
-      {recommendations.length ? (
-        <div className="space-y-6">
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
-                <tr>
-                  <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Product</th>
-                  <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Month</th>
-                  <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Quantity Sold</th>
-                  <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Recommendation</th>
-                  <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentRecommendations.map((rec, i) => (
-                  <tr
-                    key={`${rec.id}-${i}`}
-                    className={`border-b border-gray-200 dark:border-gray-700 ${
-                      i % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
-                    } hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
+  <div className="w-full dark:bg-gray-900">
+    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-gray-800 dark:text-white">
+      Market Demands Recommendations for {storeName || "Store"}
+    </h2>
+    {recommendations.length ? (
+      <div className="space-y-6">
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
+              <tr>
+                <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Product</th>
+                <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Month</th>
+                <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Quantity Sold</th>
+                <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Recommendation</th>
+                <th className="py-3 px-4 text-left text-xs sm:text-sm font-semibold uppercase">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentRecommendations.map((rec, i) => (
+                <tr
+                  key={`${rec.id}-${i}`}
+                  className={`border-b border-gray-200 dark:border-gray-700 ${
+                    i % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
+                  } hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
+                >
+                  <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{rec.product_name}</td>
+                  <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{rec.month}</td>
+                  <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{rec.quantity_sold} units</td>
+                  <td
+                    className={`py-3 px-4 text-xs sm:text-sm font-medium ${
+                      rec.recommendation.includes("Restock")
+                        ? "text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-300 rounded-full px-2 py-1 inline-block"
+                        : "text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300 rounded-full px-2 py-1 inline-block"
+                    }`}
                   >
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{rec.product_name}</td>
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{rec.month}</td>
-                    <td className="py-3 px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{rec.quantity_sold} units</td>
-                    <td
-                      className={`py-3 px-4 text-xs sm:text-sm font-medium ${
-                        rec.recommendation.includes("Restock")
-                          ? "text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-300 rounded-full px-2 py-1 inline-block"
-                          : "text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300 rounded-full px-2 py-1 inline-block"
-                      }`}
+                    {rec.recommendation}
+                  </td>
+                  <td className="py-3 px-4 text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleDelete(rec.id)}
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
                     >
-                      {rec.recommendation}
-                    </td>
-                    <td className="py-3 px-4 text-xs sm:text-sm">
-                      <button
-                        onClick={() => handleDelete(rec.id)}
-                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-          {/* Pagination */}
-          <div className="flex justify-between items-center mt-4">
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, recommendations.length)} of {recommendations.length} entries
-            </div>
-            <div className="flex space-x-2">
+        {/* Pagination */}
+        <div className="flex justify-between items-center mt-4">
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, recommendations.length)} of {recommendations.length} entries
+          </div>
+          <div className="flex space-x-2">
               <button
                 onClick={() => paginate(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+                className={`px-2 py-0.5 rounded-lg text-xs ${
                   currentPage === 1
                     ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
@@ -193,11 +193,11 @@ function RestockRecommendations() {
               >
                 Previous
               </button>
-              {[...Array(totalPages)].map((_, i) => (
+               {[...Array(totalPages)].map((_, i) => (
                 <button
                   key={i + 1}
                   onClick={() => paginate(i + 1)}
-                  className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+                  className={`px-2 py-0.5 rounded-lg text-xs ${
                     currentPage === i + 1
                       ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -206,10 +206,10 @@ function RestockRecommendations() {
                   {i + 1}
                 </button>
               ))}
-              <button
+               <button
                 onClick={() => paginate(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base ${
+                className={`px-2 py-0.5 rounded-lg text-xs ${
                   currentPage === totalPages
                     ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
@@ -220,13 +220,13 @@ function RestockRecommendations() {
             </div>
           </div>
         </div>
-      ) : (
-        <p className="text-gray-600 dark:text-gray-300 text-center text-sm md:text-base">
-          No restock recommendations available.
-        </p>
-      )}
-    </div>
-  );
+    ) : (
+      <p className="text-gray-600 dark:text-gray-300 text-center text-sm md:text-base">
+        No restock recommendations available.
+      </p>
+    )}
+  </div>
+);
 }
 
 export default RestockRecommendations;

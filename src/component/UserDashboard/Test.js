@@ -1,116 +1,164 @@
-import { FiBarChart, FiShoppingBag, FiStar, FiAlertTriangle, FiLock } from 'react-icons/fi';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../supabaseClient';
+import {
+  FaRegMoneyBillAlt,
+  FaMoneyCheckAlt,
+  FaBoxes,
+  FaChartLine,
+  FaTasks,
+  FaArrowLeft,
+  FaReceipt,
+  FaUndoAlt,
+  FaBoxOpen,
+  FaSearch,
+} from 'react-icons/fa';
+import DynamicInventory from '../DynamicSales/DynamicInventory';
+import AttendantsDynamicSales from '../UserDashboard/AttendantsDynamicSales';
+import ExpenseTracker from './ExpenseTracker';
+import DebtTracker from './DebtTracker';
+import AttendantsUnpaidSupplies from './AttendantsUnpaidSupplies';
+import UserGadgetsDynamicProducts from './UserGadgetsDynamicProducts';
+import DynamicReceipts from '../VariexContents/DynamicReceipts';
+import DynamicReturnedItems from '../VariexContents/DynamicReturnedItems';
+import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, delay: i * 0.1 },
-  }),
-};
+const tools = [
+  {
+    key: 'sales',
+    label: 'Sales Tracker',
+    icon: <FaChartLine className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Add your sales and see how your business is doing',
+    component: <AttendantsDynamicSales />,
+  },
+  {
+    key: 'Dynamic Products',
+    label: 'Products & Pricing Tracker',
+    icon: <FaBoxes className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Add and manage your store’s products, prices, and stock here',
+    component: <UserGadgetsDynamicProducts />,
+  },
+  {
+    key: 'inventory',
+    label: 'Manage Inventory (Goods)',
+    icon: <FaTasks className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Keep an eye on how much goods you have sold and what is left in your store.',
+    component: <DynamicInventory />,
+  },
+  {
+    key: 'receipts',
+    label: 'Sales Receipts',
+    icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Monitor and track sales.',
+    component: <DynamicReceipts />,
+  },
+  {
+    key: 'returns',
+    label: 'Returned Items Tracker',
+    icon: <FaUndoAlt className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Track returned items from customers.',
+    component: <DynamicReturnedItems />,
+  },
+  {
+    key: 'expenses',
+    label: 'Expenses Tracker',
+    icon: <FaRegMoneyBillAlt className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Keep track of your stores spending.',
+    component: <ExpenseTracker />,
+  },
+  {
+    key: 'unpaid supplies',
+    label: 'Unpaid Supplies',
+    icon: <FaBoxOpen className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'See who took goods on credit and hasn’t paid yet',
+    component: <AttendantsUnpaidSupplies />,
+  },
+  {
+    key: 'debts',
+    label: 'Debtors',
+    icon: <FaMoneyCheckAlt className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Track debtors.',
+    component: <DebtTracker />,
+  },
+  {
+    key: 'Suppliers',
+    label: 'Suppliers & Product Tracker',
+    icon: <FaSearch className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'Track product & suppliers.',
+    component: <DynamicSuppliersTracker />,
+  },
+];
 
-const iconVariants = {
-  rest: { scale: 1 },
-  hover: { scale: 1.2, transition: { type: 'spring', stiffness: 300 } },
-};
+export default function DynamicDashboard() {
+  const [shopName, setShopName] = useState('Store Owner');
+  const [activeTool, setActiveTool] = useState(null);
 
-function Test() {
-  const features = [
-    {
-      icon: FiBarChart,
-      title: "Sales Trend Analysis",
-      description: "See clear, interactive sales trends and forecasts to maximize sales.",
-    },
-   
-    {
-      icon: FiShoppingBag,
-      title: "Market Demand Insights",
-      description: "Match inventory to customer demand to seize market opportunities.",
-    },
-    {
-      icon: FiStar,
-      title: "Smart Restock Recommendations",
-      description: "Let AI suggest optimal restock amounts to save time and costs.",
-    },
-    {
-      icon: FiAlertTriangle,
-      title: "Anomaly Detection",
-      description: "Catch unusual sales patterns fast to spot errors or issues.",
-    },
-    {
-      icon: FiLock,
-      title: "Theft/Audit Checks",
-      description: "Keep inventory safe with smart audit to track and reconcile products.",
-    },
-  ];
+  useEffect(() => {
+    const storeId = localStorage.getItem('store_id');
+    if (!storeId) return;
+    supabase
+      .from('stores')
+      .select('shop_name')
+      .eq('id', storeId)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data?.shop_name) {
+          setShopName(data.shop_name);
+        }
+      });
+  }, []);
+
+  const tool = tools.find(t => t.key === activeTool);
 
   return (
-    <section className="min-h-screen w-full px-4 py-16 bg-gradient-to-b from-indigo-50 to-indigo-200 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden flex items-center justify-center">
-      {/* Wavy Top Border */}
-      <svg className="absolute top-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
-        <path
-          d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
-          fill="url(#gradient)"
-          className="dark:fill-gray-800"
-        />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#c7d2fe', stopOpacity: 1 }} />
-          </linearGradient>
-        </defs>
-      </svg>
+    <div className="min-h-screen bg-white dark:bg-gray-900 w-full px-2 sm:px-4">
+      <header className="text-center mb-4 sm:mb-6">
+        <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-white">
+          Welcome, {shopName}!
+        </h1>
+        {!activeTool && (
+          <p className="text-gray-600 dark:text-gray-400 mt-2 text-xs sm:text-sm">
+            Choose a tool to continue.
+          </p>
+        )}
+      </header>
 
-      {/* Wavy Bottom Border */}
-      <svg className="absolute bottom-0 w-full h-24" viewBox="0 0 1440 100" preserveAspectRatio="none">
-        <path
-          d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
-          fill="url(#gradient)"
-          className="dark:fill-gray-800"
-        />
-      </svg>
+      {activeTool && (
+        <div className="mb-4 sm:mb-6 max-w-7xl mx-auto">
+          <button
+            onClick={() => setActiveTool(null)}
+            className="flex items-center text-indigo-600 hover:text-indigo-800 mb-4 text-xs sm:text-base"
+            aria-label="Go back to tool selection"
+          >
+            <FaArrowLeft className="mr-2" /> Back
+          </button>
+          <h2 className="text-lg sm:text-2xl font-semibold text-indigo-700 dark:text-indigo-200">
+            {tool.label}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">{tool.desc}</p>
+        </div>
+      )}
 
-      <div className="w-full px-4">
-        <h2 className="text-3xl md:text-4xl font-bold text-center text-indigo-900 dark:text-white mb-4 font-sans">
-          Sellytics — AI-Powered Retail Insights
-        </h2>
-        <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-12 font-sans">
-          Running a retail business is tough. Sellytics uses AI-powered analytics to simplify decisions, optimize operations, and boost your bottom line.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {features.map((feature, index) => (
-            <motion.div
-              key={index}
-              className="bg-white/70 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 shadow-lg flex items-start space-x-4 hover:shadow-xl transition-transform duration-300"
-              initial="hidden"
-              animate="visible"
-              custom={index}
-              variants={cardVariants}
-              whileHover={{ scale: 1.05, translateY: -5 }}
+      {activeTool ? (
+        <div className="w-full max-w-7xl mx-auto">
+          {tool.component}
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 max-w-7xl mx-auto">
+          {tools.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTool(t.key)}
+              className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 p-2 sm:p-6 rounded-xl shadow hover:shadow-lg transition h-32 sm:h-48"
+              aria-label={`Select ${t.label}`}
             >
-              <motion.div
-                className="text-indigo-600 dark:text-indigo-400 mt-1"
-                variants={iconVariants}
-                initial="rest"
-                whileHover="hover"
-              >
-                <feature.icon size={28} />
-              </motion.div>
-              <div>
-                <h3 className="text-xl font-bold text-indigo-900 dark:text-white font-sans">
-                  {feature.title}
-                </h3>
-                <p className="mt-2 text-gray-600 dark:text-gray-300 font-medium font-sans text-sm sm:text-base">
-                  {feature.description}
-                </p>
-              </div>
-            </motion.div>
+              {t.icon}
+              <span className="mt-2 text-xs sm:text-base font-medium text-indigo-800 dark:text-white">
+                {t.label}
+              </span>
+            </button>
           ))}
         </div>
-      </div>
-    </section>
+      )}
+    </div>
   );
 }
-
-export default Test;

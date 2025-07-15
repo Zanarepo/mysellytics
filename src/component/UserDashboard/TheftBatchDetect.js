@@ -511,91 +511,91 @@ function UnifiedTheftDetection() {
       )}
 
       {/* Theft Incidents Table */}
-      <div className="p-0 sm:p-6 md:p-8 max-w-7xl mx-auto">
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white mb-2">Theft/Missing Product</h3>
-        {theftIncidents.length ? (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
-                  <tr>
-                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Product</th>
-                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Missing Units</th>
-                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Date</th>
-                    <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentIncidents.map((t) => (
-                    <tr
-                      key={t.id}
-                      className={`border-b border-gray-200 dark:border-gray-700 ${
-                        t.id % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
-                      } hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors`}
-                    >
-                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{t.product_name}</td>
-                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{Math.abs(t.inventory_change)} units</td>
-                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">
-                        {new Date(t.timestamp).toLocaleDateString()}
-                      </td>
-                      <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm">
-                        <button
-                          onClick={() => handleDeleteIncident(t.id)}
-                          className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600 text-xs"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Pagination Controls */}
-            <div className="mt-4 flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded text-sm ${
-                  currentPage === 1
-                    ? "bg-gray-300 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
-                }`}
+      <div className="w-full">
+  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white mb-2">Theft/Missing Product</h3>
+  {theftIncidents.length ? (
+    <>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <thead className="bg-indigo-600 dark:bg-indigo-800 text-white dark:text-white">
+            <tr>
+              <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Product</th>
+              <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Missing Units</th>
+              <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Date</th>
+              <th className="py-2 px-3 sm:px-4 text-left text-xs sm:text-sm font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {currentIncidents.map((t) => (
+              <tr
+                key={t.id}
+                className={`border-b border-gray-200 dark:border-gray-700 ${
+                  t.id % 2 === 0 ? "bg-gray-50 dark:bg-gray-900" : "bg-white dark:bg-gray-800"
+                } hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors`}
               >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    currentPage === page
-                      ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded text-sm ${
-                  currentPage === totalPages
-                    ? "bg-gray-300 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
-                }`}
-              >
-                Next
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="text-gray-600 dark:text-gray-300 text-center text-sm sm:text-base">
-            No theft incidents detected for {storeName || "this store"}.
-          </p>
-        )}
+                <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{t.product_name}</td>
+                <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">{Math.abs(t.inventory_change)} units</td>
+                <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm text-gray-700 dark:text-white">
+                  {new Date(t.timestamp).toLocaleDateString()}
+                </td>
+                <td className="py-2 px-3 sm:px-4 text-xs sm:text-sm">
+                  <button
+                    onClick={() => handleDeleteIncident(t.id)}
+                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600 text-xs"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+      {/* Pagination Controls */}
+<div className="flex space-x-2 mt-4 justify-end">
+  <button
+    onClick={() => handlePageChange(currentPage - 1)}
+    disabled={currentPage === 1}
+    className={`px-2 py-0.5 rounded text-xs ${
+      currentPage === 1
+        ? "bg-gray-300 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+        : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
+    }`}
+  >
+    Previous
+  </button>
+  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+    <button
+      key={page}
+      onClick={() => handlePageChange(page)}
+      className={`px-2 py-0.5 rounded text-xs ${
+        currentPage === page
+          ? "bg-indigo-600 text-white dark:bg-indigo-800 dark:text-white"
+          : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+      }`}
+    >
+      {page}
+    </button>
+  ))}
+  <button
+    onClick={() => handlePageChange(currentPage + 1)}
+    disabled={currentPage === totalPages}
+    className={`px-2 py-0.5 rounded text-xs ${
+      currentPage === totalPages
+        ? "bg-gray-300 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed"
+        : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-800 dark:hover:bg-indigo-700"
+    }`}
+  >
+    Next
+  </button>
+</div>
+    </>
+  ) : (
+    <p className="text-gray-600 dark:text-gray-300 text-center text-sm sm:text-base">
+      No theft incidents detected for {storeName || "this store"}.
+    </p>
+  )}
+</div>
     </div>
   );
 }
