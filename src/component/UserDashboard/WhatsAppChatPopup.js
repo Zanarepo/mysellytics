@@ -29,7 +29,7 @@ export default function WhatsAppChatPopup() {
   return (
     <>
       {/* CTA text above the chat icon */}
-      <div className="fixed bottom-20 right-4 text-sm text-indigo-800 z-50">
+      <div className="fixed bottom-20 right-4 text-sm text-white z-50">
         Talk to us
       </div>
 
@@ -68,9 +68,9 @@ export default function WhatsAppChatPopup() {
 
       {/* Manual popup window */}
       {open && !showAutoMessage && (
-        <div className="fixed bottom-20 right-4 bg-white border rounded-lg shadow-lg w-64 z-50">
+        <div className="fixed bottom-20 right-4 bg-white text-justify-center  text-indigo-600 border rounded-lg shadow-lg w-64 z-50">
           <div className="p-4 flex flex-col">
-            <h3 className="text-lg font-semibold mb-2">Chat with us!</h3>
+            <h3 className="text-lg font-semibold mb-2   ">Chat with us!</h3>
             <p className="text-sm mb-4">Welcome to Sellytics</p>
             <a
               href={whatsappUrl}

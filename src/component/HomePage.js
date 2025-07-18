@@ -89,19 +89,19 @@ export default function LandingPage() {
         </motion.div>
 
         {/* Image Block */}
-        <motion.div
-          className="relative z-20 w-full md:w-1/2 h-[500px] flex items-center justify-center"
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, type: 'spring', stiffness: 100 }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-200/10 to-indigo-400/10 rounded-2xl"></div>
-          <img
-            src="images/welcome.jpg"
-            alt="Nigerian shop owner managing inventory"
-            className="w-full h-full object-contain md:object-cover rounded-2xl shadow-xl relative z-10"
-          />
-        </motion.div>
+       <motion.div
+  className="relative z-20 w-full md:w-1/2 h-full flex items-center justify-center"
+  initial={{ opacity: 0, x: 100 }}
+  animate={{ opacity: 1, x: 0 }}
+  transition={{ duration: 0.6, type: 'spring', stiffness: 100 }}
+>
+  <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-indigo-400/10 rounded-2xl"></div>
+  <img
+    src="images/welcome.jpg"
+    alt="Nigerian shop owner managing inventory"
+    className="w-full h-full object-cover rounded-2xl shadow-xl relative z-10"
+  />
+</motion.div>
       </section>
 
       {/* Sections */}
@@ -135,17 +135,3 @@ export default function LandingPage() {
     </div>
   );
 }
-
-/* Tailwind Custom Animation */
-// Add this in your tailwind.config.js:
-// extend: {
-//   animation: {
-//     moveStars: 'moveStars 40s linear infinite',
-//   },
-//   keyframes: {
-//     moveStars: {
-//       '0%': { backgroundPosition: '0 0' },
-//       '100%': { backgroundPosition: '1000px 1000px' },
-//     },
-//   },
-// },

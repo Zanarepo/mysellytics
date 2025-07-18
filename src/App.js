@@ -28,6 +28,7 @@ import SellyticsPayment from './component/Payments/SellyticsPayment';
 import PremiumHomepage from './component/Premiums/PremiumHomepage';
 import PushNotifications from "./component/Premiums/PushNotifications";
 import Test from './component/UserDashboard/Test';
+import Tests from './component/AdminDashboard/Tests';
 
 
 const App = () => {
@@ -53,6 +54,7 @@ const App = () => {
             <Route path="/push-notifications" element={<PushNotifications />} />
             <Route path="/signaturepad" element={<SignaturePad />} />
             <Route path="/test" element={<Test />} />
+            <Route path="/tests" element={<Tests />} />
           </Route>
         </Routes>
 
