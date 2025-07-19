@@ -99,12 +99,11 @@ const Attendance = () => {
     fetchUserData();
   }, []);
 
-  // Generate dynamic store barcode every 2 days
+  // Generate dynamic store barcode (current day)
   useEffect(() => {
     if (showBarcodeModal && storeId) {
       const today = startOfDay(new Date());
-      const twoDaysAgo = subDays(today, 2);
-      const dateSuffix = format(twoDaysAgo, 'yyyyMMdd');
+      const dateSuffix = format(today, 'yyyyMMdd');
       const storeCode = `STORE-${storeId}-${dateSuffix}`;
       const canvas = document.getElementById('store-barcode');
       console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
@@ -165,10 +164,14 @@ const Attendance = () => {
           const scannedCode = result.text;
           console.log('Scanned code:', scannedCode);
           const today = startOfDay(new Date());
-          const twoDaysAgo = subDays(today, 2);
-          const expectedDateSuffix = format(twoDaysAgo, 'yyyyMMdd');
-          const expectedCode = `STORE-${storeId}-${expectedDateSuffix}`;
-          if (scannedCode !== expectedCode) {
+          const yesterday = subDays(today, 1);
+          const todaySuffix = format(today, 'yyyyMMdd');
+          const yesterdaySuffix = format(yesterday, 'yyyyMMdd');
+          const expectedCodeToday = `STORE-${storeId}-${todaySuffix}`;
+          const expectedCodeYesterday = `STORE-${storeId}-${yesterdaySuffix}`;
+          console.log('Expected codes:', { today: expectedCodeToday, yesterday: expectedCodeYesterday });
+
+          if (scannedCode !== expectedCodeToday && scannedCode !== expectedCodeYesterday) {
             toast.error('Invalid or expired store barcode.', { toastId: 'invalid-code', duration: 3000 });
             return;
           }
@@ -216,7 +219,7 @@ const Attendance = () => {
 
           setAttendanceLogs((prev) => [data, ...prev]);
           const greeting = new Date().getHours() < 12 ? 'Good morning' : 'Goodbye';
-          const firstName = user.full_name.split(' ')[0]; // Extract first name
+          const firstName = user.full_name.split(' ')[0];
           toast.success(`${greeting}, ${firstName}! You've ${action === 'clock-in' ? 'clocked in' : 'clocked out'} at ${format(new Date(), 'PPP HH:mm')}.`, {
             toastId: `attendance-${data.id}`,
             duration: 3000,
@@ -225,6 +228,9 @@ const Attendance = () => {
           console.error('handleScan error:', err);
           toast.error(err.message, { toastId: 'scan-error', duration: 3000 });
         }
+      } else if (err && err.name !== 'NotFoundException') {
+        console.error('Scan error in callback:', err);
+        toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
       }
     },
     [storeId, userId, setAttendanceLogs]
@@ -235,28 +241,39 @@ const Attendance = () => {
     let currentCodeReader = null;
     if (scanning) {
       currentCodeReader = codeReader.current;
+      console.log('Starting scanner with webcamRef:', webcamRef.current);
       const scanCode = async () => {
         try {
+          if (!webcamRef.current) {
+            throw new Error('Webcam reference not available.');
+          }
+          console.log('Requesting camera permissions...');
+          await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          console.log('Camera permissions granted.');
           await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
+            console.log('Scanner callback triggered:', { result, err });
             if (result) {
+              console.log('Barcode detected:', result.text);
               setScanning(false);
               currentCodeReader.reset();
               handleScan(null, result);
             }
             if (err && err.name !== 'NotFoundException') {
               console.error('Scan error:', err);
-              toast.error('Error scanning code.', { toastId: 'scan-error', duration: 3000 });
+              toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
             }
           });
         } catch (err) {
           console.error('Scan setup error:', err);
-          toast.error('Failed to start scanner.', { toastId: 'scan-setup-error', duration: 3000 });
+          toast.error(`Failed to start scanner: ${err.message}`, { toastId: 'scan-setup-error', duration: 3000 });
+          setScanning(false);
         }
       };
       scanCode();
     }
     return () => {
       if (currentCodeReader) {
+        console.log('Resetting code reader.');
         currentCodeReader.reset();
       }
     };
@@ -394,7 +411,7 @@ const Attendance = () => {
                       </p>
                       {barcodeError ? (
                         <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(subDays(startOfDay(new Date()), 2), 'yyyyMMdd')}&code=Code128`}
+                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(startOfDay(new Date()), 'yyyyMMdd')}&code=Code128`}
                           alt="Store Barcode"
                           className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
                         />
@@ -404,7 +421,7 @@ const Attendance = () => {
                           className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
                         />
                       )}
-                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out. Updates every 2 days.</p>
+                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out. Updates daily.</p>
                     </>
                   ) : (
                     <p className="text-red-500 text-center">Store ID not found. Contact support.</p>
