@@ -1,428 +1,432 @@
-import React, { useState, useEffect, useCallback, Component } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { FaSave, FaUserEdit, FaSync, FaTrash, FaSearch } from 'react-icons/fa';
-import DashboardAccess from '../Ops/DashboardAccess';
+import toast from 'react-hot-toast';
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
+import { format, parseISO } from 'date-fns';
+import JsBarcode from 'jsbarcode';
+import Webcam from 'react-webcam';
+import { BrowserMultiFormatReader } from '@zxing/library';
 
-// Error boundary for ToastContainer
-class ToastErrorBoundary extends Component {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return null; // Silently fail to prevent breaking the UI
-    }
-    return this.props.children;
-  }
-}
-
-// Role-to-feature mapping
-const roleFeatureMap = {
-  account: ['expenses', 'debts', 'receipts'],
-  sales: ['sales', 'products', 'inventory', 'receipts', 'returns'],
-  'store manager': ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
-  marketing: ['customers'],
-  owner: ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
-};
-
-// Available features for manual override (aligned with store owner dashboard keys)
-const availableFeatures = [
-  'sales',
-  'Products Tracker',
-  'inventory',
-  'receipts',
-  'returns',
-  'expenses',
-  'unpaid supplies',
-  'debts',
-  'customers',
-  'Suppliers',
-];
-
-export default function StoreOwnerAdminDashboard() {
+const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
-  const [shopName, setShopName] = useState('Store Owner');
-  const [employees, setEmployees] = useState([]);
-  const [filteredEmployees, setFilteredEmployees] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [userId, setUserId] = useState(null);
+  const [, setUserEmail] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [userRoles, setUserRoles] = useState({});
-  const [userFeatures, setUserFeatures] = useState({});
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [scanning, setScanning] = useState(false);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+  const [barcodeError, setBarcodeError] = useState(false);
+  const webcamRef = useRef(null);
+  const codeReader = useRef(new BrowserMultiFormatReader());
 
-  // Fetch store_id and shop_name
+  // Fetch user data
   useEffect(() => {
-    const fetchStoreData = async () => {
+    const fetchUserData = async () => {
       try {
-        toast.dismiss(); // Clear any existing toasts
-        const storeId = localStorage.getItem('store_id');
-        if (!storeId) {
-          toast.error('No store assigned. Please log in.', { toastId: 'no-store' });
-          return;
-        }
-        setStoreId(storeId);
+        toast.dismiss();
+        const user_email = localStorage.getItem('user_email');
+        console.log('User email from localStorage:', user_email);
+        if (!user_email) throw new Error('Please log in.');
 
-        const { data, error } = await supabase
-          .from('stores')
-          .select('shop_name')
-          .eq('id', storeId)
-          .single();
-
-        if (error) {
-          toast.error('Failed to load store data.', { toastId: 'store-data-error' });
-          return;
-        }
-
-        setShopName(data?.shop_name || 'Store Owner');
-      } catch (err) {
-        toast.error('An error occurred while loading store data.', { toastId: 'store-data-catch' });
-      }
-    };
-
-    fetchStoreData();
-  }, []);
-
-  // Clean up toasts on component unmount
-  useEffect(() => {
-    return () => {
-      toast.dismiss(); // Dismiss all toasts when component unmounts
-    };
-  }, []);
-
-  // Load employees
-  const loadEmployees = useCallback(
-    async (order) => {
-      try {
-        toast.dismiss(); // Clear any existing toasts
-        if (!storeId) {
-          setError('No store ID found in local storage.');
-          setEmployees([]);
-          setFilteredEmployees([]);
-          return;
-        }
-
-        // Fetch the owner_user_id for the given store_id
+        setUserEmail(user_email);
+        console.log('Querying stores for email:', user_email);
         const { data: storeData, error: storeError } = await supabase
           .from('stores')
-          .select('owner_user_id')
-          .eq('id', storeId)
+          .select('id')
+          .eq('email_address', user_email)
           .single();
-        if (storeError || !storeData) {
-          throw new Error(`Error fetching store owner: ${storeError?.message || 'Store not found'}`);
+
+        if (storeData && !storeError) {
+          setIsAdmin(true);
+          setStoreId(storeData.id);
+          console.log('Admin found, store_id:', storeData.id);
+          console.log('Querying store_users for email:', user_email, 'store_id:', storeData.id);
+          const { data: adminData, error: adminError } = await supabase
+            .from('store_users')
+            .select('id, email_address')
+            .eq('email_address', user_email)
+            .eq('store_id', storeData.id)
+            .single();
+          if (adminError) {
+            console.error('Admin query error:', adminError);
+            throw new Error(`Admin not found: ${adminError.message}`);
+          }
+          console.log('Admin data:', adminData);
+          setUserId(adminData.id);
+          console.log('Final storeId:', storeData.id);
+        } else {
+          console.log('Not an admin, querying store_users for email:', user_email);
+          const { data: userData, error: userError } = await supabase
+            .from('store_users')
+            .select('id, store_id, email_address')
+            .eq('email_address', user_email)
+            .single();
+          if (userError) {
+            console.error('User query error:', userError);
+            throw new Error(`User not found: ${userError.message}`);
+          }
+          console.log('Staff data:', userData);
+          setIsStaff(true);
+          setUserId(userData.id);
+          setStoreId(userData.store_id);
+          console.log('Final storeId:', userData.store_id);
         }
-
-        const ownerUserId = storeData.owner_user_id;
-
-        // Fetch all stores for the owner
-        const { data: stores, error: storesError } = await supabase
-          .from('stores')
-          .select('id, shop_name')
-          .eq('owner_user_id', ownerUserId);
-        if (storesError) {
-          throw new Error(`Error fetching stores: ${storesError.message}`);
-        }
-        if (!stores || stores.length === 0) {
-          setEmployees([]);
-          setFilteredEmployees([]);
-          setError('No stores found for this owner.');
-          return;
-        }
-
-        const storeIds = stores.map((store) => store.id);
-
-        // Fetch employees for all owned stores, joining with stores for shop_name
-        const { data, error } = await supabase
-          .from('store_users')
-          .select('id, store_id, email_address, role, allowed_features, stores!inner(shop_name)')
-          .in('store_id', storeIds)
-          .order('id', { ascending: order === 'asc' });
-        if (error) {
-          throw new Error(`Error fetching employees: ${error.message}`);
-        }
-
-        // Map employees to include shop_name
-        const employeesWithShop = (data ?? []).map((employee) => ({
-          ...employee,
-          shop_name: employee.stores?.shop_name || 'N/A',
-        }));
-
-        setEmployees(employeesWithShop);
-        setFilteredEmployees(employeesWithShop);
-        setError(null);
-
-        // Initialize userRoles and userFeatures
-        const roles = {};
-        const features = {};
-        employeesWithShop.forEach((employee) => {
-          roles[employee.id] = employee.role || '';
-          features[employee.id] = employee.allowed_features || [];
-        });
-        setUserRoles(roles);
-        setUserFeatures(features);
       } catch (err) {
-        console.error(err.message);
-        setEmployees([]);
-        setFilteredEmployees([]);
+        console.error('fetchUserData error:', err);
+        toast.error(err.message, { toastId: 'auth-error' });
         setError(err.message);
-        toast.error(err.message, { toastId: 'load-employees-error' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  // Generate store barcode when modal opens
+  useEffect(() => {
+    if (showBarcodeModal && storeId) {
+      const storeCode = `STORE-${storeId}`;
+      const canvas = document.getElementById('store-barcode');
+      console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
+      if (canvas) {
+        try {
+          JsBarcode(canvas, storeCode, {
+            format: 'CODE128',
+            displayValue: true,
+            width: 3,
+            height: 80,
+            fontSize: 16,
+            background: '#ffffff',
+            lineColor: '#000000',
+            margin: 10,
+          });
+          console.log('Store barcode generated successfully for:', storeCode);
+          setBarcodeError(false);
+        } catch (err) {
+          console.error('JsBarcode error for store barcode:', err);
+          toast.error('Failed to generate store barcode.', { toastId: 'barcode-error' });
+          setBarcodeError(true);
+        }
+      } else {
+        console.log('Store barcode canvas not found');
+        setBarcodeError(true);
+      }
+    }
+  }, [showBarcodeModal, storeId]);
+
+  // Fetch attendance logs
+  useEffect(() => {
+    const fetchAttendanceLogs = async () => {
+      if (!storeId) return;
+      try {
+        console.log('Fetching attendance logs for store_id:', storeId);
+        const { data, error } = await supabase
+          .from('attendance')
+          .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
+          .eq('store_id', storeId)
+          .order('timestamp', { ascending: false });
+        if (error) throw new Error(`Error fetching logs: ${error.message}`);
+        setAttendanceLogs(data || []);
+        console.log('Attendance logs:', data);
+      } catch (err) {
+        console.error('fetchAttendanceLogs error:', err);
+        toast.error(err.message, { toastId: 'logs-error' });
+      }
+    };
+
+    fetchAttendanceLogs();
+  }, [storeId]);
+
+  // Handle barcode scan
+  const handleScan = useCallback(
+    async (err, result) => {
+      if (result) {
+        try {
+          const scannedCode = result.text;
+          console.log('Scanned code:', scannedCode);
+          const expectedCode = `STORE-${storeId}`;
+          if (scannedCode !== expectedCode) {
+            toast.error('Invalid store barcode.', { toastId: 'invalid-code' });
+            return;
+          }
+
+          // Verify user
+          const { data: user, error: userError } = await supabase
+            .from('store_users')
+            .select('id, full_name')
+            .eq('id', userId)
+            .eq('store_id', storeId)
+            .single();
+          if (userError || !user) {
+            console.error('User lookup error:', userError);
+            toast.error('User not authenticated.', { toastId: 'auth-error' });
+            return;
+          }
+          console.log('Authenticated user:', user);
+
+          // Check last action
+          const { data: lastLog, error: logError } = await supabase
+            .from('attendance')
+            .select('action')
+            .eq('user_id', user.id)
+            .eq('store_id', storeId)
+            .order('timestamp', { ascending: false })
+            .limit(1)
+            .single();
+          if (logError && logError.code !== 'PGRST116') {
+            throw new Error(`Error checking last log: ${logError.message}`);
+          }
+
+          const action = lastLog?.action === 'clock-in' ? 'clock-out' : 'clock-in';
+          const { data, error: insertError } = await supabase
+            .from('attendance')
+            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: new Date().toISOString() }])
+            .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
+            .single();
+          if (insertError) throw new Error(`Error logging attendance: ${insertError.message}`);
+
+          setAttendanceLogs((prev) => [data, ...prev]);
+          toast.success(`${user.full_name} ${action === 'clock-in' ? 'clocked in' : 'clocked out'} at ${format(new Date(), 'PPP HH:mm')}.`, {
+            toastId: `attendance-${data.id}`,
+          });
+        } catch (err) {
+          console.error('handleScan error:', err);
+          toast.error(err.message, { toastId: 'scan-error' });
+        }
       }
     },
-    [storeId]
+    [storeId, userId, setAttendanceLogs]
   );
 
-  // Filter employees based on search query
+  // Handle barcode scanning
   useEffect(() => {
-    const filtered = employees.filter(
-      (employee) =>
-        employee.email_address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        employee.role?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredEmployees(filtered);
-  }, [searchQuery, employees]);
-
-  useEffect(() => {
-    if (!storeId) {
-      setError('Admin Access.');
-      return;
+    let currentCodeReader = null;
+    if (scanning) {
+      currentCodeReader = codeReader.current;
+      const scanCode = async () => {
+        try {
+          await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
+            if (result) {
+              setScanning(false);
+              currentCodeReader.reset();
+              handleScan(null, result);
+            }
+            if (err && err.name !== 'NotFoundException') {
+              console.error('Scan error:', err);
+              toast.error('Error scanning code.', { toastId: 'scan-error' });
+            }
+          });
+        } catch (err) {
+          console.error('Scan setup error:', err);
+          toast.error('Failed to start scanner.', { toastId: 'scan-setup-error' });
+        }
+      };
+      scanCode();
     }
-    loadEmployees(sortOrder);
-  }, [storeId, sortOrder, loadEmployees]);
-
-  const handleRoleChange = (userId, role) => {
-    setUserRoles((prev) => ({ ...prev, [userId]: role }));
-    // Auto-set features based on role
-    setUserFeatures((prev) => ({
-      ...prev,
-      [userId]: roleFeatureMap[role] || [],
-    }));
-  };
-
-  const handleFeatureToggle = (userId, feature) => {
-    setUserFeatures((prev) => {
-      const currentFeatures = prev[userId] || [];
-      if (currentFeatures.includes(feature)) {
-        return { ...prev, [userId]: currentFeatures.filter((f) => f !== feature) };
+    return () => {
+      if (currentCodeReader) {
+        currentCodeReader.reset();
       }
-      return { ...prev, [userId]: [...currentFeatures, feature] };
-    });
-  };
+    };
+  }, [scanning, handleScan]);
 
-  const saveUserChanges = async (userId) => {
-    try {
-      toast.dismiss(); // Clear all toasts before saving
-      const role = userRoles[userId] || null;
-      const features = userFeatures[userId] || [];
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentLogs = attendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(attendanceLogs.length / itemsPerPage);
 
-      const { error } = await supabase
-        .from('store_users')
-        .update({ role, allowed_features: features })
-        .eq('id', userId)
-        .eq('store_id', storeId);
-
-      if (error) {
-        toast.error('Failed to update user.', { toastId: 'update-user-error' });
-        return;
-      }
-
-      toast.success('User updated successfully.', { toastId: 'update-user-success' });
-      setEditingUserId(null);
-      await loadEmployees(sortOrder);
-    } catch (err) {
-      toast.error('An error occurred while updating user.', { toastId: 'update-user-catch' });
-    }
-  };
-
-  const handleDelete = async (userId) => {
-    try {
-      toast.dismiss(); // Clear all toasts before deleting
-      const { error } = await supabase
-        .from('store_users')
-        .delete()
-        .eq('id', userId)
-        .eq('store_id', storeId);
-      if (error) {
-        toast.error('Error deleting user.', { toastId: 'delete-user-error' });
-        return;
-      }
-      toast.success('User deleted successfully.', { toastId: 'delete-user-success' });
-      await loadEmployees(sortOrder);
-    } catch (err) {
-      toast.error('Error deleting user.', { toastId: 'delete-user-catch' });
-    }
-  };
-
-  const renderContent = () => {
-    if (error) {
-      return (
-        <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto">
-          <div className="text-red-500 dark:text-red-400 text-sm sm:text-base">{error}</div>
+  return (
+    <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
+      <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {loading ? (
+        <div className="flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
         </div>
-      );
-    }
-
-    return (
-      <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <h2 className="text-lg sm:text-2xl font-semibold text-indigo-700 dark:text-indigo-200">
-            Manage Store Users
-          </h2>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <input
-                type="text"
-                placeholder="Search by email or role"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full p-2 pl-8 border rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 text-sm sm:text-base"
+      ) : (
+        <>
+          {(isAdmin || isStaff) && (
+            <div className="mb-4 flex gap-4">
+              <button
+                onClick={() => setScanning(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300"
+                disabled={!userId}
+              >
+                Scan Store Barcode
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowBarcodeModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300"
+                  disabled={!storeId}
+                >
+                  Show Store Barcode
+                </button>
+              )}
+            </div>
+          )}
+          {scanning && (
+            <div className="mb-4">
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
+                videoConstraints={{ facingMode: 'environment' }}
+                className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
+                width={300}
+                height={300}
               />
-              <FaSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            </div>
-            <div className="flex space-x-2 w-full sm:w-auto">
               <button
-                onClick={() => {
-                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  loadEmployees(sortOrder === 'asc' ? 'desc' : 'asc');
-                }}
-                className="flex-1 sm:flex-none flex items-center justify-center bg-indigo-600 text-white px-2 sm:px-3 py-2 rounded hover:bg-indigo-700 text-sm sm:text-base"
-                title="Sort"
+                onClick={() => setScanning(false)}
+                className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
-                <FaSync className="mr-0 sm:mr-2" />
-                <span className="hidden sm:inline">Sort {sortOrder === 'asc' ? 'Desc' : 'Asc'}</span>
-              </button>
-              <button
-                onClick={() => loadEmployees(sortOrder)}
-                className="flex-1 sm:flex-none flex items-center justify-center bg-indigo-600 text-white px-2 sm:px-3 py-2 rounded hover:bg-indigo-700 text-sm sm:text-base"
-                title="Refresh"
-              >
-                <FaSync className="mr-0 sm:mr-2" />
-                <span className="hidden sm:inline">Refresh</span>
+                Stop Scanning
               </button>
             </div>
+          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-indigo-100 dark:bg-indigo-800">
+                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
+                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
+                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" className="p-2 text-center text-gray-500 dark:text-gray-400">
+                      No attendance logs found.
+                    </td>
+                  </tr>
+                ) : (
+                  currentLogs.map((log) => (
+                    <tr
+                      key={log.id}
+                      className={`border-b dark:border-gray-700 ${
+                        log.action === 'clock-in' ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'
+                      }`}
+                    >
+                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.store_users?.full_name}</td>
+                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.action}</td>
+                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
+                        {format(parseISO(log.timestamp), 'PPP HH:mm')}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
-        <div className="space-y-4">
-          {filteredEmployees.length === 0 ? (
-            <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-              {searchQuery ? 'No users match your search.' : 'No users found for this store.'}
-            </p>
-          ) : (
-            filteredEmployees.map((user) => (
-              <div
-                key={user.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow"
+          {totalPages > 1 && (
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:bg-gray-300 dark:disabled:bg-gray-600"
               >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <p className="text-indigo-800 dark:text-white font-medium text-sm sm:text-base">
-                      {user.email_address || 'Unknown'}
-                    </p>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">
-                      Store: {user.shop_name}
-                    </p>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">
-                      Role: {userRoles[user.id] || 'None'}
-                    </p>
-                  </div>
-                  <div className="flex space-x-2 w-full sm:w-auto">
+                Previous
+              </button>
+              <span className="text-indigo-800 dark:text-indigo-200">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:bg-gray-300 dark:disabled:bg-gray-600"
+              >
+                Next
+              </button>
+            </div>
+          )}
+          <Dialog open={showBarcodeModal} onClose={() => setShowBarcodeModal(false)} className="relative z-50">
+            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-800 p-6">
+                <DialogTitle className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
+                  Store Barcode
+                </DialogTitle>
+                <button
+                  onClick={() => setShowBarcodeModal(false)}
+                  className="absolute top-2 right-2 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                >
+                  ✕
+                </button>
+                <div className="mt-4 flex flex-col items-center space-y-4">
+                  {storeId ? (
+                    <>
+                      <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+                        Store Barcode (ID: STORE-{storeId})
+                      </p>
+                      {barcodeError ? (
+                        <img
+                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}&code=Code128`}
+                          alt="Store Barcode"
+                          className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
+                        />
+                      ) : (
+                        <canvas
+                          id="store-barcode"
+                          className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
+                        />
+                      )}
+                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out.</p>
+                    </>
+                  ) : (
+                    <p className="text-red-500 text-center">No store ID found. Contact support.</p>
+                  )}
+                  <div className="w-full border-t pt-4 flex flex-col items-center">
+                    <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200 mb-2">Test Barcode</p>
+                    <canvas
+                      id="test-barcode"
+                      className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
+                    />
                     <button
-                      onClick={() =>
-                        setEditingUserId(editingUserId === user.id ? null : user.id)
-                      }
-                      className="flex-1 sm:flex-none flex items-center justify-center bg-indigo-600 text-white px-3 py-2 rounded hover:bg-indigo-700 text-sm sm:text-base"
+                      onClick={() => {
+                        try {
+                          JsBarcode('#test-barcode', 'TEST-BARCODE-1234', {
+                            format: 'CODE128',
+                            displayValue: true,
+                            width: 3,
+                            height: 80,
+                            fontSize: 16,
+                            background: '#ffffff',
+                            lineColor: '#000000',
+                            margin: 10,
+                          });
+                          console.log('Test barcode generated');
+                        } catch (err) {
+                          console.error('Test barcode error:', err);
+                          toast.error('Failed to generate test barcode.', { toastId: 'test-barcode-error' });
+                        }
+                      }}
+                      className="mt-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                     >
-                      <FaUserEdit className="mr-2" /> {editingUserId === user.id ? 'Cancel' : 'Edit'}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user.id)}
-                      className="flex-1 sm:flex-none flex items-center justify-center bg-red-600 text-white px-3 py-2 rounded hover:bg-indigo-700 text-sm sm:text-base"
-                    >
-                      <FaTrash className="mr-2" /> Delete
+                      Generate Test Barcode
                     </button>
                   </div>
                 </div>
-                {editingUserId === user.id && (
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label className="text-gray-700 dark:text-gray-300 text-sm">Assign Role:</label>
-                      <select
-                        value={userRoles[user.id] || ''}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                        className="mt-1 p-2 border rounded w-full bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 text-sm sm:text-base"
-                      >
-                        <option value="">Select Role</option>
-                        <option value="account">Account</option>
-                        <option value="sales">Sales</option>
-                        <option value="store manager">Store Manager</option>
-                        <option value="marketing">Marketing</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-gray-700 dark:text-gray-300 text-sm">Features:</label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-                        {availableFeatures.map((feature) => (
-                          <label key={feature} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={(userFeatures[user.id] || []).includes(feature)}
-                              onChange={() => handleFeatureToggle(user.id, feature)}
-                              className="form-checkbox text-indigo-600 h-5 w-5"
-                            />
-                            <span className="text-gray-700 dark:text-gray-300 text-sm">
-                              {feature}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => saveUserChanges(user.id)}
-                      className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 w-full sm:w-auto"
-                    >
-                      <FaSave className="mr-2" /> Save
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 w-full px-2 sm:px-4">
-      <ToastErrorBoundary>
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-          limit={1}
-        />
-      </ToastErrorBoundary>
-      <DashboardAccess />
-      <header className="text-center mb-4 sm:mb-6">
-        <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-white">
-          Welcome, {shopName}!
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2 text-xs sm:text-sm">
-          Manage your store’s users and their access.
-        </p>
-      </header>
-      {renderContent()}
+                <button
+                  onClick={() => setShowBarcodeModal(false)}
+                  className="mt-6 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  Close
+                </button>
+              </DialogPanel>
+            </div>
+          </Dialog>
+        </>
+      )}
     </div>
   );
-}
+};
+
+export default Attendance;

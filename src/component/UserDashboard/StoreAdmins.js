@@ -27,10 +27,10 @@ const roleFeatureMap = {
   sales: ['sales', 'products', 'inventory', 'receipts', 'returns'],
   'store manager': ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
   marketing: ['customers'],
-  owner: ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
+  admin: ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
 };
 
-// Available features for manual override (aligned with store owner dashboard keys)
+// Available features for manual override
 const availableFeatures = [
   'sales',
   'Products Tracker',
@@ -44,9 +44,9 @@ const availableFeatures = [
   'Suppliers',
 ];
 
-export default function StoreOwnerAdminDashboard() {
+export default function StoreAdminDashboard() {
   const [storeId, setStoreId] = useState(null);
-  const [shopName, setShopName] = useState('Store Owner');
+  const [shopName, setShopName] = useState('Store');
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,11 +61,16 @@ export default function StoreOwnerAdminDashboard() {
     const fetchStoreData = async () => {
       try {
         toast.dismiss(); // Clear any existing toasts
-        const storeId = localStorage.getItem('store_id');
-        if (!storeId) {
-          toast.error('No store assigned. Please log in.', { toastId: 'no-store' });
+        const storeIdRaw = localStorage.getItem('store_id');
+        
+        // Validate storeId
+        if (!storeIdRaw || storeIdRaw === 'null' || isNaN(parseInt(storeIdRaw))) {
+          toast.error('Invalid or missing store ID. Please log in again.', { toastId: 'invalid-store-id' });
+          setError('Invalid or missing store ID.');
           return;
         }
+
+        const storeId = parseInt(storeIdRaw); // Convert to integer
         setStoreId(storeId);
 
         const { data, error } = await supabase
@@ -76,12 +81,14 @@ export default function StoreOwnerAdminDashboard() {
 
         if (error) {
           toast.error('Failed to load store data.', { toastId: 'store-data-error' });
+          setError('Failed to load store data.');
           return;
         }
 
-        setShopName(data?.shop_name || 'Store Owner');
+        setShopName(data?.shop_name || 'Store');
       } catch (err) {
         toast.error('An error occurred while loading store data.', { toastId: 'store-data-catch' });
+        setError('An error occurred while loading store data.');
       }
     };
 
@@ -100,47 +107,19 @@ export default function StoreOwnerAdminDashboard() {
     async (order) => {
       try {
         toast.dismiss(); // Clear any existing toasts
-        if (!storeId) {
-          setError('No store ID found in local storage.');
+        if (!storeId || isNaN(storeId)) {
+          setError('No valid store ID found. Please log in again.');
           setEmployees([]);
           setFilteredEmployees([]);
+          toast.error('No valid store ID found.', { toastId: 'no-store-id' });
           return;
         }
 
-        // Fetch the owner_user_id for the given store_id
-        const { data: storeData, error: storeError } = await supabase
-          .from('stores')
-          .select('owner_user_id')
-          .eq('id', storeId)
-          .single();
-        if (storeError || !storeData) {
-          throw new Error(`Error fetching store owner: ${storeError?.message || 'Store not found'}`);
-        }
-
-        const ownerUserId = storeData.owner_user_id;
-
-        // Fetch all stores for the owner
-        const { data: stores, error: storesError } = await supabase
-          .from('stores')
-          .select('id, shop_name')
-          .eq('owner_user_id', ownerUserId);
-        if (storesError) {
-          throw new Error(`Error fetching stores: ${storesError.message}`);
-        }
-        if (!stores || stores.length === 0) {
-          setEmployees([]);
-          setFilteredEmployees([]);
-          setError('No stores found for this owner.');
-          return;
-        }
-
-        const storeIds = stores.map((store) => store.id);
-
-        // Fetch employees for all owned stores, joining with stores for shop_name
+        // Fetch employees for the current store
         const { data, error } = await supabase
           .from('store_users')
-          .select('id, store_id, email_address, role, allowed_features, stores!inner(shop_name)')
-          .in('store_id', storeIds)
+          .select('id, store_id, email_address, role, allowed_features')
+          .eq('store_id', storeId)
           .order('id', { ascending: order === 'asc' });
         if (error) {
           throw new Error(`Error fetching employees: ${error.message}`);
@@ -149,7 +128,7 @@ export default function StoreOwnerAdminDashboard() {
         // Map employees to include shop_name
         const employeesWithShop = (data ?? []).map((employee) => ({
           ...employee,
-          shop_name: employee.stores?.shop_name || 'N/A',
+          shop_name: shopName || 'N/A', // Use shopName from state
         }));
 
         setEmployees(employeesWithShop);
@@ -173,7 +152,7 @@ export default function StoreOwnerAdminDashboard() {
         toast.error(err.message, { toastId: 'load-employees-error' });
       }
     },
-    [storeId]
+    [storeId, shopName]
   );
 
   // Filter employees based on search query
@@ -227,6 +206,7 @@ export default function StoreOwnerAdminDashboard() {
 
       if (error) {
         toast.error('Failed to update user.', { toastId: 'update-user-error' });
+        setError('Failed to update user.');
         return;
       }
 
@@ -235,6 +215,7 @@ export default function StoreOwnerAdminDashboard() {
       await loadEmployees(sortOrder);
     } catch (err) {
       toast.error('An error occurred while updating user.', { toastId: 'update-user-catch' });
+      setError('An error occurred while updating user.');
     }
   };
 
@@ -248,26 +229,28 @@ export default function StoreOwnerAdminDashboard() {
         .eq('store_id', storeId);
       if (error) {
         toast.error('Error deleting user.', { toastId: 'delete-user-error' });
+        setError('Error deleting user.');
         return;
       }
       toast.success('User deleted successfully.', { toastId: 'delete-user-success' });
       await loadEmployees(sortOrder);
     } catch (err) {
       toast.error('Error deleting user.', { toastId: 'delete-user-catch' });
+      setError('Error deleting user.');
     }
   };
 
   const renderContent = () => {
     if (error) {
       return (
-        <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto">
+        <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto mt-48">
           <div className="text-red-500 dark:text-red-400 text-sm sm:text-base">{error}</div>
         </div>
       );
     }
 
     return (
-      <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto">
+      <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto ">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <h2 className="text-lg sm:text-2xl font-semibold text-indigo-700 dark:text-indigo-200">
             Manage Staff Access & Roles
@@ -309,7 +292,7 @@ export default function StoreOwnerAdminDashboard() {
         <div className="space-y-4">
           {filteredEmployees.length === 0 ? (
             <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-              {searchQuery ? 'No users match your search.' : 'No users found for this store.'}
+              {searchQuery ? 'No users match your search.' : 'No Staff found for this store.'}
             </p>
           ) : (
             filteredEmployees.map((user) => (
@@ -340,7 +323,7 @@ export default function StoreOwnerAdminDashboard() {
                     </button>
                     <button
                       onClick={() => handleDelete(user.id)}
-                      className="flex-1 sm:flex-none flex items-center justify-center bg-red-600 text-white px-3 py-2 rounded hover:bg-indigo-700 text-sm sm:text-base"
+                      className="flex-1 sm:flex-none flex items-center justify-center bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 text-sm sm:text-base"
                     >
                       <FaTrash className="mr-2" /> Delete
                     </button>
@@ -360,6 +343,7 @@ export default function StoreOwnerAdminDashboard() {
                         <option value="sales">Sales</option>
                         <option value="store manager">Store Manager</option>
                         <option value="marketing">Marketing</option>
+                        <option value="admin">Admin</option>
                       </select>
                     </div>
                     <div>
@@ -419,7 +403,7 @@ export default function StoreOwnerAdminDashboard() {
           Welcome, {shopName}!
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2 text-xs sm:text-sm">
-          Manage your store’s Staff and their access.
+          Manage your store’s staff and their access.
         </p>
       </header>
       {renderContent()}
