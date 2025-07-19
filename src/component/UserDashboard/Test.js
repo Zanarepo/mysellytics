@@ -5,7 +5,7 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, parseISO, startOfDay, isAfter, subDays, set } from 'date-fns';
 import JsBarcode from 'jsbarcode';
 import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader } from '@zxing/library';
+import { BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
 
 const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
@@ -15,13 +15,14 @@ const Attendance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
-  const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [AttendanceLogs, setAttendanceLogs] = useState([]);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(50);
+  const [itemsPerPage] = useState(5);
   const [barcodeError, setBarcodeError] = useState(false);
   const webcamRef = useRef(null);
-  const codeReader = useRef(new BrowserMultiFormatReader());
+  const codeReader = useRef(null);
+  const lastScanTime = useRef(Date.now());
 
   // Fetch user data
   useEffect(() => {
@@ -290,7 +291,7 @@ const Attendance = () => {
           toast.error(`Error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
         }
       } else if (err && err.name !== 'NotFoundException') {
-        console.error('Scan error in callback:', err);
+        console.error('Scan error:', err);
         toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
       }
     },
@@ -301,9 +302,13 @@ const Attendance = () => {
   useEffect(() => {
     let currentCodeReader = null;
     if (scanning) {
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, ['CODE128']);
+      codeReader.current = new BrowserMultiFormatReader(hints);
       currentCodeReader = codeReader.current;
       console.log('Starting scanner with webcamRef:', webcamRef.current);
       console.log('Webcam video element:', webcamRef.current?.video);
+      console.log('Scanner formats supported:', hints.get(DecodeHintType.POSSIBLE_FORMATS));
       const scanCode = async () => {
         try {
           if (!webcamRef.current || !webcamRef.current.video) {
@@ -313,6 +318,8 @@ const Attendance = () => {
           await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
           console.log('Camera permissions granted.');
           await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
+            if (Date.now() - lastScanTime.current < 500) return;
+            lastScanTime.current = Date.now();
             console.log('Scanner callback triggered:', { result, err });
             if (result) {
               console.log('Barcode detected:', result.text);
@@ -344,8 +351,8 @@ const Attendance = () => {
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = attendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(attendanceLogs.length / itemsPerPage);
+  const currentLogs = AttendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(AttendanceLogs.length / itemsPerPage);
 
   return (
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
@@ -382,7 +389,7 @@ const Attendance = () => {
             <button
               onClick={handleDeleteAllLogs}
               className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || attendanceLogs.length === 0}
+              disabled={!storeId || AttendanceLogs.length === 0}
             >
               Delete All Logs
             </button>
