@@ -115,74 +115,74 @@ const ScheduleManagement = () => {
 
 
   // Fetch staff and schedules
-  useEffect(() => {
-    const fetchStaffAndSchedules = async () => {
-      if (!storeId || !userId) return;
+ useEffect(() => {
+  const fetchStaffAndSchedules = async () => {
+    if (!storeId) return;
 
-      try {
-        const { data: storeUsers, error: usersError } = await supabase
-          .from('store_users')
-          .select('id, full_name, role')
-          .eq('store_id', storeId);
-        if (usersError) {
-          throw new Error(`Error fetching staff: ${usersError.message}`);
-        }
-        console.log('staff query result:', storeUsers);
-        setStaff(storeUsers || []);
-
-        let query = supabase
-          .from('schedules')
-          .select('id, start_date, end_date, status, reason, staff_id, store_users!staff_id(full_name, role)')
-          .eq('store_id', storeId);
-
-        if (searchName) {
-          query = query.ilike('store_users.full_name', `%${searchName}%`);
-        }
-        if (searchDateStart) {
-          query = query.gte('start_date', searchDateStart);
-        }
-        if (searchDateEnd) {
-          query = query.lte('end_date', searchDateEnd);
-        }
-        if (searchStatus) {
-          query = query.eq('status', searchStatus);
-        }
-
-        const { data: schedulesData, error: schedulesError } = await query;
-        if (schedulesError) {
-          throw new Error(`Error fetching schedules: ${schedulesError.message}`);
-        }
-        console.log('schedules query result:', schedulesData);
-
-        // Sort schedules: Active time-off, scheduled time-off, expired time-off, others
-        const today = new Date('2025-07-19');
-        const sortedSchedules = schedulesData.sort((a, b) => {
-          const aIsActive = ['TimeOffRequested', 'TimeOffApproved'].includes(a.status) && !isBefore(parseISO(a.end_date), today);
-          const bIsActive = ['TimeOffRequested', 'TimeOffApproved'].includes(b.status) && !isBefore(parseISO(b.end_date), today);
-          const aIsScheduled = ['TimeOffRequested', 'TimeOffApproved'].includes(a.status) && isAfter(parseISO(a.start_date), today);
-          const bIsScheduled = ['TimeOffRequested', 'TimeOffApproved'].includes(b.status) && isAfter(parseISO(b.start_date), today);
-          const aIsExpired = ['TimeOffRejected'].includes(a.status) || isBefore(parseISO(a.end_date), today);
-          const bIsExpired = ['TimeOffRejected'].includes(b.status) || isBefore(parseISO(b.end_date), today);
-
-          if (aIsActive && !bIsActive) return -1;
-          if (!aIsActive && bIsActive) return 1;
-          if (aIsScheduled && !bIsScheduled) return -1;
-          if (!aIsScheduled && bIsScheduled) return 1;
-          if (aIsExpired && !bIsExpired) return 1;
-          if (!aIsExpired && bIsExpired) return -1;
-          return parseISO(a.start_date) - parseISO(b.start_date);
-        });
-
-        setSchedules(sortedSchedules || []);
-      } catch (err) {
-        console.error('fetchStaffAndSchedules error:', err);
-        toast.error(err.message, { toastId: 'data-error' });
-        setError(err.message);
+    try {
+      const { data: storeUsers, error: usersError } = await supabase
+        .from('store_users')
+        .select('id, full_name, role')
+        .eq('store_id', storeId);
+      if (usersError) {
+        throw new Error(`Error fetching staff: ${usersError.message}`);
       }
-    };
+      console.log('staff query result:', storeUsers);
+      setStaff(storeUsers || []);
 
-    fetchStaffAndSchedules();
-  }, [storeId, userId, searchName, searchDateStart, searchDateEnd, searchStatus]);
+      let query = supabase
+        .from('schedules')
+        .select('id, start_date, end_date, status, reason, staff_id, store_users!staff_id(full_name, role)')
+        .eq('store_id', storeId);
+
+      if (searchName) {
+        query = query.ilike('store_users.full_name', `%${searchName}%`);
+      }
+      if (searchDateStart) {
+        query = query.gte('start_date', searchDateStart);
+      }
+      if (searchDateEnd) {
+        query = query.lte('end_date', searchDateEnd);
+      }
+      if (searchStatus) {
+        query = query.eq('status', searchStatus);
+      }
+
+      const { data: schedulesData, error: schedulesError } = await query;
+      if (schedulesError) {
+        throw new Error(`Error fetching schedules: ${schedulesError.message}`);
+      }
+      console.log('schedules query result:', schedulesData);
+
+      // Sort schedules: Active time-off, scheduled time-off, expired time-off, others
+      const today = new Date('2025-07-19');
+      const sortedSchedules = schedulesData.sort((a, b) => {
+        const aIsActive = ['TimeOffRequested', 'TimeOffApproved'].includes(a.status) && !isBefore(parseISO(a.end_date), today);
+        const bIsActive = ['TimeOffRequested', 'TimeOffApproved'].includes(b.status) && !isBefore(parseISO(b.end_date), today);
+        const aIsScheduled = ['TimeOffRequested', 'TimeOffApproved'].includes(a.status) && isAfter(parseISO(a.start_date), today);
+        const bIsScheduled = ['TimeOffRequested', 'TimeOffApproved'].includes(b.status) && isAfter(parseISO(b.start_date), today);
+        const aIsExpired = ['TimeOffRejected'].includes(a.status) || isBefore(parseISO(a.end_date), today);
+        const bIsExpired = ['TimeOffRejected'].includes(a.status) || isBefore(parseISO(b.end_date), today);
+
+        if (aIsActive && !bIsActive) return -1;
+        if (!aIsActive && bIsActive) return 1;
+        if (aIsScheduled && !bIsScheduled) return -1;
+        if (!aIsScheduled && bIsScheduled) return 1;
+        if (aIsExpired && !bIsExpired) return 1;
+        if (!aIsExpired && bIsExpired) return -1;
+        return parseISO(a.start_date) - parseISO(b.start_date);
+      });
+
+      setSchedules(sortedSchedules || []);
+    } catch (err) {
+      console.error('fetchStaffAndSchedules error:', err);
+      toast.error(err.message, { toastId: 'data-error' });
+      setError(err.message);
+    }
+  };
+
+  fetchStaffAndSchedules();
+}, [storeId, searchName, searchDateStart, searchDateEnd, searchStatus]);
 
   // Check for existing schedule
   useEffect(() => {
@@ -534,7 +534,7 @@ const ScheduleManagement = () => {
   const totalPages = Math.ceil(schedules.length / itemsPerPage);
 
   return (
-    <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
+    <div className="w-full bg-white dark:bg-gray-900">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Schedule Management</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {loading ? (
@@ -611,62 +611,81 @@ const ScheduleManagement = () => {
                 Update Schedule
               </button>
             </form>
+
+
           )}
-          {/* Staff Time-Off Request Button */}
-          {isStaff && (
-            <button
-              onClick={() => setIsRequestModalOpen(true)}
-              className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-            >
-              Request Time-Off
-            </button>
-          )}
-          {/* Search Filters */}
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Search by Name</label>
-              <input
-                type="text"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-                placeholder="Enter staff name"
-                className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Start Date</label>
-              <input
-                type="date"
-                value={searchDateStart}
-                onChange={(e) => setSearchDateStart(e.target.value)}
-                className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">End Date</label>
-              <input
-                type="date"
-                value={searchDateEnd}
-                onChange={(e) => setSearchDateEnd(e.target.value)}
-                className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Status</label>
-              <select
-                value={searchStatus}
-                onChange={(e) => setSearchStatus(e.target.value)}
-                className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">All</option>
-                <option value="Working">Working</option>
-                <option value="Off">Off</option>
-                <option value="TimeOffRequested">Time-Off Requested</option>
-                <option value="TimeOffApproved">Time-Off Approved</option>
-                <option value="TimeOffRejected">Time-Off Rejected</option>
-              </select>
-            </div>
-          </div>
+         {/* Staff Time‑Off Request Button */}
+{isStaff && (
+  <button
+    onClick={() => setIsRequestModalOpen(true)}
+    className="mb-4 w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+  >
+    Request Time‑Off
+  </button>
+)}
+
+{/* Search Filters */}
+<div className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+  {/* Name Filter */}
+  <div>
+    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">
+      Search by Name
+    </label>
+    <input
+      type="text"
+      value={searchName}
+      onChange={e => setSearchName(e.target.value)}
+      placeholder="Enter staff name"
+      className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+    />
+  </div>
+
+  {/* Start Date */}
+  <div>
+    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">
+      Start Date
+    </label>
+    <input
+      type="date"
+      value={searchDateStart}
+      onChange={e => setSearchDateStart(e.target.value)}
+      className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+    />
+  </div>
+
+  {/* End Date */}
+  <div>
+    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">
+      End Date
+    </label>
+    <input
+      type="date"
+      value={searchDateEnd}
+      onChange={e => setSearchDateEnd(e.target.value)}
+      className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+    />
+  </div>
+
+  {/* Status */}
+  <div>
+    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">
+      Status
+    </label>
+    <select
+      value={searchStatus}
+      onChange={e => setSearchStatus(e.target.value)}
+      className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+    >
+      <option value="">All</option>
+      <option value="Working">Working</option>
+      <option value="Off">Off</option>
+      <option value="TimeOffRequested">Requested</option>
+      <option value="TimeOffApproved">Approved</option>
+      <option value="TimeOffRejected">Rejected</option>
+    </select>
+  </div>
+</div>
+
           {/* Schedules Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full text-left border-collapse">

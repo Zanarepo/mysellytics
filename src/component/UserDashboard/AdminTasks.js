@@ -307,7 +307,7 @@ const TaskManagement = () => {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
+    <div className="w-full bg-white dark:bg-gray-900 ">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Task Management</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {loading ? (

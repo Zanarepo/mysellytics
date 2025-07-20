@@ -11,6 +11,7 @@ import {
   FaIdBadge,
   FaHome,
   FaRobot,
+  FaUserShield,
 } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
 import StoreUsersTour from './StoreUsersTour';
@@ -22,6 +23,7 @@ import Notifications from './Notifications';
 import StoreUsersVariex from './StoreUsersVariex';
 import UsersERetailStores from './UsersERetailStores';
 import AIpowerInsights from './AIpowerInsights';
+import AdminOps from './AdminOps';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('Fix Scan');
@@ -151,6 +153,8 @@ const Dashboard = () => {
             </div>
           );
         }
+        
+
         return (
           <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
             <StoreUsersVariex />
@@ -169,6 +173,25 @@ const Dashboard = () => {
             <UsersERetailStores />
           </div>
         );
+      case 'Admin Ops':
+        if (!allowedDashboards.includes('admin_ops')) {
+          return (
+            <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
+              Access Denied: You do not have permission to view Admin Operations.
+            </div>
+          );
+        } 
+        return (
+          <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
+            <AdminOps/>
+          </div>
+        );
+
+
+
+
+
+
       case 'Profile':
         return (
           <div className="w-full bg-white dark:bg-gray-700 rounded-lg shadow p-4">
@@ -204,7 +227,8 @@ const Dashboard = () => {
       if (
         (tab === 'Fix Scan' && !allowedDashboards.includes('fix_scan')) ||
         (tab === 'Flex Scan' && !allowedDashboards.includes('flex_scan')) ||
-        (tab === 'AI Insights' && !allowedDashboards.includes('ai_insights'))
+        (tab === 'AI Insights' && !allowedDashboards.includes('ai_insights'))||
+        (tab === 'Admin Ops' && !allowedDashboards.includes('admin_ops'))
       ) {
         setActiveTab(tab); // Allow selection to show "Access Denied"
         return;
@@ -240,6 +264,13 @@ const Dashboard = () => {
       disabled: !allowedDashboards.includes('ai_insights'),
     },
    
+    {
+      name: 'Admin Ops',
+      icon: FaUserShield,
+      aria: 'Admin Operations: Manage store operations',
+      dataTour: 'admin-ops',
+      disabled: !allowedDashboards.includes('admin_ops'),
+    },
 
 
     {

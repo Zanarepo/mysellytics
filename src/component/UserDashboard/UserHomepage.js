@@ -13,6 +13,7 @@ import {
   FaHome,
   FaRobot,
   FaUsersCog,
+  FaUserShield,
 } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
 import UserOnboardingTour from './UserOnboardingTour';
@@ -25,6 +26,7 @@ import Notifications from './Notifications';
 import PricingFeatures from '../Payments/PricingFeatures';
 import ERetailStores from './ERetailStores';
 import AIpowerInsights from './AIpowerInsights';
+import AdminOps from './AdminOps';
 
 import StoreAdmins from './StoreAdmins';
 
@@ -156,6 +158,26 @@ const Dashboard = () => {
             <AIpowerInsights />
           </div>
         );
+
+        case 'Admin Ops':
+        if (!allowedDashboards.includes('admin_ops')) {
+          return <div className="w-full bg-white dark:bg-gray-900 p-4">Access Denied: You do not have permission to view Admin Ops.</div>;
+        }
+        return (
+          <div className="w-full bg-white dark:bg-gray-900 p-4">
+            <AdminOps />
+          </div>
+        );
+
+
+
+
+
+
+
+
+
+
       case 'Sales Summary':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
@@ -175,10 +197,11 @@ const Dashboard = () => {
             <StoreAdmins/>
           </div>
         );
-      
-        
 
-      case 'Employees':
+      
+     
+      
+         case 'Employees':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <Employees />
@@ -214,7 +237,8 @@ const Dashboard = () => {
       if (
         (tab === 'Fix Scan' && !allowedDashboards.includes('fix_scan')) ||
         (tab === 'Flex Scan' && !allowedDashboards.includes('flex_scan')) ||
-        (tab === 'AI Insights' && !allowedDashboards.includes('ai_insights'))
+        (tab === 'AI Insights' && !allowedDashboards.includes('ai_insights'))||
+        (tab === 'Admin Ops' && !allowedDashboards.includes('admin_ops'))
       ) {
         setActiveTab(tab); // Allow selection to show "Access Denied"
         return;
@@ -247,6 +271,14 @@ const Dashboard = () => {
       disabled: !allowedDashboards.includes('ai_insights'),
     },
 
+     {
+      name: 'Admin Ops',
+      icon:FaUserShield,
+      aria: 'Admin Ops: Manage store operations like clocking, tasks, and schedules',
+      disabled: !allowedDashboards.includes('admin_ops'),
+    },
+
+
 
     { name: 'Sales Summary', icon: FaMoneyBillWave, aria: 'Sales Dashboard: View and analyze sales data' },
     { name: 'Notifications', icon: FaBell, aria: 'Notifications: Stay updated with store-related notifications' },
@@ -254,6 +286,7 @@ const Dashboard = () => {
     { name: 'Upgrade', icon: FaCrown, aria: 'Upgrade: Upgrade your plan for more features' },
     { name: 'Store Admins', icon: FaUsersCog, aria: 'Manage your staff and assign roles' },
     { name: 'Profile', icon: FaUser, aria: 'Profile: View and edit your profile' },
+
   ];
 
   // Toggle sidebar

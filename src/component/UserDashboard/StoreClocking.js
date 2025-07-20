@@ -275,7 +275,7 @@ const Attendance = () => {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
+    <div className="w-full bg-white dark:bg-gray-900 p-2">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
       {successMessage && <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{successMessage}</div>}
       {error && <div className="mb-4 p-2 bg-red-100 text-red-800 rounded">{error}</div>}

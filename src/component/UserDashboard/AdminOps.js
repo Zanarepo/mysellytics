@@ -1,31 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { FaClock, FaTasks, FaCalendarAlt, FaArrowLeft, FaHome } from 'react-icons/fa';
+import { FaClock, FaTasks, FaCalendarAlt, FaArrowLeft } from 'react-icons/fa';
 import StoreClocking from './StoreClocking';
 import AdminTasks from './AdminTasks';
 import StaffSchedules from './StaffSchedules';
-import { useNavigate } from 'react-router-dom';
 
 const opsTools = [
   {
     key: 'clocking',
-    label: 'Staff Clocking',
+    label: 'Time Sheet Manager',
     icon: <FaClock className="text-2xl sm:text-5xl text-indigo-600" />,
-    desc: 'Manage clock-in and clock-out records of staff',
+    desc: '',
     component: <StoreClocking />,
   },
   {
     key: 'tasks',
-    label: 'Task Manager',
+    label: 'Assignment Tracker',
     icon: <FaTasks className="text-2xl sm:text-5xl text-indigo-600" />,
-    desc: 'Assign and track staff tasks efficiently',
+
     component: <AdminTasks />,
   },
   {
     key: 'schedules',
-    label: 'Staff Schedules',
+    label: 'Schedule Manager',
     icon: <FaCalendarAlt className="text-2xl sm:text-5xl text-indigo-600" />,
-    desc: 'Manage work schedules and shifts for your staff',
+    desc: '',
     component: <StaffSchedules />,
   },
 ];
@@ -33,7 +32,6 @@ const opsTools = [
 export default function AdminOps() {
   const [shopName, setShopName] = useState('Store Admin');
   const [activeTool, setActiveTool] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
     const storeId = localStorage.getItem('store_id');
@@ -52,10 +50,10 @@ export default function AdminOps() {
   const tool = opsTools.find((t) => t.key === activeTool);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 w-full p-4">
+    <div className="min-h-screen bg-white dark:bg-gray-900 w-full">
       <header className="text-center mb-4 sm:mb-6">
         <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-white">
-          Admin Operations for {shopName}
+         {shopName} Admin Operations
         </h1>
         {!activeTool && (
           <p className="text-gray-600 dark:text-gray-400 mt-2 text-xs sm:text-sm">
@@ -83,14 +81,7 @@ export default function AdminOps() {
         </div>
       ) : (
         <>
-          <div className="mb-4 flex justify-end">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center px-3 py-1.5 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-xs sm:text-sm"
-            >
-              <FaHome className="mr-2" /> Back to Dashboard
-            </button>
-          </div>
+      
 
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
             {opsTools.map((t) => (
