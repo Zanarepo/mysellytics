@@ -381,8 +381,38 @@ const Attendance = () => {
                       <p className="text-xs text-gray-500">Scan this barcode to clock in/out.</p>
                     </>
                   ) : (
-                    <p className="text-red-500">Store ID not found. Please check your store settings.</p>
+                    <p className="text-red-500 text-center">No store ID found. Contact support.</p>
                   )}
+                  <div className="w-full border-t pt-4 flex flex-col items-center">
+                    <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200 mb-2">Test Barcode</p>
+                    <canvas
+                      id="test-barcode"
+                      className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
+                    />
+                    <button
+                      onClick={() => {
+                        try {
+                          JsBarcode('#test-barcode', 'TEST-BARCODE-1234', {
+                            format: 'CODE128',
+                            displayValue: true,
+                            width: 3,
+                            height: 80,
+                            fontSize: 16,
+                            background: '#ffffff',
+                            lineColor: '#000000',
+                            margin: 10,
+                          });
+                          console.log('Test barcode generated');
+                        } catch (err) {
+                          console.error('Test barcode error:', err);
+                          toast.error('Failed to generate test barcode.', { toastId: 'test-barcode-error' });
+                        }
+                      }}
+                      className="mt-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      Generate Test Barcode
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowBarcodeModal(false)}

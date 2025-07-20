@@ -5,7 +5,7 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, parseISO, startOfDay, isAfter, subDays, set } from 'date-fns';
 import JsBarcode from 'jsbarcode';
 import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
+import { BrowserMultiFormatReader } from '@zxing/library';
 
 const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
@@ -15,14 +15,13 @@ const Attendance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
-  const [AttendanceLogs, setAttendanceLogs] = useState([]);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
   const [barcodeError, setBarcodeError] = useState(false);
   const webcamRef = useRef(null);
-  const codeReader = useRef(null);
-  const lastScanTime = useRef(Date.now());
+  const codeReader = useRef(new BrowserMultiFormatReader());
 
   // Fetch user data
   useEffect(() => {
@@ -157,41 +156,6 @@ const Attendance = () => {
     fetchAttendanceLogs();
   }, [storeId]);
 
-  // Delete single attendance log
-  const handleDeleteLog = async (logId) => {
-    try {
-      console.log('Deleting attendance log:', logId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('id', logId)
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting log: ${error.message}`);
-      setAttendanceLogs((prev) => prev.filter((log) => log.id !== logId));
-      toast.success('Attendance log deleted.', { toastId: `delete-${logId}`, duration: 3000 });
-    } catch (err) {
-      console.error('handleDeleteLog error:', err);
-      toast.error(err.message, { toastId: 'delete-error', duration: 3000 });
-    }
-  };
-
-  // Delete all attendance logs for store
-  const handleDeleteAllLogs = async () => {
-    try {
-      console.log('Deleting all attendance logs for store_id:', storeId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
-      setAttendanceLogs([]);
-      toast.success('All attendance logs deleted.', { toastId: 'delete-all', duration: 3000 });
-    } catch (err) {
-      console.error('handleDeleteAllLogs error:', err);
-      toast.error(err.message, { toastId: 'delete-all-error', duration: 3000 });
-    }
-  };
-
   // Handle barcode scan
   const handleScan = useCallback(
     async (err, result) => {
@@ -291,7 +255,7 @@ const Attendance = () => {
           toast.error(`Error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
         }
       } else if (err && err.name !== 'NotFoundException') {
-        console.error('Scan error:', err);
+        console.error('Scan error in callback:', err);
         toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
       }
     },
@@ -302,24 +266,17 @@ const Attendance = () => {
   useEffect(() => {
     let currentCodeReader = null;
     if (scanning) {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, ['CODE128']);
-      codeReader.current = new BrowserMultiFormatReader(hints);
       currentCodeReader = codeReader.current;
       console.log('Starting scanner with webcamRef:', webcamRef.current);
-      console.log('Webcam video element:', webcamRef.current?.video);
-      console.log('Scanner formats supported:', hints.get(DecodeHintType.POSSIBLE_FORMATS));
       const scanCode = async () => {
         try {
-          if (!webcamRef.current || !webcamRef.current.video) {
-            throw new Error('Webcam reference or video element not available.');
+          if (!webcamRef.current) {
+            throw new Error('Webcam reference not available.');
           }
           console.log('Requesting camera permissions...');
           await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
           console.log('Camera permissions granted.');
           await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
-            if (Date.now() - lastScanTime.current < 500) return;
-            lastScanTime.current = Date.now();
             console.log('Scanner callback triggered:', { result, err });
             if (result) {
               console.log('Barcode detected:', result.text);
@@ -351,8 +308,8 @@ const Attendance = () => {
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = AttendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(AttendanceLogs.length / itemsPerPage);
+  const currentLogs = attendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(attendanceLogs.length / itemsPerPage);
 
   return (
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
@@ -385,15 +342,6 @@ const Attendance = () => {
               )}
             </div>
           )}
-          {isStoreOwner && (
-            <button
-              onClick={handleDeleteAllLogs}
-              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || AttendanceLogs.length === 0}
-            >
-              Delete All Logs
-            </button>
-          )}
           {scanning && (
             <div className="mb-4">
               <Webcam
@@ -420,18 +368,12 @@ const Attendance = () => {
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
-                  {isStoreOwner && (
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Actions</th>
-                  )}
                 </tr>
               </thead>
               <tbody>
                 {currentLogs.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={isStoreOwner ? 4 : 3}
-                      className="p-2 text-center text-gray-500 dark:text-gray-400"
-                    >
+                    <td colSpan="3" className="p-2 text-center text-gray-500 dark:text-gray-400">
                       No attendance logs found.
                     </td>
                   </tr>
@@ -450,16 +392,6 @@ const Attendance = () => {
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
                         {format(parseISO(log.timestamp), 'PPP HH:mm')}
                       </td>
-                      {isStoreOwner && (
-                        <td className="p-2">
-                          <button
-                            onClick={() => handleDeleteLog(log.id)}
-                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
                     </tr>
                   ))
                 )}
