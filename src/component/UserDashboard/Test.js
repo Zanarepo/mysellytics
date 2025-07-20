@@ -99,7 +99,8 @@ const Attendance = () => {
   // Generate store barcode when modal opens
   useEffect(() => {
     if (showBarcodeModal && storeId) {
-      const storeCode = `STORE-${storeId}`;
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const storeCode = `STORE-${storeId}-${today}`;
       const canvas = document.getElementById('store-barcode');
       console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
       if (canvas) {
@@ -189,19 +190,19 @@ const Attendance = () => {
         try {
           const scannedCode = result.text;
           console.log('Scanned code:', scannedCode);
-          const expectedCode = `STORE-${storeId}`;
-          if (scannedCode !== expectedCode) {
+          const scannedParts = scannedCode.split('-');
+          const expectedPrefix = `STORE-${storeId}`;
+          if (scannedParts.length < 2 || !scannedCode.startsWith(expectedPrefix)) {
             console.log('Invalid store barcode:', scannedCode);
             return;
           }
 
-        const now = new Date();
+            const now = new Date();
 const currentHour = now.getHours();
 if (currentHour >= 5 && currentHour < 21) {
   console.log('Clocking only allowed between 6:00 AM and 5:00 AM the next day.');
   return;
 }
-
           // Verify user
           let user = { id: userId, full_name: 'Store Owner' };
           if (userId !== 0) {
@@ -405,7 +406,7 @@ if (currentHour >= 5 && currentHour < 21) {
             <table className="min-w-full text-left border-collapse">
               <thead>
                 <tr className="bg-indigo-100 dark:bg-indigo-800">
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Staff</th>
+                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
                   {isStoreOwner && (
@@ -492,11 +493,14 @@ if (currentHour >= 5 && currentHour < 21) {
                   {storeId ? (
                     <>
                       <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
-                        Store Barcode (ID: STORE-{storeId})
+                        Store Barcode (ID: STORE-{storeId}-{format(new Date(), 'yyyy-MM-dd')})
                       </p>
                       {barcodeError ? (
                         <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}&code=Code128`}
+                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(
+                            new Date(),
+                            'yyyy-MM-dd'
+                          )}&code=Code128`}
                           alt="Store Barcode"
                           className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
                         />
