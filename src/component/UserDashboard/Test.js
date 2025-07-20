@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
+import toast from 'react-hot-toast';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { format, parseISO, startOfDay, isAfter, subDays, set } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import JsBarcode from 'jsbarcode';
 import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
+import { BrowserMultiFormatReader } from '@zxing/library';
 
 const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
@@ -20,13 +21,13 @@ const Attendance = () => {
   const [itemsPerPage] = useState(5);
   const [barcodeError, setBarcodeError] = useState(false);
   const webcamRef = useRef(null);
-  const codeReader = useRef(null);
-  const lastScanTime = useRef(Date.now());
+  const codeReader = useRef(new BrowserMultiFormatReader());
 
   // Fetch user data
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        toast.dismiss();
         const user_email = localStorage.getItem('user_email');
         console.log('User email from localStorage:', user_email);
         if (!user_email) throw new Error('Please log in.');
@@ -88,6 +89,7 @@ const Attendance = () => {
         }
       } catch (err) {
         console.error('fetchUserData error:', err);
+        toast.error(err.message, { toastId: 'auth-error' });
         setError(err.message);
       } finally {
         setLoading(false);
@@ -97,12 +99,10 @@ const Attendance = () => {
     fetchUserData();
   }, []);
 
-  // Generate daily store barcode
+  // Generate store barcode when modal opens
   useEffect(() => {
     if (showBarcodeModal && storeId) {
-      const today = startOfDay(new Date());
-      const dateSuffix = format(today, 'yyyyMMdd');
-      const storeCode = `STORE-${storeId}-${dateSuffix}`;
+      const storeCode = `STORE-${storeId}`;
       const canvas = document.getElementById('store-barcode');
       console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
       if (canvas) {
@@ -121,6 +121,7 @@ const Attendance = () => {
           setBarcodeError(false);
         } catch (err) {
           console.error('JsBarcode error for store barcode:', err);
+          toast.error('Failed to generate store barcode.', { toastId: 'barcode-error' });
           setBarcodeError(true);
         }
       } else {
@@ -146,44 +147,12 @@ const Attendance = () => {
         console.log('Attendance logs:', data);
       } catch (err) {
         console.error('fetchAttendanceLogs error:', err);
+        toast.error(err.message, { toastId: 'logs-error' });
       }
     };
 
     fetchAttendanceLogs();
   }, [storeId]);
-
-  // Delete single attendance log
-  const handleDeleteLog = async (logId) => {
-    try {
-      console.log('Deleting attendance log:', logId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('id', logId)
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting log: ${error.message}`);
-      setAttendanceLogs((prev) => prev.filter((log) => log.id !== logId));
-      console.log('Attendance log deleted:', logId);
-    } catch (err) {
-      console.error('handleDeleteLog error:', err);
-    }
-  };
-
-  // Delete all attendance logs for store
-  const handleDeleteAllLogs = async () => {
-    try {
-      console.log('Deleting all attendance logs for store_id:', storeId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
-      setAttendanceLogs([]);
-      console.log('All attendance logs deleted for store_id:', storeId);
-    } catch (err) {
-      console.error('handleDeleteAllLogs error:', err);
-    }
-  };
 
   // Handle barcode scan
   const handleScan = useCallback(
@@ -192,26 +161,9 @@ const Attendance = () => {
         try {
           const scannedCode = result.text;
           console.log('Scanned code:', scannedCode);
-
-          // Check if within clocking hours (6:00 AM - 9:00 PM WAT)
-          const now = new Date('2025-07-20T08:00:00+01:00'); // Mock 8:00 AM WAT for testing
-          const currentHour = now.getHours();
-          if (currentHour < 6 || currentHour >= 21) {
-            console.log('Clocking rejected: Outside 6:00 AM - 9:00 PM window');
-            return;
-          }
-
-          // Validate barcode
-          const today = startOfDay(now);
-          const yesterday = subDays(today, 1);
-          const todaySuffix = format(today, 'yyyyMMdd');
-          const yesterdaySuffix = format(yesterday, 'yyyyMMdd');
-          const expectedCodeToday = `STORE-${storeId}-${todaySuffix}`;
-          const expectedCodeYesterday = `STORE-${storeId}-${yesterdaySuffix}`;
-          console.log('Expected codes:', { today: expectedCodeToday, yesterday: expectedCodeYesterday });
-
-          if (scannedCode !== expectedCodeToday && scannedCode !== expectedCodeYesterday) {
-            console.log('Invalid or expired store barcode:', scannedCode);
+          const expectedCode = `STORE-${storeId}`;
+          if (scannedCode !== expectedCode) {
+            toast.error('Invalid store barcode.', { toastId: 'invalid-code' });
             return;
           }
 
@@ -226,6 +178,7 @@ const Attendance = () => {
               .single();
             if (userError || !userData) {
               console.error('User lookup error:', userError);
+              toast.error('User not authenticated.', { toastId: 'auth-error' });
               return;
             }
             user = userData;
@@ -234,10 +187,10 @@ const Attendance = () => {
             console.log('Using default user for store owner: id=0, full_name=Store Owner');
           }
 
-          // Check last action and enforce clock-in if no clock-out by 9:00 PM
+          // Check last action
           const { data: lastLog, error: logError } = await supabase
             .from('attendance')
-            .select('action, timestamp')
+            .select('action')
             .eq('user_id', user.id)
             .eq('store_id', storeId)
             .order('timestamp', { ascending: false })
@@ -247,117 +200,54 @@ const Attendance = () => {
             throw new Error(`Error checking last log: ${logError.message}`);
           }
 
-          let action = 'clock-in';
-          if (lastLog) {
-            const lastLogTime = parseISO(lastLog.timestamp);
-            const lastDayEnd = set(startOfDay(lastLogTime), { hours: 21, minutes: 0, seconds: 0 });
-            if (lastLog.action === 'clock-in' && isAfter(now, lastDayEnd)) {
-              console.log('No clock-out by 9:00 PM; forcing clock-in.');
-              action = 'clock-in';
-            } else {
-              action = lastLog.action === 'clock-in' ? 'clock-out' : 'clock-in';
-            }
-          }
-
+          const action = lastLog?.action === 'clock-in' ? 'clock-out' : 'clock-in';
           const { data, error: insertError } = await supabase
             .from('attendance')
-            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: now.toISOString() }])
+            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: new Date().toISOString() }])
             .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
             .single();
           if (insertError) throw new Error(`Error logging attendance: ${insertError.message}`);
 
           setAttendanceLogs((prev) => [data, ...prev]);
-          const firstName = user.full_name.split(' ')[0];
-          console.log('Clock-in/out recorded:', { user: firstName, action, time: format(now, 'PPP HH:mm') });
+          toast.success(`${user.full_name} ${action === 'clock-in' ? 'clocked in' : 'clocked out'} at ${format(new Date(), 'PPP HH:mm')}.`, {
+            toastId: `attendance-${data.id}`,
+          });
         } catch (err) {
           console.error('handleScan error:', err);
+          toast.error(err.message, { toastId: 'scan-error' });
         }
-      } else if (err && err.name !== 'NotFoundException') {
-        console.error('Scan error in callback:', err);
-      } else if (err) {
-        console.log('Scan callback: Barcode not detected (NotFoundException).');
       }
     },
-    [storeId, userId]
+    [storeId, userId, setAttendanceLogs]
   );
 
   // Handle barcode scanning
   useEffect(() => {
     let currentCodeReader = null;
     if (scanning) {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, ['CODE128']);
-      codeReader.current = new BrowserMultiFormatReader(hints);
       currentCodeReader = codeReader.current;
-      console.log('Starting scanner with webcamRef:', webcamRef.current);
-      console.log('Webcam state:', { ready: !!webcamRef.current, video: !!webcamRef.current?.video });
-      console.log('Scanner formats supported:', hints.get(DecodeHintType.POSSIBLE_FORMATS));
       const scanCode = async () => {
         try {
-          if (!webcamRef.current || !webcamRef.current.video) {
-            console.error('Webcam reference or video element not available.');
-            setScanning(false);
-            return;
-          }
-          let attempts = 0;
-          const maxAttempts = 3;
-          let selectedDeviceId = null;
-          while (attempts < maxAttempts) {
-            try {
-              console.log('Camera permissions requested for facingMode: environment');
-              const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', width: 640, height: 480 }
-              });
-              if (webcamRef.current?.video) {
-                webcamRef.current.video.srcObject = stream;
-                console.log('Video stream assigned:', stream.getVideoTracks()[0].getSettings());
-                selectedDeviceId = stream.getVideoTracks()[0].getSettings().deviceId;
-              }
-              break;
-            } catch (err) {
-              attempts++;
-              console.warn(`Camera setup attempt ${attempts} failed:`, err);
-              if (attempts === maxAttempts) {
-                console.error('Max camera setup attempts reached:', err);
-                setScanning(false);
-                return;
-              }
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          }
-          console.log('Scanner initialized with deviceId:', selectedDeviceId || 'default');
-          const timeoutId = setTimeout(() => {
-            console.log('Scanning timeout after 30 seconds.');
-            setScanning(false);
-            currentCodeReader.reset();
-          }, 30000);
-          await currentCodeReader.decodeFromVideoDevice(selectedDeviceId, webcamRef.current.video, (result, err) => {
-            if (Date.now() - lastScanTime.current < 500) return;
-            lastScanTime.current = Date.now();
-            console.log('Scanner callback triggered:', { result: result?.text, err: err?.name });
+          await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
             if (result) {
-              console.log('Barcode detected:', result.text);
               setScanning(false);
               currentCodeReader.reset();
-              clearTimeout(timeoutId);
               handleScan(null, result);
             }
             if (err && err.name !== 'NotFoundException') {
               console.error('Scan error:', err);
-            } else if (err) {
-              console.log('Barcode not detected (NotFoundException).');
+              toast.error('Error scanning code.', { toastId: 'scan-error' });
             }
           });
         } catch (err) {
           console.error('Scan setup error:', err);
-          setScanning(false);
+          toast.error('Failed to start scanner.', { toastId: 'scan-setup-error' });
         }
       };
       scanCode();
     }
     return () => {
       if (currentCodeReader) {
-        console.log('Resetting code reader.');
         currentCodeReader.reset();
       }
     };
@@ -399,31 +289,17 @@ const Attendance = () => {
               )}
             </div>
           )}
-          {isStoreOwner && (
-            <button
-              onClick={handleDeleteAllLogs}
-              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || attendanceLogs.length === 0}
-            >
-              Delete All Logs
-            </button>
-          )}
           {scanning && (
             <div className="mb-4">
-              <div className="relative">
-                <Webcam
-                  audio={false}
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  videoConstraints={{ facingMode: 'environment', width: 640, height: 480 }}
-                  className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
-                  width={300}
-                  height={300}
-                />
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[200px] h-[100px] border-2 border-dashed border-red-500 bg-black/20 pointer-events-none">
-                  <p className="text-center text-red-500 text-xs mt-1">Align barcode here</p>
-                </div>
-              </div>
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
+                videoConstraints={{ facingMode: 'environment' }}
+                className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
+                width={300}
+                height={300}
+              />
               <button
                 onClick={() => setScanning(false)}
                 className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
@@ -439,18 +315,12 @@ const Attendance = () => {
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
-                  {isStoreOwner && (
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Actions</th>
-                  )}
                 </tr>
               </thead>
               <tbody>
                 {currentLogs.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={isStoreOwner ? 4 : 3}
-                      className="p-2 text-center text-gray-500 dark:text-gray-400"
-                    >
+                    <td colSpan="3" className="p-2 text-center text-gray-500 dark:text-gray-400">
                       No attendance logs found.
                     </td>
                   </tr>
@@ -462,23 +332,11 @@ const Attendance = () => {
                         log.action === 'clock-in' ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'
                       }`}
                     >
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
-                        {log.store_users?.full_name || 'Store Owner'}
-                      </td>
+                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.store_users?.full_name || 'Store Owner'}</td>
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.action}</td>
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
                         {format(parseISO(log.timestamp), 'PPP HH:mm')}
                       </td>
-                      {isStoreOwner && (
-                        <td className="p-2">
-                          <button
-                            onClick={() => handleDeleteLog(log.id)}
-                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
                     </tr>
                   ))
                 )}
@@ -527,10 +385,7 @@ const Attendance = () => {
                       </p>
                       {barcodeError ? (
                         <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(
-                            startOfDay(new Date()),
-                            'yyyyMMdd'
-                          )}&code=Code128`}
+                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}&code=Code128`}
                           alt="Store Barcode"
                           className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
                         />
@@ -540,7 +395,7 @@ const Attendance = () => {
                           className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
                         />
                       )}
-                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out. Updates daily.</p>
+                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out.</p>
                     </>
                   ) : (
                     <p className="text-red-500 text-center">Store ID not found. Contact support.</p>
