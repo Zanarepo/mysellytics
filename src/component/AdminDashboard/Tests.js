@@ -1,542 +1,452 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import toast from 'react-hot-toast';
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
+import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/react';
+import { format, parseISO, startOfDay, set, isAfter } from 'date-fns';
+import JsBarcode from 'jsbarcode';
+import Webcam from 'react-webcam';
+import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/library';
 
-const TaskManagement = () => {
+const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [user_email, setUserEmail] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
-  const [, setCurrentUserId] = useState(null);
-  const [newTask, setNewTask] = useState({
-    task_name: '',
-    description: '',
-    status: 'Pending',
-    remarks: '',
-    staff_id: '',
-  });
-  const [error, setError] = useState(null);
+  const [, setUserEmail] = useState(null);
+  const [isStoreOwner, setIsStoreOwner] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [modalRemarks, setModalRemarks] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [filteredLogs, setFilteredLogs] = useState([]);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
+  const [, setConfirmingLogId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+  const [barcodeError, setBarcodeError] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
+  const webcamRef = useRef(null);
+  const codeReader = useRef(new BrowserMultiFormatReader());
+  const streamRef = useRef(null);
 
-  // Fetch user and store data using user_email
+  // Fetch user & store data
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        toast.dismiss();
         const user_email = localStorage.getItem('user_email');
-
-        console.log('localStorage user_email:', user_email ?? 'null/undefined');
-
-        if (!user_email) {
-          throw new Error('Missing user email. Please log in.');
-        }
+        if (!user_email) throw new Error('Please log in.');
         setUserEmail(user_email);
 
-        // Check if user is an admin by looking in the stores table
+        // Check store ownership
         const { data: storeData, error: storeError } = await supabase
           .from('stores')
           .select('id')
           .eq('email_address', user_email)
-          .single();
-        console.log('stores query result:', storeData, 'error:', storeError?.message);
+          .maybeSingle();
+        if (storeError) throw new Error(storeError.message);
 
-        if (storeData && !storeError) {
-          // User found in stores table, they are an admin
-          setIsAdmin(true);
+        let userData = null;
+        if (storeData) {
+          setIsStoreOwner(true);
           setStoreId(storeData.id);
-          // Fetch user_id from store_users for the admin (optional, depending on your schema)
-          const { data: adminUserData, error: adminUserError } = await supabase
+
+          // Ensure store owner has a store_users entry
+          const { data: existingUser, error: uErr } = await supabase
             .from('store_users')
             .select('id')
             .eq('email_address', user_email)
             .eq('store_id', storeData.id)
-            .single();
-          if (adminUserError || !adminUserData) {
-            // If admin is not in store_users, use a fallback or generate a user_id if needed
-            // For simplicity, we'll assume admin doesn't need to be in store_users
-            setUserId(null); // Or set a default/fallback user_id if required
-          } else {
-            setUserId(adminUserData.id);
-            setCurrentUserId(adminUserData.id);
+            .maybeSingle();
+          if (uErr) throw new Error(uErr.message);
+          if (existingUser) userData = existingUser;
+          else {
+            const { data: newUser, error: iErr } = await supabase
+              .from('store_users')
+              .insert([{ email_address: user_email, store_id: storeData.id, full_name: 'Store Owner', role: 'Owner' }])
+              .select('id')
+              .single();
+            if (iErr) throw new Error(iErr.message);
+            userData = newUser;
           }
         } else {
-          // User is not an admin, check if they are a staff member in store_users
-          const { data: userData, error: userDataError } = await supabase
+          // Regular store user
+          const { data: uData, error: ue } = await supabase
             .from('store_users')
             .select('id, store_id')
             .eq('email_address', user_email)
-            .single();
-          console.log('store_users query result:', userData, 'error:', userDataError?.message);
-
-          if (userDataError || !userData) {
-            throw new Error(`User not found in stores or store_users: ${userDataError?.message || 'No user data'}`);
-          }
-          setIsStaff(true);
-          setUserId(userData.id);
-          setCurrentUserId(userData.id);
-          setStoreId(userData.store_id);
-
-          // Validate store_id
-          const { data: storeValidation, error: storeValidationError } = await supabase
-            .from('stores')
-            .select('id')
-            .eq('id', userData.store_id)
-            .single();
-          if (storeValidationError || !storeValidation) {
-            throw new Error(`Invalid store ID (${userData.store_id}): ${storeValidationError?.message || 'Store not found'}`);
-          }
+            .maybeSingle();
+          if (ue) throw new Error(ue.message);
+          if (!uData) throw new Error('User not found in store_users.');
+          userData = uData;
+          setStoreId(uData.store_id);
         }
+        setUserId(userData.id);
       } catch (err) {
-        console.error('fetchUserData error:', err);
-        toast.error(err.message, { toastId: 'data-error' });
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-
     fetchUserData();
   }, []);
 
-  // Fetch staff and tasks once storeId and userId are set
+  // Generate store barcode
   useEffect(() => {
-    const fetchStaffAndTasks = async () => {
-      if (!storeId) return; // Skip if storeId is not set
+    if (showBarcodeModal && storeId) {
+      const today = format(new Date(), 'd');
+      const code = `STORE-${storeId}-${today}`;
+      const canvas = document.getElementById('store-barcode');
+      if (canvas) {
+        try {
+          JsBarcode(canvas, code, { format: 'CODE128', displayValue: true, width: 4, height: 100, fontSize: 18, background: '#fff', lineColor: '#000', margin: 10 });
+          setBarcodeError(false);
+        } catch {
+          setBarcodeError(true);
+        }
+      } else setBarcodeError(true);
+    }
+  }, [showBarcodeModal, storeId]);
 
+  // Fetch attendance logs
+  useEffect(() => {
+    const fetchLogs = async () => {
+      if (!storeId) return;
       try {
-        const { data: storeUsers, error: usersError } = await supabase
-          .from('store_users')
-          .select('id, full_name, role')
-          .eq('store_id', storeId);
-        if (usersError) {
-          throw new Error(`Error fetching staff: ${usersError.message}`);
-        }
-        console.log('staff query result:', storeUsers);
-        setStaff(storeUsers || []);
-
-        const query = supabase
-          .from('tasks')
-          .select('id, task_name, description, status, remarks, approval_status, staff_id, store_users!staff_id(full_name, role)')
-          .eq('store_id', storeId);
-        if (!isAdmin) {
-          query.eq('staff_id', userId);
-        }
-        const { data: tasksData, error: tasksError } = await query;
-        if (tasksError) {
-          throw new Error(`Error fetching tasks: ${tasksError.message}`);
-        }
-        console.log('tasks query result:', tasksData);
-        setTasks(tasksData || []);
+        const { data, error: e } = await supabase
+          .from('attendance')
+          .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
+          .eq('store_id', storeId)
+          .order('timestamp', { ascending: false });
+        if (e) throw new Error(e.message);
+        setAttendanceLogs(data);
+        setFilteredLogs(data);
       } catch (err) {
-        console.error('fetchStaffAndTasks error:', err);
-        toast.error(err.message, { toastId: 'data-error' });
         setError(err.message);
       }
     };
+    fetchLogs();
+  }, [storeId]);
 
-    fetchStaffAndTasks();
-  }, [storeId, userId, isAdmin]);
+  // Filter and search functionality
+  useEffect(() => {
+    let filtered = attendanceLogs;
 
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewTask((prev) => ({ ...prev, [name]: value }));
-  };
+    // Filter by action
+    if (actionFilter !== 'all') {
+      filtered = filtered.filter(log => log.action === actionFilter);
+    }
 
-  // Open modal with task details
-  const openModal = (task) => {
-    setSelectedTask(task);
-    setModalRemarks(task.remarks || '');
-    setIsModalOpen(true);
-  };
-
-  // Close modal
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedTask(null);
-    setModalRemarks('');
-  };
-
-  // Update task status or remarks
-  const handleTaskUpdate = async (taskId, updates) => {
-    try {
-      toast.dismiss();
-      const query = supabase
-        .from('tasks')
-        .update(updates)
-        .eq('id', taskId)
-        .eq('store_id', storeId);
-      if (!isAdmin) {
-        query.eq('staff_id', userId);
-      }
-      const { error } = await query;
-      if (error) {
-        throw new Error(`Error updating task: ${error.message}`);
-      }
-
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskId ? { ...task, ...updates } : task
-        )
+    // Filter by search term
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(log =>
+        log.store_users?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.action.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      if (updates.status) {
-        toast.success(`Task status updated to "${updates.status}".`, { toastId: `status-updated-${taskId}` });
-      } else if (updates.remarks) {
-        toast.success('Remarks updated, pending admin approval.', { toastId: `remarks-updated-${taskId}` });
-        toast.success(`New remarks added to task "${tasks.find(t => t.id === taskId)?.task_name}" for approval.`, { toastId: `admin-notify-${taskId}` });
-      } else if (updates.approval_status) {
-        toast.success(`Remarks ${updates.approval_status} for task "${tasks.find(t => t.id === taskId)?.task_name}".`, { toastId: `approval-${taskId}` });
-      }
-    } catch (err) {
-      console.error('handleTaskUpdate error:', err);
-      toast.error(err.message, { toastId: 'task-update-error' });
     }
-  };
 
-  // Approve or reject remarks (admin only)
-  const handleApproval = async (taskId, approvalStatus) => {
-    if (!isAdmin) {
-      toast.error('Only admins can approve remarks.', { toastId: 'not-admin' });
-      return;
-    }
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
+    setFilteredLogs(filtered);
+    setCurrentPage(1); // Reset to first page when filtering
+  }, [attendanceLogs, searchTerm, actionFilter]);
 
-    const updates = { approval_status: approvalStatus };
-    if (approvalStatus === 'Approved' && task.status === 'In Progress') {
-      updates.status = 'Completed';
-    }
-    await handleTaskUpdate(taskId, updates);
-    closeModal();
-  };
-
-  // Delete task
-  const handleDeleteTask = async (taskId) => {
+  // Delete single log
+  const handleDeleteLog = async (logId) => {
+    setConfirmingLogId(null);
     try {
-      toast.dismiss();
-      const query = supabase
-        .from('tasks')
-        .delete()
-        .eq('id', taskId)
-        .eq('store_id', storeId);
-      if (!isAdmin) {
-        query.eq('staff_id', userId);
-      }
-      const { error } = await query;
-      if (error) {
-        throw new Error(`Error deleting task: ${error.message}`);
-      }
-
-      setTasks((prev) => prev.filter((task) => task.id !== taskId));
-      toast.success('Task deleted successfully.', { toastId: `task-deleted-${taskId}` });
-      setShowDeleteConfirm(false);
-      setTaskToDelete(null);
-    } catch (err) {
-      console.error('handleDeleteTask error:', err);
-      toast.error(err.message, { toastId: 'task-delete-error' });
+      const { error: delErr } = await supabase.from('attendance').delete().eq('id', logId).eq('store_id', storeId);
+      if (delErr) throw new Error(delErr.message);
+      setAttendanceLogs((prev) => prev.filter((l) => l.id !== logId));
+      setSuccessMessage('Log deleted successfully.');
+    } catch {
+      setError('Critical error deleting log.');
     }
   };
 
-  // Create a new task (admin only)
-  const handleCreateTask = async (e) => {
-    e.preventDefault();
-    if (!isAdmin) {
-      toast.error('Only admins can create tasks.', { toastId: 'not-admin' });
-      return;
-    }
+  // Delete all logs
+  const handleDeleteAllLogs = async () => {
+    setShowConfirmDeleteAll(false);
     try {
-      toast.dismiss();
-      if (!newTask.task_name || !newTask.staff_id) {
-        toast.error('Please fill in all required fields.', { toastId: 'form-error' });
-        return;
-      }
+      const { error: delErr } = await supabase.from('attendance').delete().eq('store_id', storeId);
+      if (delErr) throw new Error(delErr.message);
+      setAttendanceLogs([]);
+      setSuccessMessage('All logs deleted successfully.');
+    } catch {
+      setError('Critical error deleting all logs.');
+    }
+  };
 
-      // Fetch user_id for the creator (admin) if needed
-      let creatorId = userId;
-      if (!creatorId) {
-        const { data: creatorData, error: creatorError } = await supabase
-          .from('store_users')
-          .select('id')
-          .eq('email_address', user_email)
-          .eq('store_id', storeId)
-          .single();
-        if (creatorError && creatorError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-          throw new Error(`Error fetching creator data: ${creatorError.message}`);
+  // Handle scan
+  const handleScan = useCallback(
+    async (err, result) => {
+      if (result) {
+        try {
+          const scanned = result.text;
+          const today = format(new Date(), 'd');
+          if (scanned !== `STORE-${storeId}-${today}`) {
+            setError('Invalid store barcode.');
+            return;
+          }
+          const now = new Date();
+          const hour = now.getHours();
+          if (hour < 6 || hour >= 21) {
+            setError('Allowed only 6 AM–9 PM.');
+            return;
+          }
+          const { data: u } = await supabase.from('store_users').select('id, full_name').eq('id', userId).eq('store_id', storeId).single();
+          const { data: lastLog } = await supabase.from('attendance').select('action, timestamp').eq('user_id', u.id).eq('store_id', storeId).order('timestamp', { ascending: false }).limit(1).single();
+          let action = 'clock-in';
+          if (lastLog) {
+            const lastTime = parseISO(lastLog.timestamp);
+            const cutoff = set(startOfDay(lastTime), { hours: 21, minutes: 0, seconds: 0 });
+            if (lastLog.action === 'clock-in' && isAfter(now, cutoff)) action = 'clock-in';
+            else action = lastLog.action === 'clock-in' ? 'clock-out' : 'clock-in';
+          }
+          const { data } = await supabase.from('attendance').insert([{ store_id: storeId, user_id: u.id, action, timestamp: now.toISOString() }]).select('id, action, timestamp, store_users!user_id(full_name)').single();
+          setAttendanceLogs((prev) => [data, ...prev]);
+          setSuccessMessage(`${u.full_name} ${action} at ${format(now, 'PPP HH:mm')}.`);
+        } catch (e) {
+          setError(e.message);
         }
-        creatorId = creatorData?.id || null; // Allow null if admin is not in store_users
       }
+    },
+    [storeId, userId]
+  );
 
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert([
-          {
-            store_id: storeId,
-            staff_id: parseInt(newTask.staff_id),
-            task_name: newTask.task_name,
-            description: newTask.description,
-            status: newTask.status,
-            remarks: newTask.remarks,
-            approval_status: 'Pending',
-            created_by: creatorId, // May be null if admin is not in store_users
-          },
-        ])
-        .select('id, task_name, description, status, remarks, approval_status, staff_id, store_users!staff_id(full_name, role)')
-        .single();
-
-      if (error) {
-        throw new Error(`Error creating task: ${error.message}`);
-      }
-
-      setTasks((prev) => [...prev, data]);
-      toast.success(`Task "${newTask.task_name}" assigned to ${staff.find(s => s.id === parseInt(newTask.staff_id))?.full_name}.`, { toastId: 'task-created' });
-      toast.success(`You have been assigned a new task: "${newTask.task_name}"`, { toastId: `staff-notify-${newTask.staff_id}` });
-      setNewTask({ task_name: '', description: '', status: 'Pending', remarks: '', staff_id: '' });
-    } catch (err) {
-      console.error('handleCreateTask error:', err);
-      toast.error(err.message, { toastId: 'task-create-error' });
+  // Scanning effect
+  useEffect(() => {
+    let reader = null;
+    if (scanning) {
+      reader = codeReader.current;
+      const start = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        streamRef.current = stream;
+        webcamRef.current.video.srcObject = stream;
+        reader.decodeFromVideoDevice(stream.getVideoTracks()[0].getSettings().deviceId, webcamRef.current.video, (res, err) => {
+          if (res) {
+            setScanning(false);
+            handleScan(null, res);
+          }
+        }, new Map([[BarcodeFormat.CODE_128, true]]));
+      };
+      start();
     }
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      if (reader) reader.reset();
+    };
+  }, [scanning, handleScan]);
+
+  // Pagination
+  const last = currentPage * itemsPerPage;
+  const first = last - itemsPerPage;
+  const currentLogs = filteredLogs.slice(first, last);
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+
+  // Helper function to get action color classes
+  const getActionColorClass = (action) => {
+    return action === 'clock-in' 
+      ? 'bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium'
+      : 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setActionFilter('all');
+    setCurrentPage(1);
   };
 
   return (
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
-      <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Task Management</h2>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
+      <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
+      {successMessage && <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{successMessage}</div>}
+      {error && <div className="mb-4 p-2 bg-red-100 text-red-800 rounded">{error}</div>}
       {loading ? (
-        <div className="flex justify-center items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
-        </div>
+        <div className="flex justify-center items-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"/></div>
       ) : (
         <>
-          {isAdmin && (
-            <form onSubmit={handleCreateTask} className="mb-8 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Task Name</label>
-                  <input
-                    type="text"
-                    name="task_name"
-                    value={newTask.task_name}
-                    onChange={handleInputChange}
-                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Assign to Staff</label>
-                  <select
-                    name="staff_id"
-                    value={newTask.staff_id}
-                    onChange={handleInputChange}
-                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    required
-                  >
-                    <option value="">Select Staff</option>
-                    {staff.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.full_name} ({s.role || 'N/A'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Status</label>
-                  <select
-                    name="status"
-                    value={newTask.status}
-                    onChange={handleInputChange}
-                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Description</label>
-                  <textarea
-                    name="description"
-                    value={newTask.description}
-                    onChange={handleInputChange}
-                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    rows="4"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Remarks</label>
-                  <textarea
-                    name="remarks"
-                    value={newTask.remarks}
-                    onChange={handleInputChange}
-                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    rows="2"
-                  />
-                </div>
+          {(isStoreOwner || userId) && (
+            <div className="mb-4 flex gap-4">
+              <button onClick={() => setScanning(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" disabled={!storeId}>Scan Store Barcode</button>
+              {isStoreOwner && <button onClick={() => setShowBarcodeModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700" disabled={!storeId}>Show Store Barcode</button>}
+            </div>
+          )}
+          {isStoreOwner && <button onClick={() => setShowConfirmDeleteAll(true)} className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700" disabled={!attendanceLogs.length}>Delete All Logs</button>}
+
+          {/* Search and Filter Section */}
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search by user name or action</label>
+                <input
+                  type="text"
+                  placeholder="Search attendance logs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Filter by action</label>
+                <select
+                  value={actionFilter}
+                  onChange={(e) => setActionFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value="all">All Actions</option>
+                  <option value="clock-in">Clock In</option>
+                  <option value="clock-out">Clock Out</option>
+                </select>
               </div>
               <button
-                type="submit"
-                className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                onClick={clearFilters}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
               >
-                Create Task
+                Clear Filters
               </button>
-            </form>
+            </div>
+            {(searchTerm || actionFilter !== 'all') && (
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Showing {filteredLogs.length} of {attendanceLogs.length} logs
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Delete All Dialog */}
+          <Dialog open={showConfirmDeleteAll} onClose={() => setShowConfirmDeleteAll(false)} className="relative z-50">
+            <div className="fixed inset-0 bg-black/30"/>
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="w-full max-w-xs bg-white dark:bg-gray-800 p-6 rounded-lg">
+                <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirm Deletion</DialogTitle>
+                <DialogDescription className="mt-2 text-sm text-gray-700 dark:text-gray-300">Delete <strong>all</strong> attendance logs? This cannot be undone.</DialogDescription>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button onClick={() => setShowConfirmDeleteAll(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancel</button>
+                  <button onClick={handleDeleteAllLogs} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete All</button>
+                </div>
+              </DialogPanel>
+            </div>
+          </Dialog>
+
+          {/* Scanning */}
+          {scanning && (
+            <div className="mb-4">
+              <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" videoConstraints={{ facingMode: { ideal: 'environment' } }} className="mx-auto rounded-md border" width={300} height={300}/>
+              <button onClick={() => setScanning(false)} className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Stop Scanning</button>
+            </div>
           )}
-          {(isAdmin || isStaff) && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-indigo-100 dark:bg-indigo-800">
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Task Name</th>
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Assigned To</th>
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Approval Status</th>
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
+
+          {/* Logs Table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left border-collapse bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow">
+              <thead>
+                <tr className="bg-indigo-100 dark:bg-indigo-800">
+                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">User</th>
+                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Action</th>
+                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Timestamp</th>
+                  {isStoreOwner && <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {currentLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={isStoreOwner ? 4 : 3} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      {filteredLogs.length === 0 && attendanceLogs.length > 0 ? 'No logs match your search criteria.' : 'No attendance logs found.'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {tasks.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="p-2 text-center text-gray-500 dark:text-gray-400">
-                        No tasks found.
+                ) : (
+                  currentLogs.map((log, index) => (
+                    <tr key={log.id} className={`${index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-800'} hover:bg-gray-100 dark:hover:bg-gray-700`}>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                        {log.store_users?.full_name || 'Unknown User'}
                       </td>
-                    </tr>
-                  ) : (
-                    tasks.map((task) => (
-                      <tr key={task.id} className="border-b dark:border-gray-700">
-                        <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{task.task_name}</td>
-                        <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{task.store_users?.full_name}</td>
-                        <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{task.approval_status}</td>
-                        <td className="p-2 flex flex-col md:flex-row gap-2">
-                          <button
-                            onClick={() => openModal(task)}
-                            className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => {
-                              setTaskToDelete(task.id);
-                              setShowDeleteConfirm(true);
-                            }}
-                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                      <td className="px-4 py-3 text-sm border-b border-gray-200 dark:border-gray-700">
+                        <span className={getActionColorClass(log.action)}>
+                          {log.action === 'clock-in' ? 'Clock In' : 'Clock Out'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                        {format(parseISO(log.timestamp), 'PPP HH:mm')}
+                      </td>
+                      {isStoreOwner && (
+                        <td className="px-4 py-3 text-sm border-b border-gray-200 dark:border-gray-700">
+                          <button 
+                            onClick={() => handleDeleteLog(log.id)} 
+                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
                           >
                             Delete
                           </button>
                         </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {first + 1} to {Math.min(last, filteredLogs.length)} of {filteredLogs.length} logs
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                    if (totalPages <= 7 || pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-2 text-sm rounded-md ${
+                            currentPage === pageNum
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                      return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
-          {/* Modal for task details */}
-          <Dialog open={isModalOpen} onClose={closeModal} className="relative z-50">
-            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+
+          {/* Barcode Modal */}
+          <Dialog open={showBarcodeModal} onClose={() => setShowBarcodeModal(false)} className="relative z-50">
+            <div className="fixed inset-0 bg-black/30"/>
             <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="w-full max-w-lg rounded-lg bg-white dark:bg-gray-800 p-6">
-                <DialogTitle className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
-                  Task Details: {selectedTask?.task_name}
-                </DialogTitle>
-                <button
-                  onClick={closeModal}
-                  className="absolute top-2 right-2 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
-                >
-                  ✕
-                </button>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Staff Role</label>
-                    <p className="text-indigo-800 dark:text-indigo-200">{selectedTask?.store_users?.role || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Description</label>
-                    <p className="text-indigo-800 dark:text-indigo-200">{selectedTask?.description || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Status</label>
-                    <select
-                      value={selectedTask?.status || 'Pending'}
-                      onChange={(e) => handleTaskUpdate(selectedTask?.id, { status: e.target.value })}
-                      className="p-1 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                      disabled={isAdmin ? (selectedTask?.approval_status !== 'Approved' && selectedTask?.status === 'In Progress') : (selectedTask?.status === 'Completed' || selectedTask?.approval_status !== 'Approved')}
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      {isAdmin && <option value="Completed">Completed</option>}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Remarks</label>
-                    {isAdmin ? (
-                      <p className="text-indigo-800 dark:text-indigo-200">{selectedTask?.remarks || '-'}</p>
-                    ) : (
-                      <textarea
-                        value={modalRemarks}
-                        onChange={(e) => {
-                          setModalRemarks(e.target.value);
-                          handleTaskUpdate(selectedTask?.id, { remarks: e.target.value });
-                        }}
-                        className="p-1 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        rows="4"
-                      />
-                    )}
-                  </div>
-                  {isAdmin && selectedTask?.remarks && selectedTask?.approval_status === 'Pending' && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApproval(selectedTask.id, 'Approved')}
-                        className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleApproval(selectedTask.id, 'Rejected')}
-                        className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700"
-                      >
-                        Reject
-                      </button>
-                    </div>
+              <DialogPanel className="w-full max-w-sm bg-white dark:bg-gray-800 p-6 rounded-lg">
+                <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">Store Barcode</DialogTitle>
+                <button onClick={() => setShowBarcodeModal(false)} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">✕</button>
+                <div className="mt-4 text-center">
+                  {barcodeError ? (
+                    <img src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(new Date(), 'd')}&code=Code128`} alt="Store Barcode" className="mx-auto"/>
+                  ) : (
+                    <canvas id="store-barcode" className="mx-auto"/>
                   )}
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Scan this barcode to clock in/out.</p>
                 </div>
-                <button
-                  onClick={closeModal}
-                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                >
-                  Close
-                </button>
-              </DialogPanel>
-            </div>
-          </Dialog>
-          {/* Delete Confirmation Modal */}
-          <Dialog open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} className="relative z-50">
-            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-800 p-6">
-                <DialogTitle className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
-                  Confirm Delete
-                </DialogTitle>
-                <p className="mt-2 text-indigo-800 dark:text-indigo-200">Are you sure you want to delete this task?</p>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => handleDeleteTask(taskToDelete)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded-md hover:bg-gray-400 dark:hover:bg-gray-500"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                <button onClick={() => setShowBarcodeModal(false)} className="mt-4 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Close</button>
               </DialogPanel>
             </div>
           </Dialog>
@@ -546,4 +456,4 @@ const TaskManagement = () => {
   );
 };
 
-export default TaskManagement;
+export default Attendance;

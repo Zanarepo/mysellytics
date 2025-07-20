@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
+import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/react';
 import { format, parseISO, startOfDay, set, isAfter } from 'date-fns';
 import JsBarcode from 'jsbarcode';
 import Webcam from 'react-webcam';
@@ -13,458 +13,363 @@ const Attendance = () => {
   const [isStoreOwner, setIsStoreOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [filteredLogs, setFilteredLogs] = useState([]);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
+  const [, setConfirmingLogId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
+  const itemsPerPage = 5;
   const [barcodeError, setBarcodeError] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
   const webcamRef = useRef(null);
   const codeReader = useRef(new BrowserMultiFormatReader());
   const streamRef = useRef(null);
 
-  // Fetch user data
+  // Fetch user & store data
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const user_email = localStorage.getItem('user_email');
-        console.log('User email from localStorage:', user_email);
         if (!user_email) throw new Error('Please log in.');
-
         setUserEmail(user_email);
-        console.log('Querying stores for email:', user_email);
+
+        // Check store ownership
         const { data: storeData, error: storeError } = await supabase
           .from('stores')
           .select('id')
           .eq('email_address', user_email)
           .maybeSingle();
-        if (storeError) {
-          console.error('Store query error:', storeError);
-          throw new Error(`Error checking store owner: ${storeError.message}`);
-        }
+        if (storeError) throw new Error(storeError.message);
 
+        let userData = null;
         if (storeData) {
-          console.log('User is store owner for store_id:', storeData.id);
           setIsStoreOwner(true);
           setStoreId(storeData.id);
-          console.log('Final storeId:', storeData.id);
-          console.log('Querying store_users for email:', user_email);
-          let userData = null;
-          const { data: existingUserData, error: userError } = await supabase
+
+          // Ensure store owner has a store_users entry
+          const { data: existingUser, error: uErr } = await supabase
             .from('store_users')
             .select('id')
             .eq('email_address', user_email)
             .eq('store_id', storeData.id)
             .maybeSingle();
-          if (userError) {
-            console.error('User query error:', userError);
-            throw new Error(`Error fetching user data: ${userError.message}`);
-          }
-          if (existingUserData) {
-            console.log('User data:', existingUserData);
-            userData = existingUserData;
-          } else {
-            console.log('No store_users entry found for store owner; creating one.');
-            const { data: newUserData, error: insertError } = await supabase
+          if (uErr) throw new Error(uErr.message);
+          if (existingUser) userData = existingUser;
+          else {
+            const { data: newUser, error: iErr } = await supabase
               .from('store_users')
-              .insert([
-                {
-                  email_address: user_email,
-                  store_id: storeData.id,
-                  full_name: 'Store Owner',
-                  role: 'Owner',
-                },
-              ])
+              .insert([{ email_address: user_email, store_id: storeData.id, full_name: 'Store Owner', role: 'Owner' }])
               .select('id')
               .single();
-            if (insertError) {
-              console.error('Error inserting store owner into store_users:', insertError);
-              throw new Error(`Error creating store owner user: ${insertError.message}`);
-            }
-            userData = newUserData;
-            console.log('Created store_users entry:', userData);
+            if (iErr) throw new Error(iErr.message);
+            userData = newUser;
           }
-          setUserId(userData.id);
         } else {
-          console.log('User is not store owner, querying store_users for email:', user_email);
-          const { data: userData, error: userError } = await supabase
+          // Regular store user
+          const { data: uData, error: ue } = await supabase
             .from('store_users')
             .select('id, store_id')
             .eq('email_address', user_email)
             .maybeSingle();
-          if (userError) {
-            console.error('User query error:', userError);
-            throw new Error(`Error fetching user data: ${userError.message}`);
-          }
-          if (!userData) {
-            console.error('No user found for email:', user_email);
-            throw new Error('User not found in store_users.');
-          }
-          console.log('User data:', userData);
-          setUserId(userData.id);
-          setStoreId(userData.store_id);
-          console.log('Final storeId:', userData.store_id);
+          if (ue) throw new Error(ue.message);
+          if (!uData) throw new Error('User not found in store_users.');
+          userData = uData;
+          setStoreId(uData.store_id);
         }
+        setUserId(userData.id);
       } catch (err) {
-        console.error('fetchUserData error:', err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-
     fetchUserData();
   }, []);
 
-  // Generate store barcode when modal opens
+  // Generate store barcode
   useEffect(() => {
     if (showBarcodeModal && storeId) {
       const today = format(new Date(), 'd');
-      const storeCode = `STORE-${storeId}-${today}`;
+      const code = `STORE-${storeId}-${today}`;
       const canvas = document.getElementById('store-barcode');
-      console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
       if (canvas) {
         try {
-          JsBarcode(canvas, storeCode, {
-            format: 'CODE128',
-            displayValue: true,
-            width: 4,
-            height: 100,
-            fontSize: 18,
-            background: '#ffffff',
-            lineColor: '#000000',
-            margin: 10,
-          });
-          console.log('Store barcode generated successfully for:', storeCode);
+          JsBarcode(canvas, code, { format: 'CODE128', displayValue: true, width: 4, height: 100, fontSize: 18, background: '#fff', lineColor: '#000', margin: 10 });
           setBarcodeError(false);
-        } catch (err) {
-          console.error('JsBarcode error for store barcode:', err);
+        } catch {
           setBarcodeError(true);
         }
-      } else {
-        console.log('Store barcode canvas not found');
-        setBarcodeError(true);
-      }
+      } else setBarcodeError(true);
     }
   }, [showBarcodeModal, storeId]);
 
   // Fetch attendance logs
   useEffect(() => {
-    const fetchAttendanceLogs = async () => {
+    const fetchLogs = async () => {
       if (!storeId) return;
       try {
-        console.log('Fetching attendance logs for store_id:', storeId);
-        const { data, error } = await supabase
+        const { data, error: e } = await supabase
           .from('attendance')
           .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
           .eq('store_id', storeId)
           .order('timestamp', { ascending: false });
-        if (error) throw new Error(`Error fetching logs: ${error.message}`);
-        setAttendanceLogs(data || []);
-        console.log('Attendance logs:', data);
+        if (e) throw new Error(e.message);
+        setAttendanceLogs(data);
+        setFilteredLogs(data);
       } catch (err) {
-        console.error('fetchAttendanceLogs error:', err);
         setError(err.message);
       }
     };
-
-    fetchAttendanceLogs();
+    fetchLogs();
   }, [storeId]);
 
-  // Delete single attendance log
+  // Filter and search functionality
+  useEffect(() => {
+    let filtered = attendanceLogs;
+
+    // Filter by action
+    if (actionFilter !== 'all') {
+      filtered = filtered.filter(log => log.action === actionFilter);
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(log =>
+        log.store_users?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.action.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredLogs(filtered);
+    setCurrentPage(1); // Reset to first page when filtering
+  }, [attendanceLogs, searchTerm, actionFilter]);
+
+  // Delete single log
   const handleDeleteLog = async (logId) => {
+    setConfirmingLogId(null);
     try {
-      console.log('Deleting attendance log:', logId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('id', logId)
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting log: ${error.message}`);
-      setAttendanceLogs((prev) => prev.filter((log) => log.id !== logId));
-      console.log('Attendance log deleted:', logId);
-    } catch (err) {
-      console.error('handleDeleteLog error:', err);
-      setError(err.message);
+      const { error: delErr } = await supabase.from('attendance').delete().eq('id', logId).eq('store_id', storeId);
+      if (delErr) throw new Error(delErr.message);
+      setAttendanceLogs((prev) => prev.filter((l) => l.id !== logId));
+      setSuccessMessage('Log deleted successfully.');
+    } catch {
+      setError('Critical error deleting log.');
     }
   };
 
-  // Delete all attendance logs for store
+  // Delete all logs
   const handleDeleteAllLogs = async () => {
+    setShowConfirmDeleteAll(false);
     try {
-      console.log('Deleting all attendance logs for store_id:', storeId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
+      const { error: delErr } = await supabase.from('attendance').delete().eq('store_id', storeId);
+      if (delErr) throw new Error(delErr.message);
       setAttendanceLogs([]);
-      console.log('All attendance logs deleted for store_id:', storeId);
-    } catch (err) {
-      console.error('handleDeleteAllLogs error:', err);
-      setError(err.message);
+      setSuccessMessage('All logs deleted successfully.');
+    } catch {
+      setError('Critical error deleting all logs.');
     }
   };
 
-  // Handle barcode scan
+  // Handle scan
   const handleScan = useCallback(
     async (err, result) => {
       if (result) {
         try {
-          const scannedCode = result.text;
-          console.log('Scanned code:', scannedCode);
+          const scanned = result.text;
           const today = format(new Date(), 'd');
-          const expectedCode = `STORE-${storeId}-${today}`;
-          if (scannedCode !== expectedCode) {
+          if (scanned !== `STORE-${storeId}-${today}`) {
             setError('Invalid store barcode.');
             return;
           }
-
-          // Check if within clocking hours (6:00 AM - 9:00 PM WAT)
           const now = new Date();
-          const currentHour = now.getHours();
-          if (currentHour < 6 || currentHour >= 21) {
-            setError('Clocking only allowed between 6:00 AM and 9:00 PM.');
+          const hour = now.getHours();
+          if (hour < 6 || hour >= 21) {
+            setError('Allowed only 6 AM–9 PM.');
             return;
           }
-
-          // Verify user
-          const { data: userData, error: userError } = await supabase
-            .from('store_users')
-            .select('id, full_name')
-            .eq('id', userId)
-            .eq('store_id', storeId)
-            .single();
-          if (userError || !userData) {
-            console.error('User lookup error:', userError);
-            setError('User not authenticated.');
-            return;
-          }
-          const user = userData;
-          console.log('Authenticated user:', user);
-
-          // Check last action and enforce clock-in if no clock-out by 9:00 PM
-          const { data: lastLog, error: logError } = await supabase
-            .from('attendance')
-            .select('action, timestamp')
-            .eq('user_id', user.id)
-            .eq('store_id', storeId)
-            .order('timestamp', { ascending: false })
-            .limit(1)
-            .single();
-          if (logError && logError.code !== 'PGRST116') {
-            throw new Error(`Error checking last log: ${logError.message}`);
-          }
-
+          const { data: u } = await supabase.from('store_users').select('id, full_name').eq('id', userId).eq('store_id', storeId).single();
+          const { data: lastLog } = await supabase.from('attendance').select('action, timestamp').eq('user_id', u.id).eq('store_id', storeId).order('timestamp', { ascending: false }).limit(1).single();
           let action = 'clock-in';
           if (lastLog) {
-            const lastLogTime = parseISO(lastLog.timestamp);
-            const lastDayEnd = set(startOfDay(lastLogTime), { hours: 21, minutes: 0, seconds: 0 });
-            if (lastLog.action === 'clock-in' && isAfter(now, lastDayEnd)) {
-              console.log('No clock-out by 9:00 PM; forcing clock-in.');
-              action = 'clock-in';
-            } else {
-              action = lastLog.action === 'clock-in' ? 'clock-out' : 'clock-in';
-            }
+            const lastTime = parseISO(lastLog.timestamp);
+            const cutoff = set(startOfDay(lastTime), { hours: 21, minutes: 0, seconds: 0 });
+            if (lastLog.action === 'clock-in' && isAfter(now, cutoff)) action = 'clock-in';
+            else action = lastLog.action === 'clock-in' ? 'clock-out' : 'clock-in';
           }
-
-          const { data, error: insertError } = await supabase
-            .from('attendance')
-            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: now.toISOString() }])
-            .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
-            .single();
-          if (insertError) throw new Error(`Error logging attendance: ${insertError.message}`);
-
+          const { data } = await supabase.from('attendance').insert([{ store_id: storeId, user_id: u.id, action, timestamp: now.toISOString() }]).select('id, action, timestamp, store_users!user_id(full_name)').single();
           setAttendanceLogs((prev) => [data, ...prev]);
-          console.log(`${user.full_name} ${action} at ${format(now, 'PPP HH:mm')}.`);
-        } catch (err) {
-          console.error('handleScan error:', err);
-          setError(err.message);
+          setSuccessMessage(`${u.full_name} ${action} at ${format(now, 'PPP HH:mm')}.`);
+        } catch (e) {
+          setError(e.message);
         }
       }
     },
     [storeId, userId]
   );
 
-  // Handle barcode scanning
+  // Scanning effect
   useEffect(() => {
-    let currentCodeReader = null; // Initialize for cleanup
+    let reader = null;
     if (scanning) {
-      currentCodeReader = codeReader.current; // Capture ref value
-      const scanCode = async () => {
-        let stream = null;
-        try {
-          // Ensure webcam is mounted
-          if (!webcamRef.current || !webcamRef.current.video) {
-            console.error('Webcam reference or video element not available.');
-            setError('Webcam not available. Please ensure camera access is granted.');
+      reader = codeReader.current;
+      const start = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        streamRef.current = stream;
+        webcamRef.current.video.srcObject = stream;
+        reader.decodeFromVideoDevice(stream.getVideoTracks()[0].getSettings().deviceId, webcamRef.current.video, (res, err) => {
+          if (res) {
             setScanning(false);
-            return;
+            handleScan(null, res);
           }
-
-          // Request camera access
-          console.log('Requesting camera access with facingMode: environment');
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          });
-          streamRef.current = stream;
-          webcamRef.current.video.srcObject = stream;
-          console.log('Video stream assigned:', stream.getVideoTracks()[0].getSettings());
-
-          // Initialize scanner
-          const hints = new Map();
-          hints.set(BarcodeFormat.CODE_128, true);
-          currentCodeReader.timeBetweenDecodingAttempts = 200;
-          console.log('Starting barcode scanning');
-          const result = await currentCodeReader.decodeFromVideoDevice(
-            stream.getVideoTracks()[0].getSettings().deviceId,
-            webcamRef.current.video,
-            (result, err) => {
-              if (result) {
-                console.log('Barcode detected:', result.text);
-                setScanning(false);
-                handleScan(null, result);
-              }
-              if (err && err.name !== 'NotFoundException') {
-                console.error('Scan error:', err);
-                setError('Error scanning barcode. Please try again.');
-              }
-            },
-            hints
-          );
-          if (result) {
-            setScanning(false);
-            handleScan(null, result);
-          }
-        } catch (err) {
-          console.error('Scan setup error:', err);
-          setError('Failed to start scanner. Please check camera permissions.');
-          setScanning(false);
-        }
+        }, new Map([[BarcodeFormat.CODE_128, true]]));
       };
-      scanCode();
+      start();
     }
-
     return () => {
-      // Cleanup
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        console.log('Video stream stopped.');
-      }
-      if (currentCodeReader) {
-        currentCodeReader.reset();
-        console.log('Code reader reset.');
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      if (reader) reader.reset();
     };
   }, [scanning, handleScan]);
 
   // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = attendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(attendanceLogs.length / itemsPerPage);
+  const last = currentPage * itemsPerPage;
+  const first = last - itemsPerPage;
+  const currentLogs = filteredLogs.slice(first, last);
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+
+  // Helper function to get action color classes
+  const getActionColorClass = (action) => {
+    return action === 'clock-in' 
+      ? 'bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium'
+      : 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setActionFilter('all');
+    setCurrentPage(1);
+  };
 
   return (
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {successMessage && <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{successMessage}</div>}
+      {error && <div className="mb-4 p-2 bg-red-100 text-red-800 rounded">{error}</div>}
       {loading ? (
-        <div className="flex justify-center items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
-        </div>
+        <div className="flex justify-center items-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"/></div>
       ) : (
         <>
           {(isStoreOwner || userId) && (
             <div className="mb-4 flex gap-4">
-              <button
-                onClick={() => setScanning(true)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300"
-                disabled={!storeId}
-              >
-                Scan Store Barcode
-              </button>
-              {isStoreOwner && (
-                <button
-                  onClick={() => setShowBarcodeModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300"
-                  disabled={!storeId}
-                >
-                  Show Store Barcode
-                </button>
-              )}
+              <button onClick={() => setScanning(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" disabled={!storeId}>Scan Store Barcode</button>
+              {isStoreOwner && <button onClick={() => setShowBarcodeModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700" disabled={!storeId}>Show Store Barcode</button>}
             </div>
           )}
-          {isStoreOwner && (
-            <button
-              onClick={handleDeleteAllLogs}
-              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || attendanceLogs.length === 0}
-            >
-              Delete All Logs
-            </button>
-          )}
+          {isStoreOwner && <button onClick={() => setShowConfirmDeleteAll(true)} className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700" disabled={!attendanceLogs.length}>Delete All Logs</button>}
+
+          {/* Search and Filter Section */}
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search by user name or action</label>
+                <input
+                  type="text"
+                  placeholder="Search attendance logs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Filter by action</label>
+                <select
+                  value={actionFilter}
+                  onChange={(e) => setActionFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value="all">All Actions</option>
+                  <option value="clock-in">Clock In</option>
+                  <option value="clock-out">Clock Out</option>
+                </select>
+              </div>
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              >
+                Clear Filters
+              </button>
+            </div>
+            {(searchTerm || actionFilter !== 'all') && (
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Showing {filteredLogs.length} of {attendanceLogs.length} logs
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Delete All Dialog */}
+          <Dialog open={showConfirmDeleteAll} onClose={() => setShowConfirmDeleteAll(false)} className="relative z-50">
+            <div className="fixed inset-0 bg-black/30"/>
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="w-full max-w-xs bg-white dark:bg-gray-800 p-6 rounded-lg">
+                <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirm Deletion</DialogTitle>
+                <DialogDescription className="mt-2 text-sm text-gray-700 dark:text-gray-300">Delete <strong>all</strong> attendance logs? This cannot be undone.</DialogDescription>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button onClick={() => setShowConfirmDeleteAll(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancel</button>
+                  <button onClick={handleDeleteAllLogs} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete All</button>
+                </div>
+              </DialogPanel>
+            </div>
+          </Dialog>
+
+          {/* Scanning */}
           {scanning && (
             <div className="mb-4">
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }}
-                className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
-                width={300}
-                height={300}
-              />
-              <button
-                onClick={() => setScanning(false)}
-                className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Stop Scanning
-              </button>
+              <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" videoConstraints={{ facingMode: { ideal: 'environment' } }} className="mx-auto rounded-md border" width={300} height={300}/>
+              <button onClick={() => setScanning(false)} className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Stop Scanning</button>
             </div>
           )}
+
+          {/* Logs Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left border-collapse">
+            <table className="min-w-full text-left border-collapse bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow">
               <thead>
                 <tr className="bg-indigo-100 dark:bg-indigo-800">
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
-                  {isStoreOwner && (
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Actions</th>
-                  )}
+                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">User</th>
+                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Action</th>
+                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Timestamp</th>
+                  {isStoreOwner && <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {currentLogs.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={isStoreOwner ? 4 : 3}
-                      className="p-2 text-center text-gray-500 dark:text-gray-400"
-                    >
-                      No attendance logs found.
+                    <td colSpan={isStoreOwner ? 4 : 3} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      {filteredLogs.length === 0 && attendanceLogs.length > 0 ? 'No logs match your search criteria.' : 'No attendance logs found.'}
                     </td>
                   </tr>
                 ) : (
-                  currentLogs.map((log) => (
-                    <tr
-                      key={log.id}
-                      className={`border-b dark:border-gray-700 ${
-                        log.action === 'clock-in' ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'
-                      }`}
-                    >
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
-                        {log.store_users?.full_name || 'Store Owner'}
+                  currentLogs.map((log, index) => (
+                    <tr key={log.id} className={`${index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-800'} hover:bg-gray-100 dark:hover:bg-gray-700`}>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                        {log.store_users?.full_name || 'Unknown User'}
                       </td>
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.action}</td>
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
+                      <td className="px-4 py-3 text-sm border-b border-gray-200 dark:border-gray-700">
+                        <span className={getActionColorClass(log.action)}>
+                          {log.action === 'clock-in' ? 'Clock In' : 'Clock Out'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                         {format(parseISO(log.timestamp), 'PPP HH:mm')}
                       </td>
                       {isStoreOwner && (
-                        <td className="p-2">
-                          <button
-                            onClick={() => handleDeleteLog(log.id)}
-                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                        <td className="px-4 py-3 text-sm border-b border-gray-200 dark:border-gray-700">
+                          <button 
+                            onClick={() => handleDeleteLog(log.id)} 
+                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
                           >
                             Delete
                           </button>
@@ -476,73 +381,72 @@ const Attendance = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="mt-4 flex justify-center gap-4">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:bg-gray-300 dark:disabled:bg-gray-600"
-              >
-                Previous
-              </button>
-              <span className="text-indigo-800 dark:text-indigo-200">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:bg-gray-300 dark:disabled:bg-gray-600"
-              >
-                Next
-              </button>
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {first + 1} to {Math.min(last, filteredLogs.length)} of {filteredLogs.length} logs
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                    if (totalPages <= 7 || pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-2 text-sm rounded-md ${
+                            currentPage === pageNum
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                      return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Barcode Modal */}
           <Dialog open={showBarcodeModal} onClose={() => setShowBarcodeModal(false)} className="relative z-50">
-            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+            <div className="fixed inset-0 bg-black/30"/>
             <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-800 p-6">
-                <DialogTitle className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
-                  Store Barcode
-                </DialogTitle>
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="absolute top-2 right-2 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
-                >
-                  ✕
-                </button>
-                <div className="mt-4 flex flex-col items-center space-y-4">
-                  {storeId ? (
-                    <>
-                      <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
-                        Store Barcode (ID: STORE-{storeId}-{format(new Date(), 'd')})
-                      </p>
-                      {barcodeError ? (
-                        <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(
-                            new Date(),
-                            'd'
-                          )}&code=Code128&dpi=300`}
-                          alt="Store Barcode"
-                          className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
-                        />
-                      ) : (
-                        <canvas
-                          id="store-barcode"
-                          className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
-                        />
-                      )}
-                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out.</p>
-                    </>
+              <DialogPanel className="w-full max-w-sm bg-white dark:bg-gray-800 p-6 rounded-lg">
+                <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">Store Barcode</DialogTitle>
+                <button onClick={() => setShowBarcodeModal(false)} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">✕</button>
+                <div className="mt-4 text-center">
+                  {barcodeError ? (
+                    <img src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(new Date(), 'd')}&code=Code128`} alt="Store Barcode" className="mx-auto"/>
                   ) : (
-                    <p className="text-red-500 text-center">Store ID not found. Contact support.</p>
+                    <canvas id="store-barcode" className="mx-auto"/>
                   )}
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Scan this barcode to clock in/out.</p>
                 </div>
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="mt-6 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                >
-                  Close
-                </button>
+                <button onClick={() => setShowBarcodeModal(false)} className="mt-4 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Close</button>
               </DialogPanel>
             </div>
           </Dialog>
