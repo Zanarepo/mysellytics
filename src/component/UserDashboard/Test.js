@@ -299,10 +299,39 @@ const Attendance = () => {
             setScanning(false);
             return;
           }
-          console.log('Camera permissions requested for facingMode: environment');
-          await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          console.log('Camera permissions granted.');
-          await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
+          let attempts = 0;
+          const maxAttempts = 3;
+          let selectedDeviceId = null;
+          while (attempts < maxAttempts) {
+            try {
+              console.log('Camera permissions requested for facingMode: environment');
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: 640, height: 480 }
+              });
+              if (webcamRef.current?.video) {
+                webcamRef.current.video.srcObject = stream;
+                console.log('Video stream assigned:', stream.getVideoTracks()[0].getSettings());
+                selectedDeviceId = stream.getVideoTracks()[0].getSettings().deviceId;
+              }
+              break;
+            } catch (err) {
+              attempts++;
+              console.warn(`Camera setup attempt ${attempts} failed:`, err);
+              if (attempts === maxAttempts) {
+                console.error('Max camera setup attempts reached:', err);
+                setScanning(false);
+                return;
+              }
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+          console.log('Scanner initialized with deviceId:', selectedDeviceId || 'default');
+          const timeoutId = setTimeout(() => {
+            console.log('Scanning timeout after 30 seconds.');
+            setScanning(false);
+            currentCodeReader.reset();
+          }, 30000);
+          await currentCodeReader.decodeFromVideoDevice(selectedDeviceId, webcamRef.current.video, (result, err) => {
             if (Date.now() - lastScanTime.current < 500) return;
             lastScanTime.current = Date.now();
             console.log('Scanner callback triggered:', { result: result?.text, err: err?.name });
@@ -310,6 +339,7 @@ const Attendance = () => {
               console.log('Barcode detected:', result.text);
               setScanning(false);
               currentCodeReader.reset();
+              clearTimeout(timeoutId);
               handleScan(null, result);
             }
             if (err && err.name !== 'NotFoundException') {
@@ -380,15 +410,20 @@ const Attendance = () => {
           )}
           {scanning && (
             <div className="mb-4">
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: 'environment' }}
-                className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
-                width={300}
-                height={300}
-              />
+              <div className="relative">
+                <Webcam
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  videoConstraints={{ facingMode: 'environment', width: 640, height: 480 }}
+                  className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
+                  width={300}
+                  height={300}
+                />
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[200px] h-[100px] border-2 border-dashed border-red-500 bg-black/20 pointer-events-none">
+                  <p className="text-center text-red-500 text-xs mt-1">Align barcode here</p>
+                </div>
+              </div>
               <button
                 onClick={() => setScanning(false)}
                 className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
