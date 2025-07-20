@@ -41,6 +41,7 @@ const TaskManagement = () => {
         }
         setUserEmail(user_email);
 
+        // Check if user is an admin by looking in the stores table
         const { data: storeData, error: storeError } = await supabase
           .from('stores')
           .select('id')
@@ -49,8 +50,10 @@ const TaskManagement = () => {
         console.log('stores query result:', storeData, 'error:', storeError?.message);
 
         if (storeData && !storeError) {
+          // User found in stores table, they are an admin
           setIsAdmin(true);
           setStoreId(storeData.id);
+          // Fetch user_id from store_users for the admin (optional, depending on your schema)
           const { data: adminUserData, error: adminUserError } = await supabase
             .from('store_users')
             .select('id')
@@ -58,11 +61,15 @@ const TaskManagement = () => {
             .eq('store_id', storeData.id)
             .single();
           if (adminUserError || !adminUserData) {
-            throw new Error(`Admin user not found in store_users: ${adminUserError?.message || 'No admin user data'}`);
+            // If admin is not in store_users, use a fallback or generate a user_id if needed
+            // For simplicity, we'll assume admin doesn't need to be in store_users
+            setUserId(null); // Or set a default/fallback user_id if required
+          } else {
+            setUserId(adminUserData.id);
+            setCurrentUserId(adminUserData.id);
           }
-          setUserId(adminUserData.id);
-          setCurrentUserId(adminUserData.id);
         } else {
+          // User is not an admin, check if they are a staff member in store_users
           const { data: userData, error: userDataError } = await supabase
             .from('store_users')
             .select('id, store_id')
@@ -78,6 +85,7 @@ const TaskManagement = () => {
           setCurrentUserId(userData.id);
           setStoreId(userData.store_id);
 
+          // Validate store_id
           const { data: storeValidation, error: storeValidationError } = await supabase
             .from('stores')
             .select('id')
@@ -102,7 +110,7 @@ const TaskManagement = () => {
   // Fetch staff and tasks once storeId and userId are set
   useEffect(() => {
     const fetchStaffAndTasks = async () => {
-      if (!storeId || !userId) return;
+      if (!storeId) return; // Skip if storeId is not set
 
       try {
         const { data: storeUsers, error: usersError } = await supabase
@@ -252,14 +260,19 @@ const TaskManagement = () => {
         return;
       }
 
-      const { data: creatorData, error: creatorError } = await supabase
-        .from('store_users')
-        .select('id')
-        .eq('email_address', user_email)
-        .eq('store_id', storeId)
-        .single();
-      if (creatorError || !creatorData) {
-        throw new Error(`Admin user not found in store_users: ${creatorError?.message || 'No creator data'}`);
+      // Fetch user_id for the creator (admin) if needed
+      let creatorId = userId;
+      if (!creatorId) {
+        const { data: creatorData, error: creatorError } = await supabase
+          .from('store_users')
+          .select('id')
+          .eq('email_address', user_email)
+          .eq('store_id', storeId)
+          .single();
+        if (creatorError && creatorError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          throw new Error(`Error fetching creator data: ${creatorError.message}`);
+        }
+        creatorId = creatorData?.id || null; // Allow null if admin is not in store_users
       }
 
       const { data, error } = await supabase
@@ -273,7 +286,7 @@ const TaskManagement = () => {
             status: newTask.status,
             remarks: newTask.remarks,
             approval_status: 'Pending',
-            created_by: creatorData.id,
+            created_by: creatorId, // May be null if admin is not in store_users
           },
         ])
         .select('id, task_name, description, status, remarks, approval_status, staff_id, store_users!staff_id(full_name, role)')
@@ -294,7 +307,7 @@ const TaskManagement = () => {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-900 p-4">
+    <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Task Management</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {loading ? (

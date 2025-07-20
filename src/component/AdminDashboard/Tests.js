@@ -1,96 +1,103 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { format, parseISO, startOfDay, isAfter, subDays, set } from 'date-fns';
-import JsBarcode from 'jsbarcode';
-import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
 
-const Attendance = () => {
+const TaskManagement = () => {
   const [storeId, setStoreId] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [, setUserEmail] = useState(null);
-  const [isStoreOwner, setIsStoreOwner] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [user_email, setUserEmail] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const [, setCurrentUserId] = useState(null);
+  const [newTask, setNewTask] = useState({
+    task_name: '',
+    description: '',
+    status: 'Pending',
+    remarks: '',
+    staff_id: '',
+  });
   const [error, setError] = useState(null);
-  const [scanning, setScanning] = useState(false);
-  const [attendanceLogs, setAttendanceLogs] = useState([]);
-  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
-  const [barcodeError, setBarcodeError] = useState(false);
-  const webcamRef = useRef(null);
-  const codeReader = useRef(null);
-  const lastScanTime = useRef(Date.now());
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [modalRemarks, setModalRemarks] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
-  // Fetch user data
+  // Fetch user and store data using user_email
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         toast.dismiss();
         const user_email = localStorage.getItem('user_email');
-        console.log('User email from localStorage:', user_email);
-        if (!user_email) throw new Error('Please log in.');
 
+        console.log('localStorage user_email:', user_email ?? 'null/undefined');
+
+        if (!user_email) {
+          throw new Error('Missing user email. Please log in.');
+        }
         setUserEmail(user_email);
-        console.log('Querying stores for email:', user_email);
+
+        // Check if user is an admin by looking in the stores table
         const { data: storeData, error: storeError } = await supabase
           .from('stores')
           .select('id')
           .eq('email_address', user_email)
-          .maybeSingle();
-        if (storeError) {
-          console.error('Store query error:', storeError);
-          throw new Error(`Error checking store owner: ${storeError.message}`);
-        }
+          .single();
+        console.log('stores query result:', storeData, 'error:', storeError?.message);
 
-        if (storeData) {
-          console.log('User is store owner for store_id:', storeData.id);
-          setIsStoreOwner(true);
+        if (storeData && !storeError) {
+          // User found in stores table, they are an admin
+          setIsAdmin(true);
           setStoreId(storeData.id);
-          console.log('Final storeId:', storeData.id);
-          console.log('Querying store_users for email:', user_email);
-          const { data: userData, error: userError } = await supabase
+          // Fetch user_id from store_users for the admin (optional, depending on your schema)
+          const { data: adminUserData, error: adminUserError } = await supabase
             .from('store_users')
             .select('id')
             .eq('email_address', user_email)
             .eq('store_id', storeData.id)
-            .maybeSingle();
-          if (userError) {
-            console.error('User query error:', userError);
-            throw new Error(`Error fetching user data: ${userError.message}`);
-          }
-          if (userData) {
-            console.log('User data:', userData);
-            setUserId(userData.id);
+            .single();
+          if (adminUserError || !adminUserData) {
+            // If admin is not in store_users, use a fallback or generate a user_id if needed
+            // For simplicity, we'll assume admin doesn't need to be in store_users
+            setUserId(null); // Or set a default/fallback user_id if required
           } else {
-            console.log('No store_users entry found for store owner; using default userId.');
-            setUserId(0); // Default userId for store owners not in store_users
+            setUserId(adminUserData.id);
+            setCurrentUserId(adminUserData.id);
           }
         } else {
-          console.log('User is not store owner, querying store_users for email:', user_email);
-          const { data: userData, error: userError } = await supabase
+          // User is not an admin, check if they are a staff member in store_users
+          const { data: userData, error: userDataError } = await supabase
             .from('store_users')
             .select('id, store_id')
             .eq('email_address', user_email)
-            .maybeSingle();
-          if (userError) {
-            console.error('User query error:', userError);
-            throw new Error(`Error fetching user data: ${userError.message}`);
+            .single();
+          console.log('store_users query result:', userData, 'error:', userDataError?.message);
+
+          if (userDataError || !userData) {
+            throw new Error(`User not found in stores or store_users: ${userDataError?.message || 'No user data'}`);
           }
-          if (!userData) {
-            console.error('No user found for email:', user_email);
-            throw new Error('User not found in store_users.');
-          }
-          console.log('User data:', userData);
+          setIsStaff(true);
           setUserId(userData.id);
+          setCurrentUserId(userData.id);
           setStoreId(userData.store_id);
-          console.log('Final storeId:', userData.store_id);
+
+          // Validate store_id
+          const { data: storeValidation, error: storeValidationError } = await supabase
+            .from('stores')
+            .select('id')
+            .eq('id', userData.store_id)
+            .single();
+          if (storeValidationError || !storeValidation) {
+            throw new Error(`Invalid store ID (${userData.store_id}): ${storeValidationError?.message || 'Store not found'}`);
+          }
         }
       } catch (err) {
         console.error('fetchUserData error:', err);
-        toast.error(err.message, { toastId: 'auth-error', duration: 3000 });
+        toast.error(err.message, { toastId: 'data-error' });
         setError(err.message);
       } finally {
         setLoading(false);
@@ -100,269 +107,208 @@ const Attendance = () => {
     fetchUserData();
   }, []);
 
-  // Generate daily store barcode
+  // Fetch staff and tasks once storeId and userId are set
   useEffect(() => {
-    if (showBarcodeModal && storeId) {
-      const today = startOfDay(new Date());
-      const dateSuffix = format(today, 'yyyyMMdd');
-      const storeCode = `STORE-${storeId}-${dateSuffix}`;
-      const canvas = document.getElementById('store-barcode');
-      console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
-      if (canvas) {
-        try {
-          JsBarcode(canvas, storeCode, {
-            format: 'CODE128',
-            displayValue: true,
-            width: 3,
-            height: 80,
-            fontSize: 16,
-            background: '#ffffff',
-            lineColor: '#000000',
-            margin: 10,
-          });
-          console.log('Store barcode generated successfully for:', storeCode);
-          setBarcodeError(false);
-        } catch (err) {
-          console.error('JsBarcode error for store barcode:', err);
-          toast.error('Failed to generate store barcode.', { toastId: 'barcode-error', duration: 3000 });
-          setBarcodeError(true);
-        }
-      } else {
-        console.log('Store barcode canvas not found');
-        setBarcodeError(true);
-      }
-    }
-  }, [showBarcodeModal, storeId]);
+    const fetchStaffAndTasks = async () => {
+      if (!storeId) return; // Skip if storeId is not set
 
-  // Fetch attendance logs
-  useEffect(() => {
-    const fetchAttendanceLogs = async () => {
-      if (!storeId) return;
       try {
-        console.log('Fetching attendance logs for store_id:', storeId);
-        const { data, error } = await supabase
-          .from('attendance')
-          .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
-          .eq('store_id', storeId)
-          .order('timestamp', { ascending: false });
-        if (error) throw new Error(`Error fetching logs: ${error.message}`);
-        setAttendanceLogs(data || []);
-        console.log('Attendance logs:', data);
+        const { data: storeUsers, error: usersError } = await supabase
+          .from('store_users')
+          .select('id, full_name, role')
+          .eq('store_id', storeId);
+        if (usersError) {
+          throw new Error(`Error fetching staff: ${usersError.message}`);
+        }
+        console.log('staff query result:', storeUsers);
+        setStaff(storeUsers || []);
+
+        const query = supabase
+          .from('tasks')
+          .select('id, task_name, description, status, remarks, approval_status, staff_id, store_users!staff_id(full_name, role)')
+          .eq('store_id', storeId);
+        if (!isAdmin) {
+          query.eq('staff_id', userId);
+        }
+        const { data: tasksData, error: tasksError } = await query;
+        if (tasksError) {
+          throw new Error(`Error fetching tasks: ${tasksError.message}`);
+        }
+        console.log('tasks query result:', tasksData);
+        setTasks(tasksData || []);
       } catch (err) {
-        console.error('fetchAttendanceLogs error:', err);
-        toast.error(err.message, { toastId: 'logs-error', duration: 3000 });
+        console.error('fetchStaffAndTasks error:', err);
+        toast.error(err.message, { toastId: 'data-error' });
+        setError(err.message);
       }
     };
 
-    fetchAttendanceLogs();
-  }, [storeId]);
+    fetchStaffAndTasks();
+  }, [storeId, userId, isAdmin]);
 
-  // Delete single attendance log
-  const handleDeleteLog = async (logId) => {
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewTask((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Open modal with task details
+  const openModal = (task) => {
+    setSelectedTask(task);
+    setModalRemarks(task.remarks || '');
+    setIsModalOpen(true);
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedTask(null);
+    setModalRemarks('');
+  };
+
+  // Update task status or remarks
+  const handleTaskUpdate = async (taskId, updates) => {
     try {
-      console.log('Deleting attendance log:', logId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('id', logId)
+      toast.dismiss();
+      const query = supabase
+        .from('tasks')
+        .update(updates)
+        .eq('id', taskId)
         .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting log: ${error.message}`);
-      setAttendanceLogs((prev) => prev.filter((log) => log.id !== logId));
-      toast.success('Attendance log deleted.', { toastId: `delete-${logId}`, duration: 3000 });
+      if (!isAdmin) {
+        query.eq('staff_id', userId);
+      }
+      const { error } = await query;
+      if (error) {
+        throw new Error(`Error updating task: ${error.message}`);
+      }
+
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId ? { ...task, ...updates } : task
+        )
+      );
+      if (updates.status) {
+        toast.success(`Task status updated to "${updates.status}".`, { toastId: `status-updated-${taskId}` });
+      } else if (updates.remarks) {
+        toast.success('Remarks updated, pending admin approval.', { toastId: `remarks-updated-${taskId}` });
+        toast.success(`New remarks added to task "${tasks.find(t => t.id === taskId)?.task_name}" for approval.`, { toastId: `admin-notify-${taskId}` });
+      } else if (updates.approval_status) {
+        toast.success(`Remarks ${updates.approval_status} for task "${tasks.find(t => t.id === taskId)?.task_name}".`, { toastId: `approval-${taskId}` });
+      }
     } catch (err) {
-      console.error('handleDeleteLog error:', err);
-      toast.error(err.message, { toastId: 'delete-error', duration: 3000 });
+      console.error('handleTaskUpdate error:', err);
+      toast.error(err.message, { toastId: 'task-update-error' });
     }
   };
 
-  // Delete all attendance logs for store
-  const handleDeleteAllLogs = async () => {
+  // Approve or reject remarks (admin only)
+  const handleApproval = async (taskId, approvalStatus) => {
+    if (!isAdmin) {
+      toast.error('Only admins can approve remarks.', { toastId: 'not-admin' });
+      return;
+    }
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updates = { approval_status: approvalStatus };
+    if (approvalStatus === 'Approved' && task.status === 'In Progress') {
+      updates.status = 'Completed';
+    }
+    await handleTaskUpdate(taskId, updates);
+    closeModal();
+  };
+
+  // Delete task
+  const handleDeleteTask = async (taskId) => {
     try {
-      console.log('Deleting all attendance logs for store_id:', storeId);
-      const { error } = await supabase
-        .from('attendance')
+      toast.dismiss();
+      const query = supabase
+        .from('tasks')
         .delete()
+        .eq('id', taskId)
         .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
-      setAttendanceLogs([]);
-      toast.success('All attendance logs deleted.', { toastId: 'delete-all', duration: 3000 });
+      if (!isAdmin) {
+        query.eq('staff_id', userId);
+      }
+      const { error } = await query;
+      if (error) {
+        throw new Error(`Error deleting task: ${error.message}`);
+      }
+
+      setTasks((prev) => prev.filter((task) => task.id !== taskId));
+      toast.success('Task deleted successfully.', { toastId: `task-deleted-${taskId}` });
+      setShowDeleteConfirm(false);
+      setTaskToDelete(null);
     } catch (err) {
-      console.error('handleDeleteAllLogs error:', err);
-      toast.error(err.message, { toastId: 'delete-all-error', duration: 3000 });
+      console.error('handleDeleteTask error:', err);
+      toast.error(err.message, { toastId: 'task-delete-error' });
     }
   };
 
-  // Handle barcode scan
-  const handleScan = useCallback(
-    async (err, result) => {
-      if (result) {
-        try {
-          const scannedCode = result.text;
-          console.log('Scanned code:', scannedCode);
-
-          // Check if within clocking hours (6:00 AM - 9:00 PM WAT)
-          const now = new Date('2025-07-20T08:00:00+01:00'); // Mock 8:00 AM WAT for testing
-          const currentHour = now.getHours();
-          if (currentHour < 6 || currentHour >= 21) {
-            toast.error('Clocking is only allowed between 6:00 AM and 9:00 PM.', { toastId: 'time-error', duration: 3000 });
-            return;
-          }
-
-          // Validate barcode
-          const today = startOfDay(now);
-          const yesterday = subDays(today, 1);
-          const todaySuffix = format(today, 'yyyyMMdd');
-          const yesterdaySuffix = format(yesterday, 'yyyyMMdd');
-          const expectedCodeToday = `STORE-${storeId}-${todaySuffix}`;
-          const expectedCodeYesterday = `STORE-${storeId}-${yesterdaySuffix}`;
-          console.log('Expected codes:', { today: expectedCodeToday, yesterday: expectedCodeYesterday });
-
-          if (scannedCode !== expectedCodeToday && scannedCode !== expectedCodeYesterday) {
-            toast.error('Invalid or expired store barcode.', { toastId: 'invalid-code', duration: 3000 });
-            return;
-          }
-
-          // Verify user
-          let user = { id: userId, full_name: 'Store Owner' };
-          if (userId !== 0) {
-            const { data: userData, error: userError } = await supabase
-              .from('store_users')
-              .select('id, full_name')
-              .eq('id', userId)
-              .eq('store_id', storeId)
-              .single();
-            if (userError || !userData) {
-              console.error('User lookup error:', userError);
-              toast.error('User not authenticated.', { toastId: 'auth-error', duration: 3000 });
-              return;
-            }
-            user = userData;
-            console.log('Authenticated user:', user);
-          } else {
-            console.log('Using default user for store owner: id=0, full_name=Store Owner');
-          }
-
-          // Check last action and enforce clock-in if no clock-out by 9:00 PM
-          const { data: lastLog, error: logError } = await supabase
-            .from('attendance')
-            .select('action, timestamp')
-            .eq('user_id', user.id)
-            .eq('store_id', storeId)
-            .order('timestamp', { ascending: false })
-            .limit(1)
-            .single();
-          if (logError && logError.code !== 'PGRST116') {
-            throw new Error(`Error checking last log: ${logError.message}`);
-          }
-
-          let action = 'clock-in';
-          if (lastLog) {
-            const lastLogTime = parseISO(lastLog.timestamp);
-            const lastDayEnd = set(startOfDay(lastLogTime), { hours: 21, minutes: 0, seconds: 0 });
-            if (lastLog.action === 'clock-in' && isAfter(now, lastDayEnd)) {
-              console.log('No clock-out by 9:00 PM; forcing clock-in.');
-              action = 'clock-in';
-            } else {
-              action = lastLog.action === 'clock-in' ? 'clock-out' : 'clock-in';
-            }
-          }
-
-          const { data, error: insertError } = await supabase
-            .from('attendance')
-            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: now.toISOString() }])
-            .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
-            .single();
-          if (insertError) throw new Error(`Error logging attendance: ${insertError.message}`);
-
-          setAttendanceLogs((prev) => [data, ...prev]);
-          const greeting = now.getHours() < 12 ? 'Good morning' : 'Goodbye';
-          const firstName = user.full_name.split(' ')[0];
-          toast.success(
-            `${greeting}, ${firstName}! You've ${action === 'clock-in' ? 'clocked in' : 'clocked out'} at ${format(
-              now,
-              'PPP HH:mm'
-            )}.`,
-            {
-              toastId: `attendance-${data.id}`,
-              duration: 3000,
-            }
-          );
-        } catch (err) {
-          console.error('handleScan error:', err);
-          toast.error(`Error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
-        }
-      } else if (err && err.name !== 'NotFoundException') {
-        console.error('Scan error in callback:', err);
-        toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
-      } else if (err) {
-        console.log('Scan callback: Barcode not detected (NotFoundException), no toast displayed.');
-      }
-    },
-    [storeId, userId]
-  );
-
-  // Handle barcode scanning
-  useEffect(() => {
-    let currentCodeReader = null;
-    if (scanning) {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, ['CODE128']);
-      codeReader.current = new BrowserMultiFormatReader(hints);
-      currentCodeReader = codeReader.current;
-      console.log('Starting scanner with webcamRef:', webcamRef.current);
-      console.log('Webcam video element:', webcamRef.current?.video);
-      console.log('Scanner formats supported:', hints.get(DecodeHintType.POSSIBLE_FORMATS));
-      const scanCode = async () => {
-        try {
-          if (!webcamRef.current || !webcamRef.current.video) {
-            throw new Error('Webcam reference or video element not available.');
-          }
-          console.log('Requesting camera permissions...');
-          await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          console.log('Camera permissions granted.');
-          await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
-            if (Date.now() - lastScanTime.current < 500) return;
-            lastScanTime.current = Date.now();
-            console.log('Scanner callback triggered:', { result, err });
-            if (result) {
-              console.log('Barcode detected:', result.text);
-              setScanning(false);
-              currentCodeReader.reset();
-              handleScan(null, result);
-            }
-            if (err && err.name !== 'NotFoundException') {
-              console.error('Scan error:', err);
-              toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
-            } else if (err) {
-              console.log('Barcode not detected (NotFoundException), no toast displayed.');
-            }
-          });
-        } catch (err) {
-          console.error('Scan setup error:', err);
-          toast.error(`Failed to start scanner: ${err.message}`, { toastId: 'scan-setup-error', duration: 3000 });
-          setScanning(false);
-        }
-      };
-      scanCode();
+  // Create a new task (admin only)
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) {
+      toast.error('Only admins can create tasks.', { toastId: 'not-admin' });
+      return;
     }
-    return () => {
-      if (currentCodeReader) {
-        console.log('Resetting code reader.');
-        currentCodeReader.reset();
+    try {
+      toast.dismiss();
+      if (!newTask.task_name || !newTask.staff_id) {
+        toast.error('Please fill in all required fields.', { toastId: 'form-error' });
+        return;
       }
-    };
-  }, [scanning, handleScan]);
 
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = attendanceLogs.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(attendanceLogs.length / itemsPerPage);
+      // Fetch user_id for the creator (admin) if needed
+      let creatorId = userId;
+      if (!creatorId) {
+        const { data: creatorData, error: creatorError } = await supabase
+          .from('store_users')
+          .select('id')
+          .eq('email_address', user_email)
+          .eq('store_id', storeId)
+          .single();
+        if (creatorError && creatorError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          throw new Error(`Error fetching creator data: ${creatorError.message}`);
+        }
+        creatorId = creatorData?.id || null; // Allow null if admin is not in store_users
+      }
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert([
+          {
+            store_id: storeId,
+            staff_id: parseInt(newTask.staff_id),
+            task_name: newTask.task_name,
+            description: newTask.description,
+            status: newTask.status,
+            remarks: newTask.remarks,
+            approval_status: 'Pending',
+            created_by: creatorId, // May be null if admin is not in store_users
+          },
+        ])
+        .select('id, task_name, description, status, remarks, approval_status, staff_id, store_users!staff_id(full_name, role)')
+        .single();
+
+      if (error) {
+        throw new Error(`Error creating task: ${error.message}`);
+      }
+
+      setTasks((prev) => [...prev, data]);
+      toast.success(`Task "${newTask.task_name}" assigned to ${staff.find(s => s.id === parseInt(newTask.staff_id))?.full_name}.`, { toastId: 'task-created' });
+      toast.success(`You have been assigned a new task: "${newTask.task_name}"`, { toastId: `staff-notify-${newTask.staff_id}` });
+      setNewTask({ task_name: '', description: '', status: 'Pending', remarks: '', staff_id: '' });
+    } catch (err) {
+      console.error('handleCreateTask error:', err);
+      toast.error(err.message, { toastId: 'task-create-error' });
+    }
+  };
 
   return (
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
-      <Toaster position="top-center" />
-      <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
+      <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Task Management</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {loading ? (
         <div className="flex justify-center items-center">
@@ -370,174 +316,227 @@ const Attendance = () => {
         </div>
       ) : (
         <>
-          {(isStoreOwner || userId) && (
-            <div className="mb-4 flex gap-4">
+          {isAdmin && (
+            <form onSubmit={handleCreateTask} className="mb-8 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Task Name</label>
+                  <input
+                    type="text"
+                    name="task_name"
+                    value={newTask.task_name}
+                    onChange={handleInputChange}
+                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Assign to Staff</label>
+                  <select
+                    name="staff_id"
+                    value={newTask.staff_id}
+                    onChange={handleInputChange}
+                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    required
+                  >
+                    <option value="">Select Staff</option>
+                    {staff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name} ({s.role || 'N/A'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Status</label>
+                  <select
+                    name="status"
+                    value={newTask.status}
+                    onChange={handleInputChange}
+                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Description</label>
+                  <textarea
+                    name="description"
+                    value={newTask.description}
+                    onChange={handleInputChange}
+                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    rows="4"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Remarks</label>
+                  <textarea
+                    name="remarks"
+                    value={newTask.remarks}
+                    onChange={handleInputChange}
+                    className="mt-1 p-2 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    rows="2"
+                  />
+                </div>
+              </div>
               <button
-                onClick={() => setScanning(true)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300"
-                disabled={!storeId}
+                type="submit"
+                className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
-                Scan Store Barcode
+                Create Task
               </button>
-              {isStoreOwner && (
-                <button
-                  onClick={() => setShowBarcodeModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300"
-                  disabled={!storeId}
-                >
-                  Show Store Barcode
-                </button>
-              )}
-            </div>
+            </form>
           )}
-          {isStoreOwner && (
-            <button
-              onClick={handleDeleteAllLogs}
-              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || attendanceLogs.length === 0}
-            >
-              Delete All Logs
-            </button>
-          )}
-          {scanning && (
-            <div className="mb-4">
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: 'environment' }}
-                className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
-                width={300}
-                height={300}
-              />
-              <button
-                onClick={() => setScanning(false)}
-                className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Stop Scanning
-              </button>
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-indigo-100 dark:bg-indigo-800">
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
-                  {isStoreOwner && (
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {currentLogs.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={isStoreOwner ? 4 : 3}
-                      className="p-2 text-center text-gray-500 dark:text-gray-400"
-                    >
-                      No attendance logs found.
-                    </td>
+          {(isAdmin || isStaff) && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-indigo-100 dark:bg-indigo-800">
+                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Task Name</th>
+                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Assigned To</th>
+                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Approval Status</th>
+                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   </tr>
-                ) : (
-                  currentLogs.map((log) => (
-                    <tr
-                      key={log.id}
-                      className={`border-b dark:border-gray-700 ${
-                        log.action === 'clock-in' ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'
-                      }`}
-                    >
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
-                        {log.store_users?.full_name || 'Store Owner'}
+                </thead>
+                <tbody>
+                  {tasks.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="p-2 text-center text-gray-500 dark:text-gray-400">
+                        No tasks found.
                       </td>
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.action}</td>
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
-                        {format(parseISO(log.timestamp), 'PPP HH:mm')}
-                      </td>
-                      {isStoreOwner && (
-                        <td className="p-2">
+                    </tr>
+                  ) : (
+                    tasks.map((task) => (
+                      <tr key={task.id} className="border-b dark:border-gray-700">
+                        <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{task.task_name}</td>
+                        <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{task.store_users?.full_name}</td>
+                        <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{task.approval_status}</td>
+                        <td className="p-2 flex flex-col md:flex-row gap-2">
                           <button
-                            onClick={() => handleDeleteLog(log.id)}
+                            onClick={() => openModal(task)}
+                            className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => {
+                              setTaskToDelete(task.id);
+                              setShowDeleteConfirm(true);
+                            }}
                             className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
                           >
                             Delete
                           </button>
                         </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-center gap-4">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:bg-gray-300 dark:disabled:bg-gray-600"
-              >
-                Previous
-              </button>
-              <span className="text-indigo-800 dark:text-indigo-200">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:bg-gray-300 dark:disabled:bg-gray-600"
-              >
-                Next
-              </button>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
-          <Dialog open={showBarcodeModal} onClose={() => setShowBarcodeModal(false)} className="relative z-50">
+          {/* Modal for task details */}
+          <Dialog open={isModalOpen} onClose={closeModal} className="relative z-50">
             <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
             <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-800 p-6">
+              <DialogPanel className="w-full max-w-lg rounded-lg bg-white dark:bg-gray-800 p-6">
                 <DialogTitle className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
-                  Store Barcode
+                  Task Details: {selectedTask?.task_name}
                 </DialogTitle>
                 <button
-                  onClick={() => setShowBarcodeModal(false)}
+                  onClick={closeModal}
                   className="absolute top-2 right-2 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
                 >
                   ✕
                 </button>
-                <div className="mt-4 flex flex-col items-center space-y-4">
-                  {storeId ? (
-                    <>
-                      <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
-                        Store Barcode (ID: STORE-{storeId})
-                      </p>
-                      {barcodeError ? (
-                        <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(
-                            startOfDay(new Date()),
-                            'yyyyMMdd'
-                          )}&code=Code128`}
-                          alt="Store Barcode"
-                          className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
-                        />
-                      ) : (
-                        <canvas
-                          id="store-barcode"
-                          className="mx-auto w-full max-w-[250px] h-[100px] bg-white border-2 border-gray-400"
-                        />
-                      )}
-                      <p className="text-xs text-gray-500">Scan this barcode to clock in/out. Updates daily.</p>
-                    </>
-                  ) : (
-                    <p className="text-red-500 text-center">Store ID not found. Contact support.</p>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Staff Role</label>
+                    <p className="text-indigo-800 dark:text-indigo-200">{selectedTask?.store_users?.role || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Description</label>
+                    <p className="text-indigo-800 dark:text-indigo-200">{selectedTask?.description || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Status</label>
+                    <select
+                      value={selectedTask?.status || 'Pending'}
+                      onChange={(e) => handleTaskUpdate(selectedTask?.id, { status: e.target.value })}
+                      className="p-1 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      disabled={isAdmin ? (selectedTask?.approval_status !== 'Approved' && selectedTask?.status === 'In Progress') : (selectedTask?.status === 'Completed' || selectedTask?.approval_status !== 'Approved')}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      {isAdmin && <option value="Completed">Completed</option>}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-indigo-800 dark:text-indigo-200">Remarks</label>
+                    {isAdmin ? (
+                      <p className="text-indigo-800 dark:text-indigo-200">{selectedTask?.remarks || '-'}</p>
+                    ) : (
+                      <textarea
+                        value={modalRemarks}
+                        onChange={(e) => {
+                          setModalRemarks(e.target.value);
+                          handleTaskUpdate(selectedTask?.id, { remarks: e.target.value });
+                        }}
+                        className="p-1 w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        rows="4"
+                      />
+                    )}
+                  </div>
+                  {isAdmin && selectedTask?.remarks && selectedTask?.approval_status === 'Pending' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproval(selectedTask.id, 'Approved')}
+                        className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleApproval(selectedTask.id, 'Rejected')}
+                        className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
                   )}
                 </div>
                 <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="mt-6 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  onClick={closeModal}
+                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                 >
                   Close
                 </button>
+              </DialogPanel>
+            </div>
+          </Dialog>
+          {/* Delete Confirmation Modal */}
+          <Dialog open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} className="relative z-50">
+            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-800 p-6">
+                <DialogTitle className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
+                  Confirm Delete
+                </DialogTitle>
+                <p className="mt-2 text-indigo-800 dark:text-indigo-200">Are you sure you want to delete this task?</p>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => handleDeleteTask(taskToDelete)}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded-md hover:bg-gray-400 dark:hover:bg-gray-500"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </DialogPanel>
             </div>
           </Dialog>
@@ -547,4 +546,4 @@ const Attendance = () => {
   );
 };
 
-export default Attendance;
+export default TaskManagement;
