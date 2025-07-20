@@ -195,13 +195,12 @@ const Attendance = () => {
             return;
           }
 
-          // Check if within clocking hours (6:00 AM - 9:00 PM WAT)
-          const now = new Date();
-          const currentHour = now.getHours();
-          if (currentHour < 6 || currentHour >= 21) {
-            console.log('Clocking only allowed between 6:00 AM and 9:00 PM.');
-            return;
-          }
+        const now = new Date();
+const currentHour = now.getHours();
+if (currentHour >= 5 && currentHour < 21) {
+  console.log('Clocking only allowed between 6:00 AM and 5:00 AM the next day.');
+  return;
+}
 
           // Verify user
           let user = { id: userId, full_name: 'Store Owner' };
@@ -406,7 +405,7 @@ const Attendance = () => {
             <table className="min-w-full text-left border-collapse">
               <thead>
                 <tr className="bg-indigo-100 dark:bg-indigo-800">
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
+                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Staff</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
                   {isStoreOwner && (
