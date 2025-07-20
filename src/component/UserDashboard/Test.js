@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, parseISO } from 'date-fns';
 import JsBarcode from 'jsbarcode';
@@ -154,23 +154,6 @@ const Attendance = () => {
     fetchAttendanceLogs();
   }, [storeId]);
 
-  // Delete all attendance logs for store
-  const handleDeleteAllLogs = async () => {
-    try {
-      console.log('Deleting all attendance logs for store_id:', storeId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
-      setAttendanceLogs([]);
-      toast.success('All attendance logs deleted.', { toastId: 'delete-all-success' });
-    } catch (err) {
-      console.error('handleDeleteAllLogs error:', err);
-      toast.error(err.message, { toastId: 'delete-all-error' });
-    }
-  };
-
   // Handle barcode scan
   const handleScan = useCallback(
     async (err, result) => {
@@ -235,7 +218,7 @@ const Attendance = () => {
         }
       }
     },
-    [storeId, userId]
+    [storeId, userId, setAttendanceLogs]
   );
 
   // Handle barcode scanning
@@ -280,7 +263,6 @@ const Attendance = () => {
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      <Toaster position="top-center" />
       {loading ? (
         <div className="flex justify-center items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
@@ -306,15 +288,6 @@ const Attendance = () => {
                 </button>
               )}
             </div>
-          )}
-          {isStoreOwner && (
-            <button
-              onClick={handleDeleteAllLogs}
-              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || attendanceLogs.length === 0}
-            >
-              Delete All Logs
-            </button>
           )}
           {scanning && (
             <div className="mb-4">
