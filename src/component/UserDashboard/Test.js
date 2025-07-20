@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import toast, { Toaster } from 'react-hot-toast';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, parseISO, startOfDay, isAfter, subDays, set } from 'date-fns';
 import JsBarcode from 'jsbarcode';
@@ -28,7 +27,6 @@ const Attendance = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        toast.dismiss();
         const user_email = localStorage.getItem('user_email');
         console.log('User email from localStorage:', user_email);
         if (!user_email) throw new Error('Please log in.');
@@ -90,7 +88,6 @@ const Attendance = () => {
         }
       } catch (err) {
         console.error('fetchUserData error:', err);
-        toast.error(err.message, { toastId: 'auth-error', duration: 3000 });
         setError(err.message);
       } finally {
         setLoading(false);
@@ -124,7 +121,6 @@ const Attendance = () => {
           setBarcodeError(false);
         } catch (err) {
           console.error('JsBarcode error for store barcode:', err);
-          toast.error('Failed to generate store barcode.', { toastId: 'barcode-error', duration: 3000 });
           setBarcodeError(true);
         }
       } else {
@@ -150,7 +146,6 @@ const Attendance = () => {
         console.log('Attendance logs:', data);
       } catch (err) {
         console.error('fetchAttendanceLogs error:', err);
-        toast.error(err.message, { toastId: 'logs-error', duration: 3000 });
       }
     };
 
@@ -168,10 +163,9 @@ const Attendance = () => {
         .eq('store_id', storeId);
       if (error) throw new Error(`Error deleting log: ${error.message}`);
       setAttendanceLogs((prev) => prev.filter((log) => log.id !== logId));
-      toast.success('Attendance log deleted.', { toastId: `delete-${logId}`, duration: 3000 });
+      console.log('Attendance log deleted:', logId);
     } catch (err) {
       console.error('handleDeleteLog error:', err);
-      toast.error(err.message, { toastId: 'delete-error', duration: 3000 });
     }
   };
 
@@ -185,10 +179,9 @@ const Attendance = () => {
         .eq('store_id', storeId);
       if (error) throw new Error(`Error deleting all logs: ${error.message}`);
       setAttendanceLogs([]);
-      toast.success('All attendance logs deleted.', { toastId: 'delete-all', duration: 3000 });
+      console.log('All attendance logs deleted for store_id:', storeId);
     } catch (err) {
       console.error('handleDeleteAllLogs error:', err);
-      toast.error(err.message, { toastId: 'delete-all-error', duration: 3000 });
     }
   };
 
@@ -204,7 +197,7 @@ const Attendance = () => {
           const now = new Date('2025-07-20T08:00:00+01:00'); // Mock 8:00 AM WAT for testing
           const currentHour = now.getHours();
           if (currentHour < 6 || currentHour >= 21) {
-            toast.error('Clocking is only allowed between 6:00 AM and 9:00 PM.', { toastId: 'time-error', duration: 3000 });
+            console.log('Clocking rejected: Outside 6:00 AM - 9:00 PM window');
             return;
           }
 
@@ -218,7 +211,7 @@ const Attendance = () => {
           console.log('Expected codes:', { today: expectedCodeToday, yesterday: expectedCodeYesterday });
 
           if (scannedCode !== expectedCodeToday && scannedCode !== expectedCodeYesterday) {
-            toast.error('Invalid or expired store barcode.', { toastId: 'invalid-code', duration: 3000 });
+            console.log('Invalid or expired store barcode:', scannedCode);
             return;
           }
 
@@ -233,7 +226,6 @@ const Attendance = () => {
               .single();
             if (userError || !userData) {
               console.error('User lookup error:', userError);
-              toast.error('User not authenticated.', { toastId: 'auth-error', duration: 3000 });
               return;
             }
             user = userData;
@@ -275,27 +267,15 @@ const Attendance = () => {
           if (insertError) throw new Error(`Error logging attendance: ${insertError.message}`);
 
           setAttendanceLogs((prev) => [data, ...prev]);
-          const greeting = now.getHours() < 12 ? 'Good morning' : 'Goodbye';
           const firstName = user.full_name.split(' ')[0];
-          toast.success(
-            `${greeting}, ${firstName}! You've ${action === 'clock-in' ? 'clocked in' : 'clocked out'} at ${format(
-              now,
-              'PPP HH:mm'
-            )}.`,
-            {
-              toastId: `attendance-${data.id}`,
-              duration: 3000,
-            }
-          );
+          console.log('Clock-in/out recorded:', { user: firstName, action, time: format(now, 'PPP HH:mm') });
         } catch (err) {
           console.error('handleScan error:', err);
-          toast.error(`Error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
         }
       } else if (err && err.name !== 'NotFoundException') {
         console.error('Scan error in callback:', err);
-        toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
       } else if (err) {
-        console.log('Scan callback: Barcode not detected (NotFoundException), no toast displayed.');
+        console.log('Scan callback: Barcode not detected (NotFoundException).');
       }
     },
     [storeId, userId]
@@ -310,23 +290,22 @@ const Attendance = () => {
       codeReader.current = new BrowserMultiFormatReader(hints);
       currentCodeReader = codeReader.current;
       console.log('Starting scanner with webcamRef:', webcamRef.current);
-      console.log('Webcam video element:', webcamRef.current?.video);
+      console.log('Webcam state:', { ready: !!webcamRef.current, video: !!webcamRef.current?.video });
       console.log('Scanner formats supported:', hints.get(DecodeHintType.POSSIBLE_FORMATS));
       const scanCode = async () => {
         try {
           if (!webcamRef.current || !webcamRef.current.video) {
             console.error('Webcam reference or video element not available.');
-            toast.error('Webcam not available.', { toastId: 'webcam-error', duration: 3000 });
             setScanning(false);
             return;
           }
-          console.log('Requesting camera permissions...');
+          console.log('Camera permissions requested for facingMode: environment');
           await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
           console.log('Camera permissions granted.');
           await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
             if (Date.now() - lastScanTime.current < 500) return;
             lastScanTime.current = Date.now();
-            console.log('Scanner callback triggered:', { result, err });
+            console.log('Scanner callback triggered:', { result: result?.text, err: err?.name });
             if (result) {
               console.log('Barcode detected:', result.text);
               setScanning(false);
@@ -335,14 +314,12 @@ const Attendance = () => {
             }
             if (err && err.name !== 'NotFoundException') {
               console.error('Scan error:', err);
-              toast.error(`Scanning error: ${err.message}`, { toastId: 'scan-error', duration: 3000 });
             } else if (err) {
-              console.log('Barcode not detected (NotFoundException), no toast displayed.');
+              console.log('Barcode not detected (NotFoundException).');
             }
           });
         } catch (err) {
           console.error('Scan setup error:', err);
-          toast.error(`Failed to start scanner: ${err.message}`, { toastId: 'scan-setup-error', duration: 3000 });
           setScanning(false);
         }
       };
@@ -364,7 +341,6 @@ const Attendance = () => {
 
   return (
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
-      <Toaster position="top-center" />
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {loading ? (
