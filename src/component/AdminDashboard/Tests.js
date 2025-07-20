@@ -21,7 +21,7 @@ const Attendance = () => {
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
   const [, setConfirmingLogId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 50;
   const [barcodeError, setBarcodeError] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionFilter, setActionFilter] = useState('all');
@@ -263,54 +263,48 @@ const Attendance = () => {
         <div className="flex justify-center items-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"/></div>
       ) : (
         <>
-          {(isStoreOwner || userId) && (
-            <div className="mb-4 flex gap-4">
-              <button onClick={() => setScanning(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" disabled={!storeId}>Scan Store Barcode</button>
-              {isStoreOwner && <button onClick={() => setShowBarcodeModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700" disabled={!storeId}>Show Store Barcode</button>}
-            </div>
-          )}
-          {isStoreOwner && <button onClick={() => setShowConfirmDeleteAll(true)} className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700" disabled={!attendanceLogs.length}>Delete All Logs</button>}
+        {(isStoreOwner || userId) && (
+  <div className="mb-4 flex flex-col md:flex-row gap-2 md:gap-4">
+    <button
+      onClick={() => setScanning(true)}
+      disabled={!storeId}
+      className="w-full md:w-auto px-3 py-1.5 bg-indigo-600 text-white rounded-md text-xs md:text-sm hover:bg-indigo-700 disabled:opacity-50"
+    >
+      Scan Store Barcode
+    </button>
+    {isStoreOwner && (
+      <button
+        onClick={() => setShowBarcodeModal(true)}
+        disabled={!storeId}
+        className="w-full md:w-auto px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs md:text-sm hover:bg-blue-700 disabled:opacity-50"
+      >
+        Show Store Barcode
+      </button>
+    )}
+  </div>
+)}
 
-          {/* Search and Filter Section */}
-          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search by user name or action</label>
-                <input
-                  type="text"
-                  placeholder="Search attendance logs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Filter by action</label>
-                <select
-                  value={actionFilter}
-                  onChange={(e) => setActionFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                >
-                  <option value="all">All Actions</option>
-                  <option value="clock-in">Clock In</option>
-                  <option value="clock-out">Clock Out</option>
-                </select>
-              </div>
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-              >
-                Clear Filters
-              </button>
-            </div>
-            {(searchTerm || actionFilter !== 'all') && (
-              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Showing {filteredLogs.length} of {attendanceLogs.length} logs
-              </div>
-            )}
-          </div>
+     {scanning && (
+  <div className="mb-4 flex flex-col items-center gap-2">
+    <Webcam
+      audio={false}
+      ref={webcamRef}
+      screenshotFormat="image/jpeg"
+      videoConstraints={{ facingMode: { ideal: 'environment' } }}
+      className="rounded-md border"
+      width={250}
+      height={250}
+    />
+    <button
+      onClick={() => setScanning(false)}
+      className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs md:text-sm hover:bg-red-700"
+    >
+      Stop Scanning
+    </button>
+  </div>
+)}
 
-          {/* Confirm Delete All Dialog */}
+    {/* Confirm Delete All Dialog */}
           <Dialog open={showConfirmDeleteAll} onClose={() => setShowConfirmDeleteAll(false)} className="relative z-50">
             <div className="fixed inset-0 bg-black/30"/>
             <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -325,111 +319,152 @@ const Attendance = () => {
             </div>
           </Dialog>
 
-          {/* Scanning */}
-          {scanning && (
-            <div className="mb-4">
-              <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" videoConstraints={{ facingMode: { ideal: 'environment' } }} className="mx-auto rounded-md border" width={300} height={300}/>
-              <button onClick={() => setScanning(false)} className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Stop Scanning</button>
-            </div>
-          )}
+        
 
-          {/* Logs Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left border-collapse bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow">
-              <thead>
-                <tr className="bg-indigo-100 dark:bg-indigo-800">
-                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">User</th>
-                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Action</th>
-                  <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Timestamp</th>
-                  {isStoreOwner && <th className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {currentLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={isStoreOwner ? 4 : 3} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                      {filteredLogs.length === 0 && attendanceLogs.length > 0 ? 'No logs match your search criteria.' : 'No attendance logs found.'}
-                    </td>
-                  </tr>
-                ) : (
-                  currentLogs.map((log, index) => (
-                    <tr key={log.id} className={`${index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-800'} hover:bg-gray-100 dark:hover:bg-gray-700`}>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                        {log.store_users?.full_name || 'Unknown User'}
-                      </td>
-                      <td className="px-4 py-3 text-sm border-b border-gray-200 dark:border-gray-700">
-                        <span className={getActionColorClass(log.action)}>
-                          {log.action === 'clock-in' ? 'Clock In' : 'Clock Out'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                        {format(parseISO(log.timestamp), 'PPP HH:mm')}
-                      </td>
-                      {isStoreOwner && (
-                        <td className="px-4 py-3 text-sm border-b border-gray-200 dark:border-gray-700">
-                          <button 
-                            onClick={() => handleDeleteLog(log.id)} 
-                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+  <div className="flex flex-col md:flex-row md:items-end md:gap-4 gap-2">
+    <div className="flex-1">
+      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Search
+      </label>
+      <input
+        type="text"
+        placeholder="User name or action"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      />
+    </div>
+    <div className="flex-1 md:w-auto">
+      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Action
+      </label>
+      <select
+        value={actionFilter}
+        onChange={(e) => setActionFilter(e.target.value)}
+        className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      >
+        <option value="all">All</option>
+        <option value="clock-in">Clock In</option>
+        <option value="clock-out">Clock Out</option>
+      </select>
+    </div>
+    <div className="flex-1 md:w-auto">
+      <button
+        onClick={clearFilters}
+        className="w-full md:w-auto px-2 py-1 bg-gray-600 text-white rounded-md text-xs hover:bg-gray-700"
+      >
+        Clear
+      </button>
+    </div>
+  </div>
+  {(searchTerm || actionFilter !== 'all') && (
+    <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+      Showing {filteredLogs.length} of {attendanceLogs.length} logs
+    </div>
+  )}
+</div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {first + 1} to {Math.min(last, filteredLogs.length)} of {filteredLogs.length} logs
-              </div>
-              <div className="flex items-center gap-2">
+
+      <div className="overflow-x-auto">
+  <table className="min-w-full text-left border-collapse bg-white dark:bg-gray-800 rounded-lg shadow text-xs md:text-sm">
+    <thead>
+      <tr className="bg-indigo-100 dark:bg-indigo-800">
+        <th className="px-2 py-2 md:px-4 md:py-3 font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">
+          User
+        </th>
+        <th className="px-2 py-2 md:px-4 md:py-3 font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">
+          Action
+        </th>
+        <th className="px-2 py-2 md:px-4 md:py-3 font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">
+          Timestamp
+        </th>
+        {isStoreOwner && (
+          <th className="px-2 py-2 md:px-4 md:py-3 font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700">
+            Actions
+          </th>
+        )}
+      </tr>
+    </thead>
+    <tbody>
+      {currentLogs.length === 0 ? (
+        <tr>
+          <td
+            colSpan={isStoreOwner ? 4 : 3}
+            className="px-2 py-6 md:px-4 md:py-8 text-center text-gray-500 dark:text-gray-400 text-xs md:text-sm"
+          >
+            {filteredLogs.length === 0 && attendanceLogs.length > 0
+              ? 'No logs match your search criteria.'
+              : 'No attendance logs found.'}
+          </td>
+        </tr>
+      ) : (
+        currentLogs.map((log, index) => (
+          <tr
+            key={log.id}
+            className={`${
+              index % 2 === 0
+                ? 'bg-gray-50 dark:bg-gray-900'
+                : 'bg-white dark:bg-gray-800'
+            } hover:bg-gray-100 dark:hover:bg-gray-700`}
+          >
+            <td className="px-2 py-2 md:px-4 md:py-3 text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+              {log.store_users?.full_name || 'Unknown User'}
+            </td>
+            <td className="px-2 py-2 md:px-4 md:py-3 border-b border-gray-200 dark:border-gray-700">
+              <span className={`${getActionColorClass(log.action)} text-xs md:text-sm`}>
+                {log.action === 'clock-in' ? 'Clock In' : 'Clock Out'}
+              </span>
+            </td>
+            <td className="px-2 py-2 md:px-4 md:py-3 text-gray-900 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+              {format(parseISO(log.timestamp), 'PPP HH:mm')}
+            </td>
+            {isStoreOwner && (
+              <td className="px-2 py-2 md:px-4 md:py-3 border-b border-gray-200 dark:border-gray-700">
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleDeleteLog(log.id)}
+                  className="w-full md:w-auto px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
                 >
-                  Previous
+                  Delete
                 </button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                    if (totalPages <= 7 || pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-2 text-sm rounded-md ${
-                            currentPage === pageNum
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                      return <span key={pageNum} className="px-2 text-gray-400">...</span>;
-                    }
-                    return null;
-                  })}
-                </div>
-                
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+              </td>
+            )}
+          </tr>
+        ))
+      )}
+    </tbody>
+  </table>
+</div>
+
+
+       {totalPages > 1 && (
+  <div className="mt-2 flex flex-col md:flex-row md:items-center md:justify-between text-xs">
+    <div className="text-gray-600 dark:text-gray-400 mb-2 md:mb-0 text-center">
+      Showing {first + 1} to {Math.min(last, filteredLogs.length)} of {filteredLogs.length} logs
+    </div>
+    <div className="flex items-center gap-1 justify-center">
+      <button
+        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+        disabled={currentPage === 1}
+        className="px-2 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Prev
+      </button>
+
+      <span className="px-2 py-1 bg-indigo-600 text-white rounded-md">
+        {currentPage}
+      </span>
+
+      <button
+        onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+        disabled={currentPage === totalPages}
+        className="px-2 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
 
           {/* Barcode Modal */}
           <Dialog open={showBarcodeModal} onClose={() => setShowBarcodeModal(false)} className="relative z-50">
