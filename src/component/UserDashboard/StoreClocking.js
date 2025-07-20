@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, parseISO } from 'date-fns';
 import JsBarcode from 'jsbarcode';
@@ -11,8 +11,7 @@ const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
   const [userId, setUserId] = useState(null);
   const [, setUserEmail] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
+  const [isStoreOwner, setIsStoreOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -39,39 +38,51 @@ const Attendance = () => {
           .from('stores')
           .select('id')
           .eq('email_address', user_email)
-          .single();
+          .maybeSingle();
+        if (storeError) {
+          console.error('Store query error:', storeError);
+          throw new Error(`Error checking store owner: ${storeError.message}`);
+        }
 
-        if (storeData && !storeError) {
-          setIsAdmin(true);
+        if (storeData) {
+          console.log('User is store owner for store_id:', storeData.id);
+          setIsStoreOwner(true);
           setStoreId(storeData.id);
-          console.log('Admin found, store_id:', storeData.id);
-          console.log('Querying store_users for email:', user_email, 'store_id:', storeData.id);
-          const { data: adminData, error: adminError } = await supabase
-            .from('store_users')
-            .select('id, email_address')
-            .eq('email_address', user_email)
-            .eq('store_id', storeData.id)
-            .single();
-          if (adminError) {
-            console.error('Admin query error:', adminError);
-            throw new Error(`Admin not found: ${adminError.message}`);
-          }
-          console.log('Admin data:', adminData);
-          setUserId(adminData.id);
           console.log('Final storeId:', storeData.id);
-        } else {
-          console.log('Not an admin, querying store_users for email:', user_email);
+          console.log('Querying store_users for email:', user_email);
           const { data: userData, error: userError } = await supabase
             .from('store_users')
-            .select('id, store_id, email_address')
+            .select('id')
             .eq('email_address', user_email)
-            .single();
+            .eq('store_id', storeData.id)
+            .maybeSingle();
           if (userError) {
             console.error('User query error:', userError);
-            throw new Error(`User not found: ${userError.message}`);
+            throw new Error(`Error fetching user data: ${userError.message}`);
           }
-          console.log('Staff data:', userData);
-          setIsStaff(true);
+          if (userData) {
+            console.log('User data:', userData);
+            setUserId(userData.id);
+          } else {
+            console.log('No store_users entry found for store owner; using default userId.');
+            setUserId(0); // Default userId for store owners not in store_users
+          }
+        } else {
+          console.log('User is not store owner, querying store_users for email:', user_email);
+          const { data: userData, error: userError } = await supabase
+            .from('store_users')
+            .select('id, store_id')
+            .eq('email_address', user_email)
+            .maybeSingle();
+          if (userError) {
+            console.error('User query error:', userError);
+            throw new Error(`Error fetching user data: ${userError.message}`);
+          }
+          if (!userData) {
+            console.error('No user found for email:', user_email);
+            throw new Error('User not found in store_users.');
+          }
+          console.log('User data:', userData);
           setUserId(userData.id);
           setStoreId(userData.store_id);
           console.log('Final storeId:', userData.store_id);
@@ -143,6 +154,23 @@ const Attendance = () => {
     fetchAttendanceLogs();
   }, [storeId]);
 
+  // Delete all attendance logs for store
+  const handleDeleteAllLogs = async () => {
+    try {
+      console.log('Deleting all attendance logs for store_id:', storeId);
+      const { error } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('store_id', storeId);
+      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
+      setAttendanceLogs([]);
+      toast.success('All attendance logs deleted.', { toastId: 'delete-all-success' });
+    } catch (err) {
+      console.error('handleDeleteAllLogs error:', err);
+      toast.error(err.message, { toastId: 'delete-all-error' });
+    }
+  };
+
   // Handle barcode scan
   const handleScan = useCallback(
     async (err, result) => {
@@ -157,18 +185,24 @@ const Attendance = () => {
           }
 
           // Verify user
-          const { data: user, error: userError } = await supabase
-            .from('store_users')
-            .select('id, full_name')
-            .eq('id', userId)
-            .eq('store_id', storeId)
-            .single();
-          if (userError || !user) {
-            console.error('User lookup error:', userError);
-            toast.error('User not authenticated.', { toastId: 'auth-error' });
-            return;
+          let user = { id: userId, full_name: 'Store Owner' };
+          if (userId !== 0) {
+            const { data: userData, error: userError } = await supabase
+              .from('store_users')
+              .select('id, full_name')
+              .eq('id', userId)
+              .eq('store_id', storeId)
+              .single();
+            if (userError || !userData) {
+              console.error('User lookup error:', userError);
+              toast.error('User not authenticated.', { toastId: 'auth-error' });
+              return;
+            }
+            user = userData;
+            console.log('Authenticated user:', user);
+          } else {
+            console.log('Using default user for store owner: id=0, full_name=Store Owner');
           }
-          console.log('Authenticated user:', user);
 
           // Check last action
           const { data: lastLog, error: logError } = await supabase
@@ -201,7 +235,7 @@ const Attendance = () => {
         }
       }
     },
-    [storeId, userId, setAttendanceLogs]
+    [storeId, userId]
   );
 
   // Handle barcode scanning
@@ -246,22 +280,23 @@ const Attendance = () => {
     <div className="w-full bg-white dark:bg-gray-900 p-4 mt-24">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
+      <Toaster position="top-center" />
       {loading ? (
         <div className="flex justify-center items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
         <>
-          {(isAdmin || isStaff) && (
+          {(isStoreOwner || userId) && (
             <div className="mb-4 flex gap-4">
               <button
                 onClick={() => setScanning(true)}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300"
-                disabled={!userId}
+                disabled={!storeId}
               >
                 Scan Store Barcode
               </button>
-              {isAdmin && (
+              {isStoreOwner && (
                 <button
                   onClick={() => setShowBarcodeModal(true)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300"
@@ -271,6 +306,15 @@ const Attendance = () => {
                 </button>
               )}
             </div>
+          )}
+          {isStoreOwner && (
+            <button
+              onClick={handleDeleteAllLogs}
+              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
+              disabled={!storeId || attendanceLogs.length === 0}
+            >
+              Delete All Logs
+            </button>
           )}
           {scanning && (
             <div className="mb-4">
@@ -315,7 +359,7 @@ const Attendance = () => {
                         log.action === 'clock-in' ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'
                       }`}
                     >
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.store_users?.full_name}</td>
+                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.store_users?.full_name || 'Store Owner'}</td>
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.action}</td>
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
                         {format(parseISO(log.timestamp), 'PPP HH:mm')}
@@ -327,7 +371,7 @@ const Attendance = () => {
             </table>
           </div>
           {totalPages > 1 && (
-            <div className="mt-4 flex justify-center gap-2">
+            <div className="mt-4 flex justify-center gap-4">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
@@ -381,7 +425,7 @@ const Attendance = () => {
                       <p className="text-xs text-gray-500">Scan this barcode to clock in/out.</p>
                     </>
                   ) : (
-                    <p className="text-red-500">Store ID not found. Please check your store settings.</p>
+                    <p className="text-red-500 text-center">Store ID not found. Contact support.</p>
                   )}
                 </div>
                 <button
