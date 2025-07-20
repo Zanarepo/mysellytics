@@ -315,7 +315,10 @@ const Attendance = () => {
       const scanCode = async () => {
         try {
           if (!webcamRef.current || !webcamRef.current.video) {
-            throw new Error('Webcam reference or video element not available.');
+            console.error('Webcam reference or video element not available.');
+            toast.error('Webcam not available.', { toastId: 'webcam-error', duration: 3000 });
+            setScanning(false);
+            return;
           }
           console.log('Requesting camera permissions...');
           await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
