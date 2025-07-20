@@ -38,73 +38,81 @@ const ScheduleManagement = () => {
   const [itemsPerPage] = useState(5);
 
   // Fetch user and store data
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        toast.dismiss();
-        const user_email = localStorage.getItem('user_email');
-        console.log('localStorage user_email:', user_email ?? 'null/undefined');
+ useEffect(() => {
+  const fetchUserData = async () => {
+    try {
+      toast.dismiss();
+      const user_email = localStorage.getItem('user_email');
+      console.log('localStorage user_email:', user_email ?? 'null/undefined');
 
-        if (!user_email) {
-          throw new Error('Missing user email. Please log in.');
-        }
-        setUserEmail(user_email);
+      if (!user_email) {
+        throw new Error('Missing user email. Please log in.');
+      }
+      setUserEmail(user_email);
 
-        const { data: storeData, error: storeError } = await supabase
-          .from('stores')
+      // Check if user is a store owner (admin)
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('email_address', user_email)
+        .maybeSingle();
+      console.log('stores query result:', storeData, 'error:', storeError?.message);
+
+      if (storeData) {
+        // User is an admin
+        setIsAdmin(true);
+        setStoreId(storeData.id);
+        // Check if admin has a store_users entry (optional)
+        const { data: adminUserData, error: adminUserError } = await supabase
+          .from('store_users')
           .select('id')
           .eq('email_address', user_email)
-          .single();
-        console.log('stores query result:', storeData, 'error:', storeError?.message);
-
-        if (storeData && !storeError) {
-          setIsAdmin(true);
-          setStoreId(storeData.id);
-          const { data: adminUserData, error: adminUserError } = await supabase
-            .from('store_users')
-            .select('id')
-            .eq('email_address', user_email)
-            .eq('store_id', storeData.id)
-            .single();
-          if (adminUserError || !adminUserData) {
-            throw new Error(`Admin user not found in store_users: ${adminUserError?.message || 'No admin user data'}`);
-          }
-          setUserId(adminUserData.id);
-        } else {
-          const { data: userData, error: userDataError } = await supabase
-            .from('store_users')
-            .select('id, store_id')
-            .eq('email_address', user_email)
-            .single();
-          console.log('store_users query result:', userData, 'error:', userDataError?.message);
-
-          if (userDataError || !userData) {
-            throw new Error(`User not found in stores or store_users: ${userDataError?.message || 'No user data'}`);
-          }
-          setIsStaff(true);
-          setUserId(userData.id);
-          setStoreId(userData.store_id);
-
-          const { data: storeValidation, error: storeValidationError } = await supabase
-            .from('stores')
-            .select('id')
-            .eq('id', userData.store_id)
-            .single();
-          if (storeValidationError || !storeValidation) {
-            throw new Error(`Invalid store ID (${userData.store_id}): ${storeValidationError?.message || 'Store not found'}`);
-          }
+          .eq('store_id', storeData.id)
+          .maybeSingle();
+        if (adminUserError) {
+          throw new Error(`Error checking admin user in store_users: ${adminUserError.message}`);
         }
-      } catch (err) {
-        console.error('fetchUserData error:', err);
-        toast.error(err.message, { toastId: 'data-error' });
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+        if (adminUserData) {
+          setUserId(adminUserData.id); // Set userId if admin has a store_users entry
+        }
+        // Note: userId may remain null for admins without a store_users entry
+      } else {
+        // Regular store user (staff)
+        const { data: userData, error: userDataError } = await supabase
+          .from('store_users')
+          .select('id, store_id')
+          .eq('email_address', user_email)
+          .maybeSingle();
+        console.log('store_users query result:', userData, 'error:', userDataError?.message);
 
-    fetchUserData();
-  }, []);
+        if (userDataError || !userData) {
+          throw new Error(`User not found in stores or store_users: ${userDataError?.message || 'No user data'}`);
+        }
+        setIsStaff(true);
+        setUserId(userData.id);
+        setStoreId(userData.store_id);
+
+        const { data: storeValidation, error: storeValidationError } = await supabase
+          .from('stores')
+          .select('id')
+          .eq('id', userData.store_id)
+          .single();
+        if (storeValidationError || !storeValidation) {
+          throw new Error(`Invalid store ID (${userData.store_id}): ${storeValidationError?.message || 'Store not found'}`);
+        }
+      }
+    } catch (err) {
+      console.error('fetchUserData error:', err);
+      toast.error(err.message, { toastId: 'data-error' });
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUserData();
+}, []);
+
 
   // Fetch staff and schedules
   useEffect(() => {
