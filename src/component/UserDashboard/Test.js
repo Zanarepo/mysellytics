@@ -4,7 +4,7 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, parseISO, startOfDay, set, isAfter } from 'date-fns';
 import JsBarcode from 'jsbarcode';
 import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/library';
+import { BrowserMultiFormatReader } from '@zxing/library';
 
 const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
@@ -17,7 +17,7 @@ const Attendance = () => {
   const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
+  const [itemsPerPage] = useState(30);
   const [barcodeError, setBarcodeError] = useState(false);
   const webcamRef = useRef(null);
   const codeReader = useRef(new BrowserMultiFormatReader());
@@ -99,8 +99,7 @@ const Attendance = () => {
   // Generate store barcode when modal opens
   useEffect(() => {
     if (showBarcodeModal && storeId) {
-      const today = format(new Date(), 'd'); // Day of year (1–366)
-      const storeCode = `STORE-${storeId}-${today}`;
+      const storeCode = `STORE-${storeId}`;
       const canvas = document.getElementById('store-barcode');
       console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
       if (canvas) {
@@ -108,9 +107,9 @@ const Attendance = () => {
           JsBarcode(canvas, storeCode, {
             format: 'CODE128',
             displayValue: true,
-            width: 4,
-            height: 100,
-            fontSize: 18,
+            width: 3,
+            height: 80,
+            fontSize: 16,
             background: '#ffffff',
             lineColor: '#000000',
             margin: 10,
@@ -190,15 +189,12 @@ const Attendance = () => {
         try {
           const scannedCode = result.text;
           console.log('Scanned code:', scannedCode);
-          const scannedParts = scannedCode.split('-');
-          const expectedPrefix = `STORE-${storeId}`;
-          if (scannedParts.length < 2 || !scannedCode.startsWith(expectedPrefix)) {
+          const expectedCode = `STORE-${storeId}`;
+          if (scannedCode !== expectedCode) {
             console.log('Invalid store barcode:', scannedCode);
             return;
           }
-
-          // Check if within clocking hours (6:00 AM - 9:00 PM WAT)
-     const now = new Date();
+const now = new Date();
 const currentHour = now.getHours();
 if (currentHour < 6 || currentHour >= 21) {
   console.log('Clocking only allowed between 6:00 AM and 9:00 PM.');
@@ -271,9 +267,6 @@ if (currentHour < 6 || currentHour >= 21) {
     let currentCodeReader = null;
     if (scanning) {
       currentCodeReader = codeReader.current;
-      const hints = new Map();
-      hints.set(BarcodeFormat.CODE_128, true);
-      currentCodeReader.timeBetweenDecodingAttempts = 100;
       const scanCode = async () => {
         try {
           if (!webcamRef.current || !webcamRef.current.video) {
@@ -282,35 +275,24 @@ if (currentHour < 6 || currentHour >= 21) {
             return;
           }
           let selectedDeviceId = null;
-          let resolution = { width: 1280, height: 720 };
           let attempts = 0;
           const maxAttempts = 3;
           while (attempts < maxAttempts) {
             try {
-              console.log('Camera permissions requested for facingMode: environment, resolution:', resolution);
+              console.log('Camera permissions requested for facingMode: environment');
               const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', ...resolution }
+                video: { facingMode: 'environment', width: 640, height: 480 }
               });
               if (webcamRef.current?.video) {
                 webcamRef.current.video.srcObject = stream;
                 console.log('Video stream assigned:', stream.getVideoTracks()[0].getSettings());
               }
               selectedDeviceId = stream.getVideoTracks()[0].getSettings().deviceId;
-              const capabilities = stream.getVideoTracks()[0].getCapabilities();
-              if (capabilities.brightness && capabilities.brightness.max < 0.1) {
-                console.warn('Low lighting detected; scanning may be less reliable.');
-              }
               break;
             } catch (err) {
               attempts++;
               console.warn(`Camera setup attempt ${attempts} failed:`, err);
               if (attempts === maxAttempts) {
-                console.warn('Falling back to lower resolution: 640x480');
-                resolution = { width: 640, height: 480 };
-                attempts = 0;
-                continue;
-              }
-              if (attempts === maxAttempts * 2) {
                 console.error('Max camera setup attempts reached:', err);
                 setScanning(false);
                 return;
@@ -320,36 +302,28 @@ if (currentHour < 6 || currentHour >= 21) {
           }
           console.log('Scanner initialized with deviceId:', selectedDeviceId || 'default');
           const timeoutId = setTimeout(() => {
-            console.log('Scanning timeout after 20 seconds.');
+            console.log('Scanning timeout after 30 seconds.');
             setScanning(false);
             currentCodeReader.reset();
-          }, 20000);
-          const scanFrame = () => {
-            currentCodeReader.decodeFromVideoDevice(
-              selectedDeviceId,
-              webcamRef.current.video,
-              (result, err) => {
-                if (result) {
-                  console.log('Barcode detected:', result.text);
-                  setScanning(false);
-                  currentCodeReader.reset();
-                  clearTimeout(timeoutId);
-                  handleScan(null, result);
-                }
-                if (err && err.name !== 'NotFoundException') {
-                  console.error('Scan error:', err);
-                }
-                if (scanning) {
-                  requestAnimationFrame(scanFrame);
-                }
-              },
-              hints
-            );
-          };
-          requestAnimationFrame(scanFrame);
+          }, 30000);
+          await currentCodeReader.decodeFromVideoDevice(
+            selectedDeviceId,
+            webcamRef.current.video,
+            (result, err) => {
+              if (result) {
+                console.log('Barcode detected:', result.text);
+                setScanning(false);
+                currentCodeReader.reset();
+                clearTimeout(timeoutId);
+                handleScan(null, result);
+              }
+              if (err && err.name !== 'NotFoundException') {
+                console.error('Scan error:', err);
+              }
+            }
+          );
         } catch (err) {
           console.error('Scan setup error:', err);
-          setScanning(false);
         }
       };
       scanCode();
@@ -413,7 +387,7 @@ if (currentHour < 6 || currentHour >= 21) {
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: 'environment', width: 1280, height: 720 }}
+                videoConstraints={{ facingMode: 'environment', width: 640, height: 480 }}
                 className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
                 width={300}
                 height={300}
@@ -430,7 +404,7 @@ if (currentHour < 6 || currentHour >= 21) {
             <table className="min-w-full text-left border-collapse">
               <thead>
                 <tr className="bg-indigo-100 dark:bg-indigo-800">
-                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
+                  <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Staff</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
                   {isStoreOwner && (
@@ -517,14 +491,11 @@ if (currentHour < 6 || currentHour >= 21) {
                   {storeId ? (
                     <>
                       <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
-                        Store Barcode (ID: STORE-{storeId}-{format(new Date(), 'd')})
+                        Store Barcode (ID: STORE-{storeId})
                       </p>
                       {barcodeError ? (
                         <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(
-                            new Date(),
-                            'd'
-                          )}&code=Code128&dpi=300`}
+                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}&code=Code128`}
                           alt="Store Barcode"
                           className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
                         />
