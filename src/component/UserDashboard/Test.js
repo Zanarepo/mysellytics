@@ -17,7 +17,7 @@ const Attendance = () => {
   const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(30);
+  const [itemsPerPage] = useState(5);
   const [barcodeError, setBarcodeError] = useState(false);
   const webcamRef = useRef(null);
   const codeReader = useRef(new BrowserMultiFormatReader());
@@ -194,10 +194,11 @@ const Attendance = () => {
             console.log('Invalid store barcode:', scannedCode);
             return;
           }
-const now = new Date();
+
+        const now = new Date();
 const currentHour = now.getHours();
-if (currentHour < 6 || currentHour >= 21) {
-  console.log('Clocking only allowed between 6:00 AM and 9:00 PM.');
+if (currentHour >= 5 && currentHour < 21) {
+  console.log('Clocking only allowed between 6:00 AM and 5:00 AM the next day.');
   return;
 }
 
