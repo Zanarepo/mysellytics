@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { format, parseISO, startOfDay, set, isAfter } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import JsBarcode from 'jsbarcode';
 import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/library';
+import { BrowserMultiFormatReader } from '@zxing/library';
 
 const Attendance = () => {
   const [storeId, setStoreId] = useState(null);
@@ -99,8 +99,7 @@ const Attendance = () => {
   // Generate store barcode when modal opens
   useEffect(() => {
     if (showBarcodeModal && storeId) {
-      const today = format(new Date(), 'd'); // Day of year (1–366)
-      const storeCode = `STORE-${storeId}-${today}`;
+      const storeCode = `STORE-${storeId}`;
       const canvas = document.getElementById('store-barcode');
       console.log('Generating store barcode for:', storeCode, 'Canvas:', canvas);
       if (canvas) {
@@ -108,9 +107,9 @@ const Attendance = () => {
           JsBarcode(canvas, storeCode, {
             format: 'CODE128',
             displayValue: true,
-            width: 4,
-            height: 100,
-            fontSize: 18,
+            width: 3,
+            height: 80,
+            fontSize: 16,
             background: '#ffffff',
             lineColor: '#000000',
             margin: 10,
@@ -144,44 +143,12 @@ const Attendance = () => {
         console.log('Attendance logs:', data);
       } catch (err) {
         console.error('fetchAttendanceLogs error:', err);
+        setError(err.message);
       }
     };
 
     fetchAttendanceLogs();
   }, [storeId]);
-
-  // Delete single attendance log
-  const handleDeleteLog = async (logId) => {
-    try {
-      console.log('Deleting attendance log:', logId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('id', logId)
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting log: ${error.message}`);
-      setAttendanceLogs((prev) => prev.filter((log) => log.id !== logId));
-      console.log('Attendance log deleted:', logId);
-    } catch (err) {
-      console.error('handleDeleteLog error:', err);
-    }
-  };
-
-  // Delete all attendance logs for store
-  const handleDeleteAllLogs = async () => {
-    try {
-      console.log('Deleting all attendance logs for store_id:', storeId);
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('store_id', storeId);
-      if (error) throw new Error(`Error deleting all logs: ${error.message}`);
-      setAttendanceLogs([]);
-      console.log('All attendance logs deleted for store_id:', storeId);
-    } catch (err) {
-      console.error('handleDeleteAllLogs error:', err);
-    }
-  };
 
   // Handle barcode scan
   const handleScan = useCallback(
@@ -190,20 +157,11 @@ const Attendance = () => {
         try {
           const scannedCode = result.text;
           console.log('Scanned code:', scannedCode);
-          const scannedParts = scannedCode.split('-');
-          const expectedPrefix = `STORE-${storeId}`;
-          if (scannedParts.length < 2 || !scannedCode.startsWith(expectedPrefix)) {
-            console.log('Invalid store barcode:', scannedCode);
+          const expectedCode = `STORE-${storeId}`;
+          if (scannedCode !== expectedCode) {
+            setError('Invalid store barcode.');
             return;
           }
-
-          // Check if within clocking hours (6:00 AM - 9:00 PM WAT)
-     const now = new Date();
-const currentHour = now.getHours();
-if (currentHour < 6 || currentHour >= 21) {
-  console.log('Clocking only allowed between 6:00 AM and 9:00 PM.');
-  return;
-}
 
           // Verify user
           let user = { id: userId, full_name: 'Store Owner' };
@@ -216,6 +174,7 @@ if (currentHour < 6 || currentHour >= 21) {
               .single();
             if (userError || !userData) {
               console.error('User lookup error:', userError);
+              setError('User not authenticated.');
               return;
             }
             user = userData;
@@ -224,10 +183,10 @@ if (currentHour < 6 || currentHour >= 21) {
             console.log('Using default user for store owner: id=0, full_name=Store Owner');
           }
 
-          // Check last action and enforce clock-in if no clock-out by 9:00 PM
+          // Check last action
           const { data: lastLog, error: logError } = await supabase
             .from('attendance')
-            .select('action, timestamp')
+            .select('action')
             .eq('user_id', user.id)
             .eq('store_id', storeId)
             .order('timestamp', { ascending: false })
@@ -237,29 +196,18 @@ if (currentHour < 6 || currentHour >= 21) {
             throw new Error(`Error checking last log: ${logError.message}`);
           }
 
-          let action = 'clock-in';
-          if (lastLog) {
-            const lastLogTime = parseISO(lastLog.timestamp);
-            const lastDayEnd = set(startOfDay(lastLogTime), { hours: 21, minutes: 0, seconds: 0 });
-            if (lastLog.action === 'clock-in' && isAfter(now, lastDayEnd)) {
-              console.log('No clock-out by 9:00 PM; forcing clock-in.');
-              action = 'clock-in';
-            } else {
-              action = lastLog.action === 'clock-in' ? 'clock-out' : 'clock-in';
-            }
-          }
-
+          const action = lastLog?.action === 'clock-in' ? 'clock-out' : 'clock-in';
           const { data, error: insertError } = await supabase
             .from('attendance')
-            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: now.toISOString() }])
+            .insert([{ store_id: storeId, user_id: user.id, action, timestamp: new Date().toISOString() }])
             .select('id, user_id, action, timestamp, store_users!user_id(full_name)')
             .single();
           if (insertError) throw new Error(`Error logging attendance: ${insertError.message}`);
 
           setAttendanceLogs((prev) => [data, ...prev]);
-          console.log(`${user.full_name} ${action} at ${format(now, 'PPP HH:mm')}.`);
         } catch (err) {
           console.error('handleScan error:', err);
+          setError(err.message);
         }
       }
     },
@@ -271,92 +219,28 @@ if (currentHour < 6 || currentHour >= 21) {
     let currentCodeReader = null;
     if (scanning) {
       currentCodeReader = codeReader.current;
-      const hints = new Map();
-      hints.set(BarcodeFormat.CODE_128, true);
-      currentCodeReader.timeBetweenDecodingAttempts = 100;
       const scanCode = async () => {
         try {
-          if (!webcamRef.current || !webcamRef.current.video) {
-            console.error('Webcam reference or video element not available.');
-            setScanning(false);
-            return;
-          }
-          let selectedDeviceId = null;
-          let resolution = { width: 1280, height: 720 };
-          let attempts = 0;
-          const maxAttempts = 3;
-          while (attempts < maxAttempts) {
-            try {
-              console.log('Camera permissions requested for facingMode: environment, resolution:', resolution);
-              const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', ...resolution }
-              });
-              if (webcamRef.current?.video) {
-                webcamRef.current.video.srcObject = stream;
-                console.log('Video stream assigned:', stream.getVideoTracks()[0].getSettings());
-              }
-              selectedDeviceId = stream.getVideoTracks()[0].getSettings().deviceId;
-              const capabilities = stream.getVideoTracks()[0].getCapabilities();
-              if (capabilities.brightness && capabilities.brightness.max < 0.1) {
-                console.warn('Low lighting detected; scanning may be less reliable.');
-              }
-              break;
-            } catch (err) {
-              attempts++;
-              console.warn(`Camera setup attempt ${attempts} failed:`, err);
-              if (attempts === maxAttempts) {
-                console.warn('Falling back to lower resolution: 640x480');
-                resolution = { width: 640, height: 480 };
-                attempts = 0;
-                continue;
-              }
-              if (attempts === maxAttempts * 2) {
-                console.error('Max camera setup attempts reached:', err);
-                setScanning(false);
-                return;
-              }
-              await new Promise(resolve => setTimeout(resolve, 1000));
+          await currentCodeReader.decodeFromVideoDevice(null, webcamRef.current.video, (result, err) => {
+            if (result) {
+              setScanning(false);
+              currentCodeReader.reset();
+              handleScan(null, result);
             }
-          }
-          console.log('Scanner initialized with deviceId:', selectedDeviceId || 'default');
-          const timeoutId = setTimeout(() => {
-            console.log('Scanning timeout after 20 seconds.');
-            setScanning(false);
-            currentCodeReader.reset();
-          }, 20000);
-          const scanFrame = () => {
-            currentCodeReader.decodeFromVideoDevice(
-              selectedDeviceId,
-              webcamRef.current.video,
-              (result, err) => {
-                if (result) {
-                  console.log('Barcode detected:', result.text);
-                  setScanning(false);
-                  currentCodeReader.reset();
-                  clearTimeout(timeoutId);
-                  handleScan(null, result);
-                }
-                if (err && err.name !== 'NotFoundException') {
-                  console.error('Scan error:', err);
-                }
-                if (scanning) {
-                  requestAnimationFrame(scanFrame);
-                }
-              },
-              hints
-            );
-          };
-          requestAnimationFrame(scanFrame);
+            if (err && err.name !== 'NotFoundException') {
+              console.error('Scan error:', err);
+              setError('Error scanning code.');
+            }
+          });
         } catch (err) {
           console.error('Scan setup error:', err);
-          setScanning(false);
+          setError('Failed to start scanner.');
         }
       };
       scanCode();
     }
     return () => {
       if (currentCodeReader) {
-        console.log('Resetting code reader.');
         currentCodeReader.reset();
       }
     };
@@ -398,22 +282,13 @@ if (currentHour < 6 || currentHour >= 21) {
               )}
             </div>
           )}
-          {isStoreOwner && (
-            <button
-              onClick={handleDeleteAllLogs}
-              className="mb-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300"
-              disabled={!storeId || attendanceLogs.length === 0}
-            >
-              Delete All Logs
-            </button>
-          )}
           {scanning && (
             <div className="mb-4">
               <Webcam
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: 'environment', width: 1280, height: 720 }}
+                videoConstraints={{ facingMode: 'environment' }}
                 className="mx-auto rounded-md border border-gray-300 dark:border-gray-600"
                 width={300}
                 height={300}
@@ -433,18 +308,12 @@ if (currentHour < 6 || currentHour >= 21) {
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">User</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Action</th>
                   <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Timestamp</th>
-                  {isStoreOwner && (
-                    <th className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">Actions</th>
-                  )}
                 </tr>
               </thead>
               <tbody>
                 {currentLogs.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={isStoreOwner ? 4 : 3}
-                      className="p-2 text-center text-gray-500 dark:text-gray-400"
-                    >
+                    <td colSpan="3" className="p-2 text-center text-gray-500 dark:text-gray-400">
                       No attendance logs found.
                     </td>
                   </tr>
@@ -456,23 +325,11 @@ if (currentHour < 6 || currentHour >= 21) {
                         log.action === 'clock-in' ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'
                       }`}
                     >
-                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
-                        {log.store_users?.full_name || 'Store Owner'}
-                      </td>
+                      <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.store_users?.full_name || 'Store Owner'}</td>
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">{log.action}</td>
                       <td className="p-2 text-indigo-800 dark:text-indigo-200 text-sm md:text-base">
                         {format(parseISO(log.timestamp), 'PPP HH:mm')}
                       </td>
-                      {isStoreOwner && (
-                        <td className="p-2">
-                          <button
-                            onClick={() => handleDeleteLog(log.id)}
-                            className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
                     </tr>
                   ))
                 )}
@@ -517,14 +374,11 @@ if (currentHour < 6 || currentHour >= 21) {
                   {storeId ? (
                     <>
                       <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
-                        Store Barcode (ID: STORE-{storeId}-{format(new Date(), 'd')})
+                        Store Barcode (ID: STORE-{storeId})
                       </p>
                       {barcodeError ? (
                         <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}-${format(
-                            new Date(),
-                            'd'
-                          )}&code=Code128&dpi=300`}
+                          src={`https://barcode.tec-it.com/barcode.ashx?data=STORE-${storeId}&code=Code128`}
                           alt="Store Barcode"
                           className="mx-auto w-full max-w-[250px] h-[100px] border-2 border-gray-400"
                         />
