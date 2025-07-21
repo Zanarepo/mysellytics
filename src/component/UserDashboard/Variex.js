@@ -25,6 +25,7 @@ import DebtTracker from './DebtTracker';
 import Unpaidsupplies from '../UserDashboard/Unpaidsupplies';
 import DashboardAccess from '../Ops/DashboardAccess';
 import UpdatedVariexReceipts from '../VariexContents/UpdatedVariexReceipts';
+import VsalesSummary from '../Ops/VsalesSummary';
 
 const tools = [
   {
@@ -83,6 +84,15 @@ const tools = [
     desc: 'Track debtors.',
     component: <DebtTracker />,
   },
+   
+ {
+     key: 'sales_summary',
+     label: 'Sales Summary',
+     icon: <FaChartLine className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+     desc: 'View a summary of your sales performance.',
+     component: <VsalesSummary />,
+   },
+ 
   {
     key: 'customers',
     label: 'Customer Manager',

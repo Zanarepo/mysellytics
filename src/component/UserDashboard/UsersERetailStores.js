@@ -13,8 +13,6 @@ import {
   FaSearch,
   FaLock,
 } from 'react-icons/fa';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import DynamicInventory from '../DynamicSales/DynamicInventory';
 import AttendantsDynamicSales from '../UserDashboard/AttendantsDynamicSales';
 import ExpenseTracker from './ExpenseTracker';
@@ -24,6 +22,8 @@ import UserGadgetsDynamicProducts from './UserGadgetsDynamicProducts';
 import DynamicReceipts from '../VariexContents/DynamicReceipts';
 import DynamicReturnedItems from '../VariexContents/DynamicReturnedItems';
 import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
+import VsalesSummary from '../Ops/VsalesSummary';
+
 
 const tools = [
   {
@@ -82,6 +82,17 @@ const tools = [
     desc: 'Track debtors.',
     component: <DebtTracker />,
   },
+
+{
+    key: 'sales_summary',
+    label: 'Sales Summary',
+    icon: <FaChartLine className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    desc: 'View a summary of your sales performance.',
+    component: <VsalesSummary />,
+  },
+
+
+
   {
     key: 'Suppliers',
     label: 'Suppliers & Product Tracker',
@@ -96,10 +107,12 @@ const featureKeyMapping = {
   'products & pricing tracker': 'Dynamic Products',
   'products': 'Dynamic Products',
   'product tracker': 'Dynamic Products',
-  'products tracker': 'Dynamic Products', // Maps store owner 'Products Tracker' to 'Dynamic Products'
+  'products tracker': 'Dynamic Products',
   'suppliers & product tracker': 'Suppliers',
   'suppliers': 'Suppliers',
   'supplier': 'Suppliers',
+  'sales summary': 'sales_summary',
+
 };
 
 export default function DynamicDashboard() {
@@ -107,21 +120,23 @@ export default function DynamicDashboard() {
   const [activeTool, setActiveTool] = useState(null);
   const [allowedFeatures, setAllowedFeatures] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const fetchAllowedFeatures = async () => {
     try {
       setIsLoading(true);
+      setError('');
       const storeId = localStorage.getItem('store_id');
       const userId = localStorage.getItem('user_id');
 
       if (!storeId) {
-        toast.error('No store assigned. Contact your admin.');
+        setError('No store assigned. Contact your admin.');
         setAllowedFeatures([]);
         return;
       }
 
       if (!userId) {
-        toast.error('User not authenticated. Please log in.');
+        setError('User not authenticated. Please log in.');
         setAllowedFeatures([]);
         return;
       }
@@ -134,7 +149,7 @@ export default function DynamicDashboard() {
         .single();
 
       if (storeError) {
-        toast.error('Failed to load store permissions.');
+        setError('Failed to load store permissions.');
         setAllowedFeatures([]);
         return;
       }
@@ -155,11 +170,11 @@ export default function DynamicDashboard() {
               .map((item) => item?.trim().toLowerCase())
               .filter(Boolean);
           } else {
-            toast.error('Invalid store feature data.');
+            setError('Invalid store feature data.');
             storeFeatures = [];
           }
         } catch (e) {
-          toast.error('Invalid store feature data.');
+          setError('Invalid store feature data.');
           storeFeatures = [];
         }
       }
@@ -173,7 +188,7 @@ export default function DynamicDashboard() {
         .single();
 
       if (userError) {
-        toast.error('Failed to load user permissions.');
+        setError('Failed to load user permissions.');
         setAllowedFeatures([]);
         return;
       }
@@ -199,11 +214,11 @@ export default function DynamicDashboard() {
               })
               .filter(Boolean);
           } else {
-            toast.error('Invalid user feature data.');
+            setError('Invalid user feature data.');
             userFeatures = [];
           }
         } catch (e) {
-          toast.error('Invalid user feature data.');
+          setError('Invalid user feature data.');
           userFeatures = [];
         }
       }
@@ -215,7 +230,7 @@ export default function DynamicDashboard() {
 
       setAllowedFeatures(effectiveFeatures);
     } catch (err) {
-      toast.error('An error occurred while loading permissions.');
+      setError('An error occurred while loading permissions.');
       setAllowedFeatures([]);
     } finally {
       setIsLoading(false);
@@ -234,10 +249,11 @@ export default function DynamicDashboard() {
 
   const handleToolClick = (key) => {
     if (!allowedFeatures.includes(key)) {
-      toast.warn(`Access Denied: ${tools.find((t) => t.key === key).label} is not enabled for your account.`);
+      setError(`Access Denied: ${tools.find((t) => t.key === key).label}: Premium feature or Contact your admin to unlock.`);
       return;
     }
     setActiveTool(key);
+    setError('');
   };
 
   const renderContent = () => {
@@ -290,7 +306,7 @@ export default function DynamicDashboard() {
               title={
                 allowedFeatures.includes(t.key)
                   ? t.desc
-                  : `Locked: ${t.label} is not enabled for your account`
+                  : `Locked: ${t.label}: Premium feature or Contact your admin to unlock`
               }
               aria-label={`Select ${t.label}`}
             >
@@ -312,7 +328,6 @@ export default function DynamicDashboard() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 w-full px-2 sm:px-4">
-      <ToastContainer />
       <header className="text-center mb-4 sm:mb-6">
         <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-white">
           Welcome, {shopName}!
@@ -323,6 +338,11 @@ export default function DynamicDashboard() {
           </p>
         )}
       </header>
+      {error && (
+        <div className="text-center text-red-500 dark:text-red-400 mb-4 text-xs sm:text-sm">
+          {error}
+        </div>
+      )}
       {renderContent()}
       <div className="p-4 max-w-7xl mx-auto">
         <button

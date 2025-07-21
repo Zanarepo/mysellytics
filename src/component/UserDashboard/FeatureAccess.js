@@ -110,6 +110,7 @@ const featureKeyMapping = {
   'suppliers & product tracker': 'Suppliers',
   'suppliers': 'Suppliers',
   'supplier': 'Suppliers',
+  'sales summary': 'Sales Summary',
 };
 
 export default function DynamicDashboard() {

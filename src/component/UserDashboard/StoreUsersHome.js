@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FaMoneyBillWave,
   FaUser,
   FaBars,
   FaTimes,
@@ -18,7 +17,6 @@ import StoreUsersTour from './StoreUsersTour';
 import WhatsapUsers from './WhatsapUsers';
 import StoreUserProfile from './StoreUsersProfile';
 import Colleagues from './Colleagues';
-import StoresSalesSummary from '../Ops/StoresSalesSummary';
 import Notifications from './Notifications';
 import StoreUsersVariex from './StoreUsersVariex';
 import UsersERetailStores from './UsersERetailStores';
@@ -125,12 +123,8 @@ const Dashboard = () => {
     }
 
     switch (activeTab) {
-      case 'Sales Summary':
-        return (
-          <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
-            <StoresSalesSummary />
-          </div>
-        );
+ 
+        
       case 'AI Insights':
         if (!allowedDashboards.includes('ai_insights')) { 
           return (
@@ -181,15 +175,14 @@ const Dashboard = () => {
             </div>
           );
         } 
+       
         return (
           <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow p-4">
             <AdminOps/>
           </div>
         );
 
-
-
-
+     
 
 
       case 'Profile':
@@ -229,6 +222,8 @@ const Dashboard = () => {
         (tab === 'Flex Scan' && !allowedDashboards.includes('flex_scan')) ||
         (tab === 'AI Insights' && !allowedDashboards.includes('ai_insights'))||
         (tab === 'Admin Ops' && !allowedDashboards.includes('admin_ops'))
+        
+        
       ) {
         setActiveTab(tab); // Allow selection to show "Access Denied"
         return;
@@ -272,13 +267,6 @@ const Dashboard = () => {
       disabled: !allowedDashboards.includes('admin_ops'),
     },
 
-
-    {
-      name: 'Sales Summary',
-      icon: FaMoneyBillWave,
-      aria: 'Sales Dashboard: View and analyze sales data',
-      dataTour: 'sales-summary',
-    },
     {
       name: 'Notifications',
       icon: FaBell,

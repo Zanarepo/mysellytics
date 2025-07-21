@@ -22,6 +22,8 @@ import StoreUserDynamicSales from '../DynamicSales/StoreUserDynamicSales';
 import StoreUserDynamicProduct from '../DynamicSales/StoreUserDynamicProduct';
 import StoreUsersUnpaidSupplies from '../UserDashboard/StoreUsersUnpaidSupplies';
 import StoreUsersLatestReceipts from '../VariexContents/StoreUsersLatestReceipts';
+import VsalesSummary from '../Ops/VsalesSummary';
+
 
 const tools = [
   {
@@ -80,6 +82,14 @@ const tools = [
     desc: 'Track debtors.',
     component: <DebtTracker />,
   },
+  {
+    key: 'sales_summary',
+    label: 'Sales Summary',
+    icon: <FaChartLine className="text-2xl sm:text-5xl text-indigo-600" />,
+    desc: 'View your sales summary.',
+    component: <VsalesSummary />,
+  },
+  
 ];
 
 // Mapping to align store owner/store user keys to this dashboard's keys
@@ -92,6 +102,7 @@ const featureKeyMapping = {
   'suppliers & product tracker': 'suppliers',
   'suppliers': 'suppliers',
   'supplier': 'suppliers',
+  'sales summary': 'sales_summary', // Maps store owner 'Sales Summary'
 };
 
 export default function DynamicDashboard() {

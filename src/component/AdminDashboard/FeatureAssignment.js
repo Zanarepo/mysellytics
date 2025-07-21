@@ -32,15 +32,17 @@ const FeatureAssignment = () => {
 
   const featureOptions = [
     { value: 'sales', label: 'Sales Tracker' },
-    { value: 'products_tracker', label: 'Products & Pricing Tracker' },
+    { value: 'Products Tracker', label: 'Products & Pricing Tracker' },
     { value: 'inventory', label: 'Manage Inventory (Goods)' },
     { value: 'receipts', label: 'Sales Receipts' },
     { value: 'returns', label: 'Returned Items Tracker' },
     { value: 'expenses', label: 'Expenses Tracker' },
-    { value: 'unpaid_supplies', label: 'Unpaid Supplies' },
+    { value: 'unpaid supplies', label: 'Unpaid Supplies' },
     { value: 'debts', label: 'Debtors' },
-    { value: 'suppliers', label: 'Suppliers' },
+    { value: 'Suppliers', label: 'Suppliers' },
     { value: 'customers', label: 'Customer Manager' },
+    { value: 'sales_summary', label: 'Sales Summary' },
+    
   ];
 
   const normalizeFeatures = useCallback((features) => {

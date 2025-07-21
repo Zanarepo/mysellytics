@@ -14,8 +14,6 @@ import {
   FaSearch,
   FaLock,
 } from 'react-icons/fa';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import DynamicInventory from '../DynamicSales/DynamicInventory';
 import ExpenseTracker from './ExpenseTracker';
 import Customers from './Customers';
@@ -27,6 +25,7 @@ import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
 import LatestReceipts from '../VariexContents/LatestReceipts';
 import DashboardAccess from '../Ops/DashboardAccess';
 import GadgetsDynamicProducts from './GadgetsDynamicProducts';
+import VsalesSummary from '../Ops/VsalesSummary';
 
 const tools = [
   {
@@ -92,6 +91,15 @@ const tools = [
     desc: 'Track product & suppliers.',
     component: <DynamicSuppliersTracker />,
   },
+  
+{
+    key: 'sales_summary',
+    label: 'Sales Summary',
+    icon: <FaChartLine className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    desc: 'View a summary of your sales performance.',
+    component: <VsalesSummary />,
+  },
+
   {
     key: 'customers',
     label: 'Customer Manager',
@@ -110,6 +118,7 @@ const featureKeyMapping = {
   'suppliers & product tracker': 'Suppliers',
   'suppliers': 'Suppliers',
   'supplier': 'Suppliers',
+  'sales summary': 'Sales Summary',
 };
 
 export default function DynamicDashboard() {
@@ -117,13 +126,15 @@ export default function DynamicDashboard() {
   const [activeTool, setActiveTool] = useState(null);
   const [allowedFeatures, setAllowedFeatures] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const fetchAllowedFeatures = async () => {
     try {
       setIsLoading(true);
+      setError('');
       const storeId = localStorage.getItem('store_id');
       if (!storeId) {
-        toast.error('Please log in to access the dashboard.');
+        setError('Please log in to access the dashboard.');
         return;
       }
 
@@ -136,7 +147,7 @@ export default function DynamicDashboard() {
         .single();
 
       if (error) {
-        toast.error('Failed to load feature permissions. Please try again.');
+        setError('Failed to load feature permissions. Please try again.');
         setAllowedFeatures([]);
         return;
       }
@@ -164,21 +175,21 @@ export default function DynamicDashboard() {
               })
               .filter(Boolean);
           } else {
-            toast.error('Invalid feature data received. Contact support.');
+            setError('Contact Supportor your org. Admin to Unlock.');
             features = [];
           }
         } catch (e) {
-          toast.error('Invalid feature data received. Contact support.');
+          setError('Contact Supportor your org. Admin to Unlock.');
           features = [];
         }
       } else {
-        toast.error('Invalid feature data received. Contact support.');
+        setError('Contact Supportor your org. Admin to Unlock.');
         features = [];
       }
 
       setAllowedFeatures(features);
     } catch (err) {
-      toast.error('An error occurred while loading permissions. Please try again.');
+      setError('An error occurred while loading permissions. Please try again.');
       setAllowedFeatures([]);
     } finally {
       setIsLoading(false);
@@ -197,10 +208,11 @@ export default function DynamicDashboard() {
 
   const handleToolClick = (key) => {
     if (!allowedFeatures.includes(key)) {
-      toast.warn(`Access Denied: ${tools.find((t) => t.key === key).label} is not enabled for your store.`);
+      setError(`Access Denied: ${tools.find((t) => t.key === key).label} is not enabled for your store.`);
       return;
     }
     setActiveTool(key);
+    setError('');
   };
 
   const renderContent = () => {
@@ -252,7 +264,7 @@ export default function DynamicDashboard() {
               title={
                 allowedFeatures.includes(t.key)
                   ? t.desc
-                  : `Locked: ${t.label} is not enabled for your store`
+                  : `Locked: ${t.label}: Premium feature or Contact your admin to unlock.`
               }
             >
               <div className="relative">
@@ -273,7 +285,6 @@ export default function DynamicDashboard() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 w-full">
-      <ToastContainer />
       <DashboardAccess />
       <header className="text-center mb-4 sm:mb-6">
         <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-white">
@@ -285,6 +296,11 @@ export default function DynamicDashboard() {
           </p>
         )}
       </header>
+      {error && (
+        <div className="text-center text-red-500 dark:text-red-400 mb-4 text-xs sm:text-sm">
+          {error}
+        </div>
+      )}
       {renderContent()}
       <div className="p-4">
         <button

@@ -11,7 +11,7 @@ const TeamManagement = () => {
   const fetchTeamMembers = useCallback(async () => {
     const { data, error } = await supabase
       .from('store_users')
-      .select('id, full_name, email_address, phone_number')
+      .select('id, full_name, email_address, phone_number, role')
       .eq('store_id', storeId);
     if (error) {
       console.error('Error fetching team members:', error.message);
@@ -44,6 +44,8 @@ const TeamManagement = () => {
               <th className="p-2">Full Name</th>
               <th className="p-2">Email</th>
               <th className="p-2">Phone</th>
+               <th className="p-2">Role</th>
+
             </tr>
           </thead>
           <tbody>
@@ -52,6 +54,9 @@ const TeamManagement = () => {
                 <td className="p-2">{member.full_name}</td>
                 <td className="p-2">{member.email_address}</td>
                 <td className="p-2">{member.phone_number}</td>
+                <td className="p-2">{member.role}</td>
+                
+
               </tr>
             ))}
           </tbody>

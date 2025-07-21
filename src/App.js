@@ -28,7 +28,7 @@ import SellyticsPayment from './component/Payments/SellyticsPayment';
 import PremiumHomepage from './component/Premiums/PremiumHomepage';
 import PushNotifications from "./component/Premiums/PushNotifications";
 import Test from './component/UserDashboard/Test';
-import Tests from './component/AdminDashboard/Tests';
+import Tests from './component/UserDashboard/Tests';
 
 
 const App = () => {

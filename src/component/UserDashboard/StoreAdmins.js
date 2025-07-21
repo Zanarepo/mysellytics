@@ -23,7 +23,7 @@ class ToastErrorBoundary extends Component {
 
 // Role-to-feature mapping
 const roleFeatureMap = {
-  account: ['expenses', 'debts', 'receipts'],
+  account: ['expenses', 'debts', 'receipts', 'sales summary'],
   sales: ['sales', 'products', 'inventory', 'receipts', 'returns'],
   'store manager': ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
   marketing: ['customers'],
@@ -42,6 +42,7 @@ const availableFeatures = [
   'debts',
   'customers',
   'Suppliers',
+  'Sales Summary',
 ];
 
 export default function StoreAdminDashboard() {
