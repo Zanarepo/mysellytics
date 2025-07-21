@@ -32,7 +32,7 @@ import StoreAdmins from './StoreAdmins';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('AI Insights');
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [allowedDashboards, setAllowedDashboards] = useState([]);
