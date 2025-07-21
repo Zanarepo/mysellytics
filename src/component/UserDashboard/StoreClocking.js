@@ -264,8 +264,8 @@ const Attendance = () => {
 
   const getActionColorClass = (action) => {
     return action === 'clock-in'
-      ? 'bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium'
-      : 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+      ? 'text-green-800 px-2 py-1 rounded-full text-xs font-medium'
+      : 'text-red-800 px-2 py-1 rounded-full text-xs font-medium';
   };
 
   const clearFilters = () => {
@@ -275,7 +275,7 @@ const Attendance = () => {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-900 p-2">
+    <div className="w-full bg-white dark:bg-gray-900">
       <h2 className="text-2xl font-bold text-indigo-800 dark:text-white mb-4">Attendance Tracking</h2>
       {successMessage && <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{successMessage}</div>}
       {error && <div className="mb-4 p-2 bg-red-100 text-red-800 rounded">{error}</div>}
