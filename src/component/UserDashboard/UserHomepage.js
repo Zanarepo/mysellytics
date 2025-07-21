@@ -416,7 +416,7 @@ const Dashboard = () => {
             }}
             className="text-indigo-800 dark:text-indigo-200 text-sm"
           >
-            Restart Tour
+         
           </button>
         </header>
         <main className="flex-1 overflow-y-auto p-4">{renderContent()}</main>
