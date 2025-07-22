@@ -86,7 +86,7 @@ const SMSCampaigns = () => {
   };
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow mt-24">
+    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
       <h3 className="text-lg font-semibold text-indigo-700 dark:text-indigo-200 mb-4">
         Create SMS Campaign
       </h3>

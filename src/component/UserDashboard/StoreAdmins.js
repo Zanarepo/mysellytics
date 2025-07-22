@@ -33,7 +33,7 @@ const roleFeatureMap = {
 // Available features for manual override
 const availableFeatures = [
   'sales',
-  'Products Tracker',
+  'Products & Pricing Tracker',
   'inventory',
   'receipts',
   'returns',

@@ -46,20 +46,20 @@ const App = () => {
             }
           >
             <Route path="/" element={<HomePage />} />
-            <Route path="/register" element={<Registration />} />
-            <Route path="/login" element={<Login />} />
+            
             <Route path="/forgot-password" element={<Forgotpassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/team-signup" element={<TeamSignup />} />
             <Route path="/push-notifications" element={<PushNotifications />} />
             <Route path="/signaturepad" element={<SignaturePad />} />
-            <Route path="/test" element={<Test />} />
-            <Route path="/tests" element={<Tests />} />
+            
           </Route>
         </Routes>
 
         {/* Routes without Navbar or Footer */}
         <Routes>
+          <Route path="/register" element={<Registration />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/adminregister" element={<AdminRegistration />} />
           <Route path="/admin" element={<Admins />} />
           <Route path="/regdashboard" element={<RegisteredDashboards />} />
@@ -75,6 +75,8 @@ const App = () => {
           <Route path="/payment" element={<SellyticsPayment />} />
           <Route path="/premiumdashboard" element={<PremiumHomepage />} />
           <Route path="/tools" element={<Tools />} />
+            <Route path="/test" element={<Test />} />
+             <Route path="/tests" element={<Tests />} />
         </Routes>
       </div>
     </Router>

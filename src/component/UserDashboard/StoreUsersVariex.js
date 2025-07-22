@@ -94,7 +94,7 @@ const tools = [
 
 // Mapping to align store owner/store user keys to this dashboard's keys
 const featureKeyMapping = {
-  'products & pricing tracker': 'products',
+ 'products & pricing tracker': 'Dynamic Products',
   'products': 'products',
   'product tracker': 'products',
   'products tracker': 'products', // Maps store owner 'Products Tracker'

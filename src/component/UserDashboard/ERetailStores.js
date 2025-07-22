@@ -26,100 +26,101 @@ import LatestReceipts from '../VariexContents/LatestReceipts';
 import DashboardAccess from '../Ops/DashboardAccess';
 import GadgetsDynamicProducts from './GadgetsDynamicProducts';
 import VsalesSummary from '../Ops/VsalesSummary';
-
 const tools = [
   {
     key: 'sales',
     label: 'Sales Tracker',
-    icon: <FaChartLine className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaChartLine className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Add your sales and see how your business is doing',
     component: <DeviceDynamicSales />,
   },
   {
-    key: 'Products Tracker',
+    key: 'products',
     label: 'Products & Pricing Tracker',
-    icon: <FaBoxes className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaBoxes className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Add and manage your store’s products, prices, and stock here',
     component: <GadgetsDynamicProducts />,
   },
   {
     key: 'inventory',
     label: 'Manage Inventory (Goods)',
-    icon: <FaTasks className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaTasks className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Keep an eye on how much goods you have sold and what is left in your store.',
     component: <DynamicInventory />,
   },
   {
     key: 'receipts',
     label: 'Sales Receipts',
-    icon: <FaReceipt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Monitor and track sales.',
     component: <LatestReceipts />,
   },
   {
     key: 'returns',
     label: 'Returned Items Tracker',
-    icon: <FaUndoAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaUndoAlt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Track returned items from customers.',
     component: <DynamicReturnedItems />,
   },
   {
     key: 'expenses',
     label: 'Expenses Tracker',
-    icon: <FaRegMoneyBillAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaRegMoneyBillAlt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Keep track of your stores spending.',
     component: <ExpenseTracker />,
   },
   {
-    key: 'unpaid supplies',
+    key: 'unpaid_supplies',
     label: 'Unpaid Supplies',
-    icon: <FaBoxOpen className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaBoxOpen className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'See who took goods on credit and hasn’t paid yet',
     component: <GadgetsUnpaidSupplies />,
   },
   {
     key: 'debts',
     label: 'Debtors',
-    icon: <FaMoneyCheckAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaMoneyCheckAlt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Track debtors.',
     component: <DebtTracker />,
   },
   {
-    key: 'Suppliers',
+    key: 'suppliers',
     label: 'Suppliers & Product Tracker',
-    icon: <FaSearch className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaSearch className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Track product & suppliers.',
     component: <DynamicSuppliersTracker />,
   },
-  
-{
+  {
     key: 'sales_summary',
     label: 'Sales Summary',
-    icon: <FaChartLine className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaChartLine className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'View a summary of your sales performance.',
     component: <VsalesSummary />,
   },
-
   {
     key: 'customers',
     label: 'Customer Manager',
-    icon: <FaUsers className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    icon: <FaUsers className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Manage your customers.',
     component: <Customers />,
   },
 ];
 
-// Mapping for common variations in allowed_features
+// Mapping for common variations in allowed_dashboard and users_dashboard
 const featureKeyMapping = {
-  'products & pricing tracker': 'Products Tracker',
-  'products': 'Products Tracker',
-  'product tracker': 'Products Tracker',
-  'products tracker': 'Products Tracker',
-  'suppliers & product tracker': 'Suppliers',
-  'suppliers': 'Suppliers',
-  'supplier': 'Suppliers',
-  'sales summary': 'Sales Summary',
+  'products & pricing tracker': 'products',
+  'products': 'products',
+  'product tracker': 'products',
+  'products tracker': 'products',
+  'dynamic products': 'products',
+  'suppliers & product tracker': 'suppliers',
+  'suppliers': 'suppliers',
+  'supplier': 'suppliers',
+  'sales summary': 'sales_summary',
+  'unpaid supplies': 'unpaid_supplies',
 };
+
+
 
 export default function DynamicDashboard() {
   const [shopName, setShopName] = useState('Store Owner');

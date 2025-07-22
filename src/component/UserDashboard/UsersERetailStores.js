@@ -108,12 +108,13 @@ const featureKeyMapping = {
   'products': 'Dynamic Products',
   'product tracker': 'Dynamic Products',
   'products tracker': 'Dynamic Products',
-  'suppliers & product tracker': 'Suppliers',
+ 'suppliers & product tracker': 'Suppliers',
   'suppliers': 'Suppliers',
   'supplier': 'Suppliers',
   'sales summary': 'sales_summary',
 
 };
+
 
 export default function DynamicDashboard() {
   const [shopName, setShopName] = useState('Store Owner');

@@ -85,7 +85,7 @@ function SellyticsFeatures() {
             Sellytics — AI-Powered Retail Insights
           </h2>
           <p className="text-sm sm:text-lg text-gray-300 max-w-3xl mx-auto font-sans">
-            Running a retail business is tough. Sellytics uses AI-powered analytics to simplify decisions, optimize operations, and boost your bottom line.
+            Running a retail business is tough. Sellytics uses AI-powered analytics to simplify decisions, optimize operations, and boost your profit.
           </p>
           <div className="mt-4 h-0.5 w-16 sm:h-1 sm:w-24 bg-gradient-to-r from-indigo-500 to-indigo-300 mx-auto rounded-full" />
         </motion.div>
