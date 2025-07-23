@@ -389,10 +389,10 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
           </>
         )}
       {(selectedReceipt || singleReceipt) && (
-  <div className={singleReceipt ? "p-4 sm:p-6 space-y-6 dark:bg-gray-900 dark:text-white w-full" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 sm:p-6 overflow-auto"}>
+  <div className={singleReceipt ? "p-4 sm:p-0 space-y-6 dark:bg-gray-900 dark:text-white w-full" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 sm:p-6 overflow-auto"}>
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-[95vw] sm:max-w-3xl flex flex-col max-h-[90vh]">
       {!singleReceipt && (
-        <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center p-0 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Receipt QR Code</h2>
           <button
             onClick={() => setSelectedReceipt(null)}
@@ -402,7 +402,7 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
           </button>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="flex-1 overflow-y-auto p-0 sm:p-0">
         <div className="flex flex-col items-center gap-4 mb-6">
           <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base text-center">
             Scan the QR code below to view and download the receipt.
@@ -415,7 +415,7 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
             <FaDownload /> Download Receipt
           </button>
         </div>
-        <div ref={printRef} className="printable-area relative bg-white p-4 sm:p-6 shadow-lg rounded-lg w-full">
+        <div ref={printRef} className="printable-area relative bg-white p-0 sm:p-6 shadow-lg rounded-lg w-full">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ color: watermarkColor, fontSize: '2rem sm:4rem', opacity: 0.1 }}>
             <span className={`${bodyFont}`}>{store?.shop_name || '-'}</span>
           </div>
