@@ -22,10 +22,11 @@ import DeviceDynamicSales from '../DynamicSales/DeviceDynamicSales';
 import DynamicReturnedItems from '../VariexContents/DynamicReturnedItems';
 import GadgetsUnpaidSupplies from '../UserDashboard/GadgetsUnpaidSupplies';
 import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
-import LatestReceipts from '../VariexContents/LatestReceipts';
+//import LatestReceipts from '../VariexContents/LatestReceipts';
 import DashboardAccess from '../Ops/DashboardAccess';
 import GadgetsDynamicProducts from './GadgetsDynamicProducts';
 import VsalesSummary from '../Ops/VsalesSummary';
+import ReceiptQRCode from '../VariexContents/ReceiptQRCode';
 const tools = [
   {
     key: 'sales',
@@ -53,7 +54,7 @@ const tools = [
     label: 'Sales Receipts',
     icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Monitor and track sales.',
-    component: <LatestReceipts />,
+    component: <ReceiptQRCode />,
   },
   {
     key: 'returns',
