@@ -5,14 +5,21 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { FaDownload, FaQrcode } from 'react-icons/fa';
+import { FaDownload, FaQrcode, FaEdit } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ReceiptQRCode({ singleReceipt = null }) {
   const storeId = localStorage.getItem("store_id");
   const [store, setStore] = useState(null);
   const [receipts, setReceipts] = useState([]);
+  const [filteredReceipts, setFilteredReceipts] = useState([]);
   const [selectedReceipt, setSelectedReceipt] = useState(singleReceipt);
   const [saleGroup, setSaleGroup] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ customer_name: "", customer_address: "", phone_number: "", warranty: "" });
+  const itemsPerPage = 20;
   const [headerBgColor] = useState('#1E3A8A');
   const [headerTextColor] = useState('#FFFFFF');
   const [headerFont] = useState('font-serif');
@@ -84,6 +91,25 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
     };
     fetchReceipts();
   }, [storeId, singleReceipt]);
+
+  // Filter receipts based on search term
+  useEffect(() => {
+    const term = searchTerm.toLowerCase();
+    setFilteredReceipts(
+      receipts.filter(r => {
+        const dateStr = r.sale_groups ? new Date(r.sale_groups.created_at).toLocaleDateString().toLowerCase() : '';
+        const fields = [
+          r.receipt_id,
+          r.customer_name,
+          r.phone_number,
+          r.warranty,
+          dateStr
+        ];
+        return fields.some(f => f?.toString().toLowerCase().includes(term));
+      })
+    );
+    setCurrentPage(1);
+  }, [searchTerm, receipts]);
 
   // Set sale group for selected or single receipt
   useEffect(() => {
@@ -170,7 +196,70 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
     setSelectedReceipt(receipt);
   };
 
+  const openEdit = (receipt) => {
+    setEditing(receipt);
+    setForm({
+      customer_name: receipt.customer_name || "",
+      customer_address: receipt.customer_address || "",
+      phone_number: receipt.phone_number || "",
+      warranty: receipt.warranty || ""
+    });
+  };
+
+  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+  const saveReceipt = async () => {
+    try {
+      await supabase.from("receipts").update({ ...editing, ...form }).eq("id", editing.id);
+      setEditing(null);
+      setForm({ customer_name: "", customer_address: "", phone_number: "", warranty: "" });
+      const { data } = await supabase
+        .from("receipts")
+        .select(`
+          *,
+          sale_groups (
+            id,
+            store_id,
+            total_amount,
+            payment_method,
+            created_at,
+            dynamic_sales (
+              id,
+              device_id,
+              quantity,
+              amount,
+              sale_group_id,
+              dynamic_product (
+                id,
+                name,
+                selling_price,
+                dynamic_product_imeis
+              )
+            )
+          )
+        `)
+        .eq("store_receipt_id", storeId)
+        .order('id', { ascending: false });
+      setReceipts(data);
+      toast.success('Receipt updated successfully!');
+    } catch (error) {
+      console.error('Error updating receipt:', error);
+      toast.error('Failed to update receipt.');
+    }
+  };
+
   const qrCodeUrl = selectedReceipt ? `${window.location.origin}/receipt/${selectedReceipt.receipt_id}` : '';
+
+  const totalPages = Math.ceil(filteredReceipts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedReceipts = filteredReceipts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   if (!storeId) {
     return <div className="p-4 text-center text-red-500">Select a store first.</div>;
@@ -194,47 +283,109 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
         {!singleReceipt && (
           <>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Store Receipts</h2>
-            <div className="overflow-x-auto rounded-lg shadow">
-              <table className="min-w-full text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <thead className="bg-gray-100 dark:bg-gray-700">
-                  <tr>
-                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Receipt ID</th>
-                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Customer</th>
-                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Phone</th>
-                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Warranty</th>
-                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receipts.map((receipt, index) => (
-                    <tr
-                      key={receipt.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700 even:bg-gray-50 dark:even:bg-gray-800 transition-colors"
-                    >
-                      <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.receipt_id}</td>
-                      <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.customer_name || '-'}</td>
-                      <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.phone_number || '-'}</td>
-                      <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.warranty || '-'}</td>
-                      <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                        <button
-                          onClick={() => handleViewQRCode(receipt)}
-                          className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-2"
-                        >
-                          <FaQrcode /> View QR Code
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {receipts.length === 0 && (
-                    <tr>
-                      <td colSpan="5" className="text-center text-gray-500 dark:text-gray-400 py-6">
-                        No receipts found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="mb-6">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Search by Receipt ID, Customer, Phone, Warranty, or Date"
+                className="flex-1 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+              />
             </div>
+            <AnimatePresence>
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="overflow-x-auto rounded-lg shadow">
+                  <table className="min-w-full text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
+                      <tr>
+                        <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Receipt ID</th>
+                        <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Customer</th>
+                        <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Phone</th>
+                        <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Warranty</th>
+                        <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Date</th>
+                        <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedReceipts.map((receipt, index) => (
+                        <tr
+                          key={receipt.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 even:bg-gray-50 dark:even:bg-gray-800 transition-colors"
+                        >
+                          <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.receipt_id}</td>
+                          <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.customer_name || '-'}</td>
+                          <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.phone_number || '-'}</td>
+                          <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 truncate">{receipt.warranty || '-'}</td>
+                          <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">{new Date(receipt.sale_groups.created_at).toLocaleDateString()}</td>
+                          <td className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex gap-4">
+                              <button
+                                onClick={() => openEdit(receipt)}
+                                className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                              >
+                                <FaEdit />
+                              </button>
+                              <button
+                                onClick={() => handleViewQRCode(receipt)}
+                                className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-2"
+                              >
+                                <FaQrcode /> View QR Code
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {paginatedReceipts.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="text-center text-gray-500 dark:text-gray-400 py-6">
+                            No receipts found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredReceipts.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-4">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                    >
+                      Previous
+                    </button>
+                    <div className="flex gap-2">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-3 py-1 rounded-lg ${
+                            currentPage === page
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </>
         )}
         {(selectedReceipt || singleReceipt) && (
@@ -325,6 +476,34 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
                   <div className="border-t text-center pt-2">Manager Signature</div>
                   <div className="border-t text-center pt-2">Customer Signature</div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {editing && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-10">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-8 space-y-6">
+              <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white">Edit Receipt {editing.receipt_id}</h2>
+              <div className="space-y-4">
+                {['customer_name', 'customer_address', 'phone_number', 'warranty'].map(field => (
+                  <label key={field} className="block">
+                    <span className="font-semibold text-gray-700 dark:text-gray-200 capitalize block mb-1">
+                      {field.replace('_', ' ')}
+                    </span>
+                    <input
+                      name={field}
+                      value={form[field]}
+                      onChange={handleChange}
+                      className="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white"
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button onClick={() => setEditing(null)} className="px-4 py-2 bg-gray-200 dark:bg-gray-800 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700">Cancel</button>
+                <button onClick={saveReceipt} className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center justify-between gap-2">
+                  <FaDownload /> Save Receipt
+                </button>
               </div>
             </div>
           </div>
