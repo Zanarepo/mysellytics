@@ -77,7 +77,7 @@ export default function ReceiptManager() {
     if (!storeId) return;
     supabase
       .from("stores")
-      .select("shop_name,business_address,phone_number")
+      .select("shop_name,business_address,phone_number,email_address")
       .eq("id", storeId)
       .single()
       .then(({ data }) => setStore(data));
@@ -885,6 +885,8 @@ export default function ReceiptManager() {
             <h1 className="text-2xl font-bold">{store?.shop_name || '-'}</h1>
             <p className="text-sm">{store?.business_address || '-'}</p>
             <p className="text-sm">Phone: {store?.phone_number || '-'}</p>
+            <p className="text-sm">Email: {store?.email_address || '-'}</p>
+
           </div>
           <table className={`w-full rounded-t border-none mb-4 mt-4 ${bodyFont}`}>
             <thead>

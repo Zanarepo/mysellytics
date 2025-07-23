@@ -32,7 +32,7 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
     if (!storeId) return;
     supabase
       .from("stores")
-      .select("shop_name,business_address,phone_number")
+      .select("shop_name,business_address,phone_number,email_address")
       .eq("id", storeId)
       .single()
       .then(({ data, error }) => {
@@ -388,98 +388,119 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
             </AnimatePresence>
           </>
         )}
-        {(selectedReceipt || singleReceipt) && (
-          <div className={singleReceipt ? "p-6 space-y-6 dark:bg-gray-900 dark:text-white" : "fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-4 overflow-auto mt-10"}>
-            <div className={singleReceipt ? "w-full max-w-4xl" : "bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl p-6"}>
-              {!singleReceipt && (
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-gray-800 dark:text-white">Receipt QR Code</h2>
-                  <button
-                    onClick={() => setSelectedReceipt(null)}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
-                  >
-                    Close
-                  </button>
-                </div>
-              )}
-              <div className="flex flex-col items-center gap-4">
-                <p className="text-gray-600 dark:text-gray-400">
-                  Scan the QR code below to view and download the receipt.
-                </p>
-                <QRCodeCanvas value={qrCodeUrl} size={200} />
-                <button
-                  onClick={generatePDF}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <FaDownload /> Download Receipt
-                </button>
-              </div>
-              <div ref={printRef} className="printable-area relative bg-white p-6 mt-6 shadow-lg rounded-lg overflow-x-auto">
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ color: watermarkColor, fontSize: '4rem', opacity: 0.1 }}>
-                  <span className={`${bodyFont}`}>{store?.shop_name || '-'}</span>
-                </div>
-                <div className={`p-4 rounded-t ${headerFont}`} style={{ backgroundColor: headerBgColor, color: headerTextColor }}>
-                  <h1 className="text-2xl font-bold">{store?.shop_name || '-'}</h1>
-                  <p className="text-sm">{store?.business_address || '-'}</p>
-                  <p className="text-sm">Phone: {store?.phone_number || '-'}</p>
-                </div>
-                <table className={`w-full rounded-t border-none mb-4 mt-4 ${bodyFont}`}>
-                  <thead>
-                    <tr>
-                      <th className="border px-4 py-2 text-left w-1/4">Product</th>
-                      <th className="border px-4 py-2 text-left w-1/4">Device ID</th>
-                      <th className="border px-4 py-2 text-left w-1/6">Quantity</th>
-                      <th className="border px-4 py-2 text-left w-1/6">Unit Price</th>
-                      <th className="border px-4 py-2 text-left w-1/6">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productGroups.map((group, index) => (
-                      <React.Fragment key={group.productId}>
-                        <tr className="bg-blue-50 dark:bg-gray-800">
-                          <td className="border-b px-4 py-2 font-bold" colSpan="2">{group.productName}</td>
-                          <td className="border-b px-2 py-2">{group.quantity}</td>
-                          <td className="border-b px-4 py-2">₦{group.unitPrice.toFixed(2)}</td>
-                          <td className="border-b px-4 py-2">₦{group.totalAmount.toFixed(2)}</td>
-                        </tr>
-                        {group.deviceIds.map((deviceId, idx) => (
-                          <tr key={`${group.productId}-${idx}`}>
-                            <td className="border-b px-4 py-2"></td>
-                            <td className="border-b px-4 py-2 pl-6">{deviceId}</td>
-                            <td className="border-b px-4 py-2"></td>
-                            <td className="border-b px-4 py-2"></td>
-                            <td className="border-b px-4 py-2"></td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan="2" className="border px-4 py-2 text-right font-bold">Total:</td>
-                      <td className="border px-4 py-2">{totalQuantity}</td>
-                      <td className="border px-4 py-2"></td>
-                      <td className="border px-4 py-2 font-bold">₦{totalAmount.toFixed(2)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-                <div className="mt-4 space-y-2">
-                  <p><strong>Receipt ID:</strong> {selectedReceipt.receipt_id}</p>
-                  <p><strong>Date:</strong> {new Date(saleGroup?.created_at).toLocaleString()}</p>
-                  <p><strong>Payment Method:</strong> {saleGroup?.payment_method}</p>
-                  <p><strong>Customer Name:</strong> {selectedReceipt.customer_name || '-'}</p>
-                  <p><strong>Address:</strong> {selectedReceipt.customer_address || '-'}</p>
-                  <p><strong>Phone:</strong> {selectedReceipt.phone_number || '-'}</p>
-                  <p><strong>Warranty:</strong> {selectedReceipt.warranty || '-'}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-8 p-4 mt-4">
-                  <div className="border-t text-center pt-2">Manager Signature</div>
-                  <div className="border-t text-center pt-2">Customer Signature</div>
-                </div>
-              </div>
-            </div>
+      {(selectedReceipt || singleReceipt) && (
+  <div className={singleReceipt ? "p-4 sm:p-6 space-y-6 dark:bg-gray-900 dark:text-white w-full" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 sm:p-6 overflow-auto"}>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-[95vw] sm:max-w-3xl flex flex-col max-h-[90vh]">
+      {!singleReceipt && (
+        <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Receipt QR Code</h2>
+          <button
+            onClick={() => setSelectedReceipt(null)}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-base"
+          >
+            Close
+          </button>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="flex flex-col items-center gap-4 mb-6">
+          <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base text-center">
+            Scan the QR code below to view and download the receipt.
+          </p>
+          <QRCodeCanvas value={qrCodeUrl} size={150} className="w-[120px] sm:w-[150px] h-auto" />
+          <button
+            onClick={generatePDF}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 text-sm sm:text-base"
+          >
+            <FaDownload /> Download Receipt
+          </button>
+        </div>
+        <div ref={printRef} className="printable-area relative bg-white p-4 sm:p-6 shadow-lg rounded-lg w-full">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ color: watermarkColor, fontSize: '2rem sm:4rem', opacity: 0.1 }}>
+            <span className={`${bodyFont}`}>{store?.shop_name || '-'}</span>
           </div>
-        )}
+          <div className={`p-3 sm:p-4 rounded-t ${headerFont}`} style={{ backgroundColor: headerBgColor, color: headerTextColor }}>
+            <h1 className="text-lg sm:text-2xl font-bold">{store?.shop_name || '-'}</h1>
+            <p className="text-xs sm:text-sm">{store?.business_address || '-'}</p>
+            <p className="text-xs sm:text-sm">Phone: {store?.phone_number || '-'}</p>
+            <p className="text-xs sm:text-sm">Email: {store?.email_address || '-'}</p>
+
+          </div>
+          <div className="overflow-x-auto">
+            <table className={`w-full border-none mb-4 mt-4 ${bodyFont} text-xs sm:text-sm`}>
+              <thead>
+                <tr className="hidden sm:table-row">
+                  <th className="border px-2 sm:px-4 py-1 sm:py-2 text-left">Product</th>
+                  <th className="border px-2 sm:px-4 py-1 sm:py-2 text-left">Device ID</th>
+                  <th className="border px-2 sm:px-4 py-1 sm:py-2 text-left">Qty</th>
+                  <th className="border px-2 sm:px-4 py-1 sm:py-2 text-left">Unit Price</th>
+                  <th className="border px-2 sm:px-4 py-1 sm:py-2 text-left">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productGroups.map((group, index) => (
+                  <React.Fragment key={group.productId}>
+                    <tr className="flex flex-col sm:table-row border-b sm:border-b-0 sm:bg-indigo-50 sm:dark:bg-gray-800">
+                      <td className="border-b px-2 sm:px-4 py-1 sm:py-2 font-bold sm:font-normal flex sm:table-cell sm:border-b">
+                        <span className="sm:hidden font-semibold mr-2">Product:</span>
+                        {group.productName}
+                      </td>
+                      <td className="border-b px-2 sm:px-4 py-1 sm:py-2 sm:pl-6 flex sm:table-cell sm:border-b">
+                        <span className="sm:hidden font-semibold mr-2">Device ID:</span>
+                        {group.deviceIds.join(', ')}
+                      </td>
+                      <td className="border-b px-2 sm:px-4 py-1 sm:py-2 flex sm:table-cell sm:border-b">
+                        <span className="sm:hidden font-semibold mr-2">Quantity:</span>
+                        {group.quantity}
+                      </td>
+                      <td className="border-b px-2 sm:px-4 py-1 sm:py-2 flex sm:table-cell sm:border-b">
+                        <span className="sm:hidden font-semibold mr-2">Unit Price:</span>
+                        ₦{group.unitPrice.toFixed(2)}
+                      </td>
+                      <td className="border-b px-2 sm:px-4 py-1 sm:py-2 flex sm:table-cell sm:border-b">
+                        <span className="sm:hidden font-semibold mr-2">Amount:</span>
+                        ₦{group.totalAmount.toFixed(2)}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="flex flex-col sm:table-row">
+                  <td colSpan="2" className="border px-2 sm:px-4 py-1 sm:py-2 text-right font-bold flex sm:table-cell sm:border-b">
+                    <span className="sm:hidden font-semibold mr-2">Total:</span>
+                  </td>
+                  <td className="border px-2 sm:px-4 py-1 sm:py-2 flex sm:table-cell sm:border-b">
+                    <span className="sm:hidden font-semibold mr-2">Total Quantity:</span>
+                    {totalQuantity}
+                  </td>
+                  <td className="border px-2 sm:px-4 py-1 sm:py-2 flex sm:table-cell sm:border-b"></td>
+                  <td className="border px-2 sm:px-4 py-1 sm:py-2 font-bold flex sm:table-cell sm:border-b">
+                    <span className="sm:hidden font-semibold mr-2">Total Amount:</span>
+                    ₦{totalAmount.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="mt-4 space-y-2 text-xs sm:text-sm">
+            <p><strong>Receipt ID:</strong> {selectedReceipt.receipt_id}</p>
+            <p><strong>Date:</strong> {new Date(saleGroup?.created_at).toLocaleString()}</p>
+            <p><strong>Payment Method:</strong> {saleGroup?.payment_method}</p>
+            <p><strong>Customer Name:</strong> {selectedReceipt.customer_name || '-'}</p>
+            <p><strong>Address:</strong> {selectedReceipt.customer_address || '-'}</p>
+            <p><strong>Phone:</strong> {selectedReceipt.phone_number || '-'}</p>
+            <p><strong>Warranty:</strong> {selectedReceipt.warranty || '-'}</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 p-4 mt-4">
+            <div className="border-t text-center pt-2 text-xs sm:text-sm">Manager Signature</div>
+            <div className="border-t text-center pt-2 text-xs sm:text-sm">Customer Signature</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
         {editing && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-10">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-8 space-y-6">
@@ -501,7 +522,7 @@ export default function ReceiptQRCode({ singleReceipt = null }) {
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button onClick={() => setEditing(null)} className="px-4 py-2 bg-gray-200 dark:bg-gray-800 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700">Cancel</button>
-                <button onClick={saveReceipt} className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center justify-between gap-2">
+                <button onClick={saveReceipt} className="px-4 py-2  text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex items-center justify-between gap-2">
                   <FaDownload /> Save Receipt
                 </button>
               </div>
