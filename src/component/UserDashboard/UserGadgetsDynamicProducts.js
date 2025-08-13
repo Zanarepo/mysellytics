@@ -104,7 +104,7 @@ function DynamicProducts() {
 
       if (modal === 'add') {
         const form = [...addForm];
-        if (form[productIndex].deviceIds.some((id, i) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
+        if (form[productIndex].deviceIds.some((id) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
           toast.error(`Barcode "${trimmedCode}" already exists in this product`);
           setScannerError(`Barcode "${trimmedCode}" already exists`);
           return false;
@@ -116,7 +116,7 @@ function DynamicProducts() {
         setAddForm(form);
         newDeviceIndex = form[productIndex].deviceIds.length - 1;
       } else if (modal === 'edit') {
-        if (editForm.deviceIds.some((id, i) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
+        if (editForm.deviceIds.some((id) => id.trim().toLowerCase() === trimmedCode.toLowerCase())) {
           toast.error(`Barcode "${trimmedCode}" already exists in this product`);
           setScannerError(`Barcode "${trimmedCode}" already exists`);
           return false;
@@ -753,6 +753,13 @@ function DynamicProducts() {
     }));
   };
 
+  const removeEditDeviceId = (idx) => {
+    setEditForm((prev) => ({
+      ...prev,
+      deviceIds: prev.deviceIds.filter((_, i) => i !== idx),
+      deviceSizes: (prev.deviceSizes || []).filter((_, i) => i !== idx),
+    }));
+  };
 
  const saveEdit = async () => {
   if (!editForm.name.trim()) {
@@ -910,11 +917,14 @@ function DynamicProducts() {
           <span className="hidden sm:inline">Add</span>
         </button>
       </div>
+
+
+      
 {showAdd && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-auto mt-16">
     <form
       onSubmit={createProducts}
- className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4">
+ className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4"    >
       <h2 className="text-lg sm:text-xl font-bold text-center text-gray-900 dark:text-gray-200">
         Add Products
       </h2>
@@ -1147,7 +1157,7 @@ function DynamicProducts() {
                     >
                       <FaEdit />
                     </button>
-                   
+                  
                   </div>
                 </td>
               </tr>
@@ -1262,7 +1272,7 @@ function DynamicProducts() {
 
       {editing && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50 mt-16">
-          <div className="bg-white dark:bg-gray-900 p-3 rounded max-w-xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto space-y-4"    >
             <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white mt-6">Edit Product</h2>
 
             <div className="space-y-4">
@@ -1377,7 +1387,16 @@ function DynamicProducts() {
                         >
                           <FaCamera />
                         </button>
-                        
+                        {editForm.deviceIds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeEditDeviceId(i)}
+                            className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            title="Remove ID"
+                          >
+                            <FaTrashAlt />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

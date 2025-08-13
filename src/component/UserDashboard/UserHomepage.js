@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
- 
   FaUser,
   FaBars,
   FaTimes,
@@ -14,8 +13,8 @@ import {
   FaRobot,
   FaUsersCog,
   FaUserShield,
+  FaMoneyBillWave,
 } from 'react-icons/fa';
-import { supabase } from '../../supabaseClient';
 import UserOnboardingTour from './UserOnboardingTour';
 import Employees from './Employees';
 import Profile from './Profile';
@@ -26,67 +25,15 @@ import PricingFeatures from '../Payments/PricingFeatures';
 import ERetailStores from './ERetailStores';
 import AIpowerInsights from './AIpowerInsights';
 import AdminOps from './AdminOps';
-
+import Financials from '../UserDashboard/Financials';
 import StoreAdmins from './StoreAdmins';
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('AI Insights');
+  const [activeTab, setActiveTab] = useState('Fix Scan');
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
-  const [allowedDashboards, setAllowedDashboards] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // Added loading state
   const navigate = useNavigate();
-
-  // Fetch allowed dashboards from Supabase using store_id from local storage
-  useEffect(() => {
-    const fetchAllowedDashboards = async () => {
-      try {
-        setIsLoading(true);
-        const storeId = localStorage.getItem('store_id');
-        if (!storeId) {
-          console.warn('No store_id found in local storage');
-          navigate('/login');
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('stores')
-          .select('allowed_dashboard')
-          .eq('id', storeId)
-          .single();
-
-        if (error) {
-          console.error('Error fetching allowed dashboards:', error);
-          setAllowedDashboards([]);
-          return;
-        }
-
-        // Debug: Log raw data from Supabase
-        console.log('Raw allowed_dashboard data:', data?.allowed_dashboard);
-
-        // Handle different data formats
-        let dashboards = [];
-        if (Array.isArray(data?.allowed_dashboard)) {
-          dashboards = data.allowed_dashboard.map(item => item.trim().toLowerCase());
-        } else if (typeof data?.allowed_dashboard === 'string') {
-          dashboards = data.allowed_dashboard.split(',').map(item => item.trim().toLowerCase());
-        }
-
-        // Debug: Log processed dashboards
-        console.log('Processed allowedDashboards:', dashboards);
-
-        setAllowedDashboards(dashboards);
-      } catch (err) {
-        console.error('Unexpected error:', err);
-        setAllowedDashboards([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAllowedDashboards();
-  }, [navigate]);
 
   // Check if tour has been shown before
   useEffect(() => {
@@ -95,17 +42,6 @@ const Dashboard = () => {
       setIsTourOpen(true);
     }
   }, []);
-
-  // Set default tab to an accessible one
-  useEffect(() => {
-    if (!isLoading) {
-      if (activeTab === 'Fix Scan' && !allowedDashboards.includes('fix_scan')) {
-        setActiveTab('Home');
-      } else if (activeTab === 'Flex Scan' && !allowedDashboards.includes('flex_scan')) {
-        setActiveTab('Home');
-      }
-    }
-  }, [allowedDashboards, isLoading, activeTab]);
 
   // Toggle dark mode
   useEffect(() => {
@@ -120,71 +56,50 @@ const Dashboard = () => {
 
   // Render main content based on active tab
   const renderContent = () => {
-    if (isLoading) {
-      return <div className="w-full bg-white dark:bg-gray-900 p-4">Loading...</div>;
-    }
-
     switch (activeTab) {
       case 'Flex Scan':
-        if (!allowedDashboards.includes('flex_scan')) {
-          return <div className="w-full bg-white dark:bg-gray-900 p-4">Access Denied: You do not have permission to view Flex Scan.</div>;
-        }
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <Variex />
           </div>
         );
-
-
       case 'Fix Scan':
-        if (!allowedDashboards.includes('fix_scan')) {
-          return <div className="w-full bg-white dark:bg-gray-900 p-4">Access Denied: You do not have permission to view Fix Scan.</div>;
-        }
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <ERetailStores />
           </div>
         );
-     
-        case 'AI Insights':
-        if (!allowedDashboards.includes('ai_insights')) { 
-          return <div className="w-full bg-white dark:bg-gray-900 p-4">Access Denied: You do not have permission to view AI Insights.</div>;
-        }
-        
-
+      case 'AI Insights':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <AIpowerInsights />
           </div>
         );
-
-        case 'Admin Ops':
-        if (!allowedDashboards.includes('admin_ops')) {
-          return <div className="w-full bg-white dark:bg-gray-900 p-4">Access Denied: You do not have permission to view Admin Ops.</div>;
-        }
+      case 'Admin Ops':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <AdminOps />
           </div>
         );
-
       case 'Notifications':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <Notifications />
           </div>
         );
+      case 'Financials':
+        return (
+          <div className="w-full bg-white dark:bg-gray-900 p-4">
+            <Financials />
+          </div>
+        );
       case 'Store Admins':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
-            <StoreAdmins/>
+            <StoreAdmins />
           </div>
         );
-
-      
-     
-      
-         case 'Employees':
+      case 'Employees':
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
             <Employees />
@@ -202,7 +117,6 @@ const Dashboard = () => {
             <Profile />
           </div>
         );
-     
       default:
         return (
           <div className="w-full bg-white dark:bg-gray-900 p-4">
@@ -217,59 +131,24 @@ const Dashboard = () => {
     if (tab === 'Home') {
       navigate('/');
     } else {
-      if (
-        (tab === 'Fix Scan' && !allowedDashboards.includes('fix_scan')) ||
-        (tab === 'Flex Scan' && !allowedDashboards.includes('flex_scan')) ||
-        (tab === 'AI Insights' && !allowedDashboards.includes('ai_insights'))||
-        (tab === 'Admin Ops' && !allowedDashboards.includes('admin_ops'))
-      ) {
-        setActiveTab(tab); // Allow selection to show "Access Denied"
-        return;
-      }
       setActiveTab(tab);
       setSidebarOpen(false);
     }
   };
 
-  // Navigation items (always include Fix Scan and Flex Scan)
+  // Navigation items
   const navItems = [
     { name: 'Home', icon: FaHome, aria: 'Home: Go to the landing page' },
-    {
-      name: 'Flex Scan',
-      icon: FaBarcode,
-      aria: 'Flex Scan: Access your store management tools',
-      disabled: !allowedDashboards.includes('flex_scan'),
-    },
-    {
-      name: 'Fix Scan',
-      icon: FaQrcode,
-      aria: 'Fix Scan: View and edit your profile',
-      disabled: !allowedDashboards.includes('fix_scan'),
-    },
-
-    {
-      name: 'AI Insights',
-      icon: FaRobot,
-      aria: 'AI Insights: AI Insights: Explore AI-driven insights for your store',
-      disabled: !allowedDashboards.includes('ai_insights'),
-    },
-
-     {
-      name: 'Admin Ops',
-      icon:FaUserShield,
-      aria: 'Admin Ops: Manage store operations like clocking, tasks, and schedules',
-      disabled: !allowedDashboards.includes('admin_ops'),
-    },
-
-
-
- 
+    { name: 'Flex Scan', icon: FaBarcode, aria: 'Flex Scan: Access your store management tools' },
+    { name: 'Fix Scan', icon: FaQrcode, aria: 'Fix Scan: View and edit your profile' },
+    { name: 'AI Insights', icon: FaRobot, aria: 'AI Insights: Explore AI-driven insights for your store' },
+    { name: 'Financials', icon: FaMoneyBillWave, aria: 'Financials: View and edit your financial data' },
+    { name: 'Admin Ops', icon: FaUserShield, aria: 'Admin Ops: Manage store operations like clocking, tasks, and schedules' },
     { name: 'Notifications', icon: FaBell, aria: 'Notifications: Stay updated with store-related notifications' },
     { name: 'Employees', icon: FaIdBadge, aria: 'Employees: Manage store employees' },
     { name: 'Upgrade', icon: FaCrown, aria: 'Upgrade: Upgrade your plan for more features' },
     { name: 'Store Admins', icon: FaUsersCog, aria: 'Manage your staff and assign roles' },
     { name: 'Profile', icon: FaUser, aria: 'Profile: View and edit your profile' },
-
   ];
 
   // Toggle sidebar
@@ -312,23 +191,17 @@ const Dashboard = () => {
                 <li
                   key={item.name}
                   data-tour={item.name.toLowerCase().replace(' ', '-')}
-                  onClick={() => !item.disabled && handleNavClick(item.name)}
-                  className={`flex items-center p-2 rounded cursor-pointer transition ${
-                    item.disabled
-                      ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-indigo-200 dark:hover:bg-indigo-600'
-                  } ${activeTab === item.name ? 'bg-indigo-200 dark:bg-indigo-600' : ''}`}
+                  onClick={() => handleNavClick(item.name)}
+                  className={`flex items-center p-2 rounded cursor-pointer transition hover:bg-indigo-200 dark:hover:bg-indigo-600 ${
+                    activeTab === item.name ? 'bg-indigo-200 dark:bg-indigo-600' : ''
+                  }`}
                   aria-label={item.aria}
-                  title={item.disabled ? 'This feature is locked' : item.aria}
                 >
                   <item.icon
                     className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`}
                   />
                   <span className={`text-indigo-800 dark:text-indigo-200 ${sidebarOpen ? 'block' : 'hidden'}`}>
                     {item.name}
-                    {item.disabled && sidebarOpen && (
-                      <span className="ml-2 text-xs text-red-500">(Locked)</span>
-                    )}
                   </span>
                 </li>
               ))}
@@ -398,9 +271,7 @@ const Dashboard = () => {
               setIsTourOpen(true);
             }}
             className="text-indigo-800 dark:text-indigo-200 text-sm"
-          >
-         
-          </button>
+          ></button>
         </header>
         <main className="flex-1 overflow-y-auto p-4">{renderContent()}</main>
       </div>
