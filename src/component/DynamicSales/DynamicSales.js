@@ -1003,58 +1003,6 @@ const fetchSales = useCallback(async () => {
     fetchSales();
   }, [fetchSales]);
 
-<<<<<<< HEAD
-=======
- 
-const fetchSales = useCallback(async () => {
-  if (!storeId) return;
-  const { data, error } = await supabase
-    .from('dynamic_sales')
-    .select(`
-      id,
-      sale_group_id,
-      dynamic_product_id,
-      quantity,
-      unit_price,
-      amount,
-      payment_method,
-      paid_to,
-      device_id,
-      sold_at,
-      customer_id,
-      dynamic_product(name),
-      customer:customer_id(fullname)
-    `)
-    .eq('store_id', storeId)
-    .order('sold_at', { ascending: false });
-  if (error) {
-    toast.error(`Failed to fetch sales: ${error.message}`);
-    setSales([]);
-    setFiltered([]);
-  } else {
-    const processedSales = (data || []).map((sale) => ({
-      ...sale,
-      deviceIds: sale.device_id ? sale.device_id.split(',').filter((id) => id.trim()) : [],
-      customer_id: sale.customer?.fullname || 'Unknown',
-    }));
-    setSales(processedSales);
-    setFiltered(processedSales);
-  }
-}, [storeId]);
-
-
-
-
-
-
-
-
-
-  useEffect(() => {
-    fetchSales();
-  }, [fetchSales]);
-
->>>>>>> c1b841487b596dde9efbb9da58c862c70ef10871
 
   useEffect(() => {
     fetchProducts();
@@ -1272,7 +1220,6 @@ const createSale = async (e) => {
 
     const groupId = grp.id;
 
-<<<<<<< HEAD
   const inserts = lines.map((l) => ({
   store_id: storeId,
   sale_group_id: groupId,
@@ -1286,20 +1233,6 @@ const createSale = async (e) => {
   customer_name: customer_name, // Add this line
 }));
 
-=======
-    const inserts = lines.map((l) => ({
-      store_id: storeId,
-      sale_group_id: groupId,
-      dynamic_product_id: l.dynamic_product_id,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      amount: l.quantity * l.unit_price,
-      device_id: l.deviceIds.filter((id) => id.trim()).join(',') || null,
-      payment_method: paymentMethod,
-      customer_id: selectedCustomerId,
-      customer_name, // Include customer_name in dynamic_sales
-    }));
->>>>>>> c1b841487b596dde9efbb9da58c862c70ef10871
     const { error: insErr } = await supabase.from('dynamic_sales').insert(inserts);
     if (insErr) throw new Error(`Sales insertion failed: ${insErr.message}`);
 
@@ -1334,7 +1267,6 @@ const saveEdit = async () => {
       }
     }
 
-<<<<<<< HEAD
    const { error } = await supabase
   .from('dynamic_sales')
   .update({
@@ -1347,20 +1279,6 @@ const saveEdit = async () => {
     customer_name: customer_name, // Add this line
   })
   .eq('id', editing);
-=======
-    const { error } = await supabase
-      .from('dynamic_sales')
-      .update({
-        dynamic_product_id: saleForm.dynamic_product_id || originalSale.dynamic_product_id,
-        quantity: saleForm.quantity,
-        unit_price: saleForm.unit_price,
-        device_id: saleForm.deviceIds.filter((id) => id.trim()).join(',') || null,
-        payment_method: saleForm.payment_method || originalSale.payment_method,
-        customer_id: saleForm.customer_id,
-        customer_name,
-      })
-      .eq('id', editing);
->>>>>>> c1b841487b596dde9efbb9da58c862c70ef10871
     if (error) throw new Error(`Update failed: ${error.message}`);
 
     await supabase
