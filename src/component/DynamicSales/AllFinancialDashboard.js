@@ -413,7 +413,7 @@ const FinancialDashboard = () => {
   }, [stores, metricFilter, timeFilter, startDate, endDate, fetchStoreComparison]);
 
   return (
-    <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen transition-all duration-300">
+    <div className="p-0 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen transition-all duration-300">
       
         <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-900 dark:text-gray-100 bg-gradient-to-r from-indigo-500 to-indigo-700 text-white py-4 rounded-lg">
          Your Business Money Dashboard

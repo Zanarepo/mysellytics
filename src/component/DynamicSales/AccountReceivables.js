@@ -245,7 +245,7 @@ export default function AccountsReceivable() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto dark:bg-gray-900 dark:text-white space-y-6">
+    <div className="p-0 sm:p-6 max-w-6xl mx-auto dark:bg-gray-900 dark:text-white space-y-6">
       <ToastContainer />
       <h2 className="text-2xl sm:text-3xl font-bold text-center text-white bg-gradient-to-r from-indigo-400 to-indigo-600 py-4 rounded-lg">
         Money Owed to You

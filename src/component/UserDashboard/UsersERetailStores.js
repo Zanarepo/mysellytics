@@ -24,6 +24,7 @@ import DynamicReturnedItems from '../VariexContents/DynamicReturnedItems';
 import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
 import VsalesSummary from '../Ops/VsalesSummary';
 import StockTransfer from './StockTransfer'
+//import Financials from './Financials';
 
 const tools = [
   {
@@ -116,6 +117,8 @@ const tools = [
     component: <DynamicSuppliersTracker />,
     isFreemium: false,
   },
+
+
 ];
 
 // Mapping to align store owner keys to store user keys

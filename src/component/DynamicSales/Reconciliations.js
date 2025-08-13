@@ -416,7 +416,7 @@ const handleEditCheck = useCallback(async () => {
   }, [newCheck.payment_method, salesByPaymentMethod, totalSalesAmount]);
 
   return (
-    <div className="p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen transition-all duration-300">
+    <div className="p-0 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen transition-all duration-300">
       <ToastContainer />
       <h2 className="text-2xl sm:text-3xl font-bold text-center text-white bg-gradient-to-r from-indigo-500 to-indigo-700 py-4 rounded-lg">
         Check Your Money

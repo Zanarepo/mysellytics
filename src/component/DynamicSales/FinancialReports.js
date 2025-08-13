@@ -141,12 +141,12 @@ export default function GeneralLedger() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto dark:bg-gray-900 dark:text-white space-y-6">
+     <div className="p-0 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen transition-all duration-300">
       <ToastContainer />
       <h2 className="text-2xl sm:text-3xl font-bold text-center text-white bg-gradient-to-r from-indigo-500 to-indigo-700 py-4 rounded-lg">
         Money Tracker (General Ledger)
       </h2>
-      <div className="flex flex-col gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
+      <div className="flex flex-col gap-4 bg-white dark:bg-gray-800 p-0 ">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative w-full sm:w-1/4">
             <BuildingStorefrontIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-indigo-500 transition-colors" />
@@ -196,10 +196,11 @@ export default function GeneralLedger() {
               <option value="Accounts Payable">Money You Owe</option>
             </select>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-1/4">
-            <div className="relative flex-1">
-              <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-indigo-500 transition-colors" />
-              <input
+          <div className="flex flex-col sm:flex-row gap-2 w-full max-w-sm">
+  <div className="relative w-full">
+    <CalendarIcon
+      className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-indigo-500 transition-colors"
+    />  <input
                 type="date"
                 value={dateRange.start}
                 onChange={e => setDateRange({ ...dateRange, start: e.target.value })}

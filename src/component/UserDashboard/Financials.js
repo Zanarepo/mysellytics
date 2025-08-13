@@ -79,129 +79,238 @@ export default function Finance() {
   const [isPremium, setIsPremium] = useState(false);
   const [, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    async function checkAuthorizationAndFetchShopName() {
-      setIsLoading(true);
-      setErrorMessage('');
-      try {
-        const storeId = localStorage.getItem('store_id');
-        const userId = localStorage.getItem('user_id');
-        const ownerId = localStorage.getItem('owner_id');
-        const userAccessRaw = localStorage.getItem('user_access');
-        let hasPremiumAccess = false;
-        let fetchedShopName = 'Store';
+useEffect(() => {
+  async function checkAuthorizationAndFetchShopName() {
+    setIsLoading(true);
+    setErrorMessage('');
 
-        if (!storeId || !userId) {
-          setIsAuthorized(false);
-          setIsLoading(false);
-          return;
+    try {
+      // Local storage keys (try a few common variants for email)
+      const storeIdRaw = localStorage.getItem('store_id');   // stores.id (current store context)
+      const userIdRaw  = localStorage.getItem('user_id');    // store_users.id (row id in store_users)
+      const ownerIdRaw = localStorage.getItem('owner_id');   // store_owners.id (owner record id)
+      const userEmail  = localStorage.getItem('email') || localStorage.getItem('user_email') || localStorage.getItem('email_address');
+      const userAccessRaw = localStorage.getItem('user_access');
+
+      const storeId = storeIdRaw ? Number(storeIdRaw) : null;
+      const userId  = userIdRaw  ? Number(userIdRaw)  : null;
+      const ownerId = ownerIdRaw ? Number(ownerIdRaw) : null;
+
+      // debug: uncomment while troubleshooting
+      // console.log({ storeIdRaw, userIdRaw, ownerIdRaw, storeId, userId, ownerId, userEmail });
+
+      let isAuthorizedUser = false;
+      let hasPremiumAccess = false;
+      let fetchedShopName = 'Store';
+
+      // Require at least a store context and some identity (owner or user)
+      if (!storeId || (!userId && !ownerId && !userEmail)) {
+        setIsAuthorized(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // ----------------------
+      // 1) Strict store_users check (ONLY allowed roles)
+      // ----------------------
+      // We match store_users.id === userId (your row PK) AND store_id === storeId
+      if (userId) {
+        try {
+          const { data: storeUserRow, error: suErr } = await supabase
+            .from('store_users')
+            .select('id, role, store_id, email_address')
+            .eq('id', userId)
+            .maybeSingle(); // safe if not found
+
+          if (!suErr && storeUserRow) {
+            // ensure the store_user row belongs to this store
+            if (Number(storeUserRow.store_id) === Number(storeId)) {
+              const role = String(storeUserRow.role || '').trim().toLowerCase();
+              const allowedRoles = ['admin', 'account', 'manager'];
+              if (allowedRoles.includes(role)) {
+                isAuthorizedUser = true;
+              } else {
+                // explicit non-authorized role
+                isAuthorizedUser = false;
+              }
+            } else {
+              // row exists but not for this store => not authorized via this row
+            }
+          }
+        } catch (err) {
+          console.error('store_users lookup error', err);
         }
+      }
 
-        // Fetch user role from store_users table
-        const { data: userData, error: userError } = await supabase
-          .from('store_users')
-          .select('role')
-          .eq('id', userId)
-          .eq('store_id', storeId)
+      // ----------------------
+      // 2) Owner checks (multiple fallbacks)
+      // ----------------------
+      // A) If ownerId (store_owner record id) is present, check stores.owner_user_id === ownerId
+      if (!isAuthorizedUser && ownerId) {
+        try {
+          const { data: storeByOwner, error: storeByOwnerErr } = await supabase
+            .from('stores')
+            .select('id, owner_user_id')
+            .eq('id', storeId)
+            .eq('owner_user_id', ownerId)
+            .maybeSingle();
+
+          if (!storeByOwnerErr && storeByOwner) {
+            isAuthorizedUser = true;
+          }
+        } catch (err) {
+          console.error('stores by ownerId lookup error', err);
+        }
+      }
+
+      // B) Extra fallback: sometimes owner_user_id may reference store_users.id — check that too
+      if (!isAuthorizedUser && userId) {
+        try {
+          const { data: storeByUserAsOwner, error: storeByUserErr } = await supabase
+            .from('stores')
+            .select('id, owner_user_id')
+            .eq('id', storeId)
+            .eq('owner_user_id', userId)
+            .maybeSingle();
+
+          if (!storeByUserErr && storeByUserAsOwner) {
+            isAuthorizedUser = true;
+          }
+        } catch (err) {
+          console.error('stores by userId-as-owner lookup error', err);
+        }
+      }
+
+      // C) If we still don't have owner match, try store_owners table by email, then ensure that owner owns this store
+      if (!isAuthorizedUser && userEmail) {
+        try {
+          const { data: ownerRow, error: ownerRowErr } = await supabase
+            .from('store_owners')
+            .select('id, email')
+            .ilike('email', userEmail) // case-insensitive
+            .maybeSingle();
+
+          if (!ownerRowErr && ownerRow && ownerRow.id) {
+            // confirm that this owner record is attached to this store (stores.owner_user_id === ownerRow.id)
+            const { data: storeByOwnerRecord, error: storeByOwnerRecordErr } = await supabase
+              .from('stores')
+              .select('id')
+              .eq('id', storeId)
+              .eq('owner_user_id', ownerRow.id)
+              .maybeSingle();
+
+            if (!storeByOwnerRecordErr && storeByOwnerRecord) {
+              isAuthorizedUser = true;
+            }
+          }
+        } catch (err) {
+          console.error('store_owners email lookup error', err);
+        }
+      }
+
+      // Save authorization state (owner OR allowed store_user)
+      setIsAuthorized(Boolean(isAuthorizedUser));
+
+      // If not authorized, exit early (we leave premium logic untouched, as requested)
+      if (!isAuthorizedUser) {
+        setIsLoading(false);
+        return;
+      }
+
+      // ========================
+      // PREMIUM LOGIC (kept intact, but improved linked-store lookup using email)
+      // ========================
+      // 1) Fetch store's main shop_name + premium
+      try {
+        const { data: storeData, error: storeError } = await supabase
+          .from('stores')
+          .select('shop_name, premium')
+          .eq('id', storeId)
           .single();
 
-        if (userError || !userData) {
-          console.error('Error fetching user role:', userError?.message);
-          setIsAuthorized(false);
-          setIsLoading(false);
-          return;
+        if (!storeError && storeData) {
+          fetchedShopName = storeData.shop_name || fetchedShopName;
+          const isPremiumStore = storeData.premium === true ||
+            (typeof storeData.premium === 'string' && storeData.premium.toLowerCase() === 'true');
+          if (isPremiumStore) hasPremiumAccess = true;
+        } else if (storeError) {
+          console.error('Error fetching store main data:', storeError);
         }
+      } catch (err) {
+        console.error('Error reading main store data:', err);
+      }
 
-        // Check if user has required role or is the owner
-        const validRoles = ['account', 'manager', 'admin'];
-        const isRoleValid = validRoles.includes(userData.role);
-        const isOwner = userId === ownerId;
-        setIsAuthorized(isRoleValid || isOwner);
-
-        // Fetch shop name and premium status
-        if (storeId) {
-          const { data: storeData, error: storeError } = await supabase
-            .from('stores')
-            .select('shop_name, premium')
-            .eq('id', storeId)
-            .single();
-
-          if (storeError) {
-            console.error('Error fetching shop name:', storeError.message);
-          } else if (storeData) {
-            fetchedShopName = storeData.shop_name || fetchedShopName;
-            const isPremiumStore = storeData.premium === true || 
-                                 (typeof storeData.premium === 'string' && 
-                                  storeData.premium.toLowerCase() === 'true');
-            if (isPremiumStore) {
-              hasPremiumAccess = true;
-            }
-          }
-        }
-
-        // If not premium yet and user_id is present, check associated stores via store_users
-        if (!hasPremiumAccess && userId) {
-          const { data: userStores, error: userStoresError } = await supabase
+      // 2) If not premium yet, check other stores the user might belong to.
+      // Use the user's email to find all store_users rows (same person across stores),
+      // then check premium on those store ids.
+      if (!hasPremiumAccess && userEmail) {
+        try {
+          const { data: userStoreRows, error: userStoreRowsErr } = await supabase
             .from('store_users')
             .select('store_id')
-            .eq('id', userId);
+            .ilike('email_address', userEmail); // returns array (rows across stores)
 
-          if (!userStoresError && userStores?.length > 0) {
-            const associatedStoreIds = userStores.map((us) => us.store_id);
-
-            // Query premium status for associated stores
-            const { data: premiumStores, error: premiumStoresError } = await supabase
-              .from('stores')
-              .select('id, shop_name, premium')
-              .in('id', associatedStoreIds)
-              .eq('premium', true);
-
-            if (!premiumStoresError && premiumStores?.length > 0) {
-              hasPremiumAccess = true;
-              fetchedShopName = premiumStores[0].shop_name || fetchedShopName;
-            }
-          }
-        }
-
-        // If user_access is present, cross-check store_ids for premium
-        if (!hasPremiumAccess && userAccessRaw) {
-          try {
-            const userAccess = JSON.parse(userAccessRaw);
-            const accessStoreIds = userAccess?.store_ids || [];
-
-            if (accessStoreIds.length > 0) {
-              const { data: premiumAccessStores, error: premiumAccessError } = await supabase
+          if (!userStoreRowsErr && userStoreRows?.length > 0) {
+            const associatedStoreIds = userStoreRows.map(r => r.store_id).filter(Boolean);
+            if (associatedStoreIds.length > 0) {
+              const { data: premiumStores, error: premiumStoresErr } = await supabase
                 .from('stores')
                 .select('id, shop_name, premium')
-                .in('id', accessStoreIds)
+                .in('id', associatedStoreIds)
                 .eq('premium', true);
 
-              if (!premiumAccessError && premiumAccessStores?.length > 0) {
+              if (!premiumStoresErr && premiumStores?.length > 0) {
                 hasPremiumAccess = true;
-                fetchedShopName = premiumAccessStores[0].shop_name || fetchedShopName;
+                fetchedShopName = premiumStores[0].shop_name || fetchedShopName;
               }
             }
-          } catch (parseError) {
-            console.error('Error parsing user_access:', parseError.message);
           }
+        } catch (err) {
+          console.error('Error checking linked stores by email:', err);
         }
-
-        setShopName(fetchedShopName);
-        setIsPremium(hasPremiumAccess);
-        if (!hasPremiumAccess) {
-          setErrorMessage('Some features are available only for premium users. Please upgrade your store’s subscription.');
-        }
-      } catch (error) {
-        console.error('Authorization check error:', error.message);
-        setErrorMessage('An unexpected error occurred. Please try again later.');
-        setIsAuthorized(false);
-      } finally {
-        setIsLoading(false);
       }
-    }
 
-    checkAuthorizationAndFetchShopName();
-  }, []);
+      // 3) If still not premium, fallback to user_access in localStorage (unchanged)
+      if (!hasPremiumAccess && userAccessRaw) {
+        try {
+          const userAccess = JSON.parse(userAccessRaw);
+          const accessStoreIds = userAccess?.store_ids || [];
+          if (accessStoreIds.length > 0) {
+            const { data: premiumAccessStores, error: premiumAccessErr } = await supabase
+              .from('stores')
+              .select('id, shop_name, premium')
+              .in('id', accessStoreIds)
+              .eq('premium', true);
+
+            if (!premiumAccessErr && premiumAccessStores?.length > 0) {
+              hasPremiumAccess = true;
+              fetchedShopName = premiumAccessStores[0].shop_name || fetchedShopName;
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing user_access:', err);
+        }
+      }
+
+      // Finalize UI state
+      setShopName(fetchedShopName);
+      setIsPremium(hasPremiumAccess);
+      if (!hasPremiumAccess) {
+        setErrorMessage('Some features are available only for premium users. Please upgrade your store’s subscription.');
+      }
+    } catch (error) {
+      console.error('Authorization check error:', error?.message || error);
+      setErrorMessage('An unexpected error occurred. Please try again later.');
+      setIsAuthorized(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  checkAuthorizationAndFetchShopName();
+}, []);
+
+
 
   const tool = financeTools.find(t => t.key === activeTool);
 

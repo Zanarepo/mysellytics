@@ -43,6 +43,8 @@ const FeatureAssignment = () => {
     { value: 'customers', label: 'Customer Manager' },
     { value: 'sales_summary', label: 'Sales Summary' },
     { value: 'stock_transfer', label: 'Stock Transfer' },
+     { value: 'financials', label: 'Financials' },
+
  
 
     

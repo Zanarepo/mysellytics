@@ -23,7 +23,7 @@ import StoreUsersVariex from './StoreUsersVariex';
 import UsersERetailStores from './UsersERetailStores';
 import AIpowerInsights from './AIpowerInsights';
 import AdminOps from './AdminOps';
-import Financials from '../UserDashboard/Financials';
+import Financials from '../Ops/Financials'
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('Fix Scan');

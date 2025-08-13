@@ -27,7 +27,7 @@ const roleFeatureMap = {
   sales: ['sales', 'products', 'inventory', 'receipts', 'returns'],
   'store manager': ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
   marketing: ['customers'],
-  admin: ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers', 'stock transfer', 'sales summary'],
+  admin: ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
 };
 
 // Available features for manual override
@@ -43,12 +43,7 @@ const availableFeatures = [
   'customers',
   'Suppliers',
   'Sales Summary',
-  'Stock Transfer',
-  'products',
-
-
-
-
+  'Financials'
 ];
 
 export default function StoreAdminDashboard() {
