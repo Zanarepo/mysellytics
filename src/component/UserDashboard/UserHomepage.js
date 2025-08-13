@@ -19,7 +19,7 @@ import UserOnboardingTour from './UserOnboardingTour';
 import Employees from './Employees';
 import Profile from './Profile';
 import Variex from './Variex';
-import WhatsapUsers from './WhatsapUsers';
+
 import Notifications from './Notifications';
 import PricingFeatures from '../Payments/PricingFeatures';
 import ERetailStores from './ERetailStores';
@@ -158,7 +158,7 @@ const Dashboard = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      <WhatsapUsers />
+
       {/* Onboarding Tour */}
       <UserOnboardingTour
         isOpen={isTourOpen}
