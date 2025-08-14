@@ -50,40 +50,36 @@ export default function AdminOps() {
         let hasPremiumAccess = false;
         let fetchedShopName = 'Store Admin';
 
-        if (!storeId) {
-          setErrorMessage('No store assigned. Contact your admin.');
+        // Check if user is authenticated (has store_id or user_id)
+        if (!storeId && !userId) {
+          setErrorMessage('No store or user assigned. Contact your admin.');
           setIsAuthorized(false);
           setIsLoading(false);
           return;
         }
 
-        if (!userId) {
-          setErrorMessage('User not authenticated. Please log in.');
-          setIsAuthorized(false);
-          setIsLoading(false);
-          return;
-        }
+        // Fetch store premium status if store_id is present
+        if (storeId) {
+          const { data: storeData, error: storeError } = await supabase
+            .from('stores')
+            .select('shop_name, premium')
+            .eq('id', storeId)
+            .single();
 
-        // Fetch store premium status
-        const { data: storeData, error: storeError } = await supabase
-          .from('stores')
-          .select('shop_name, premium')
-          .eq('id', storeId)
-          .single();
+          if (storeError) {
+            setErrorMessage('Failed to load store permissions.');
+            setIsAuthorized(false);
+            setIsLoading(false);
+            return;
+          }
 
-        if (storeError) {
-          setErrorMessage('Failed to load store permissions.');
-          setIsAuthorized(false);
-          setIsLoading(false);
-          return;
-        }
-
-        fetchedShopName = storeData?.shop_name || 'Store Admin';
-        const isPremium = storeData.premium === true || 
-                         (typeof storeData.premium === 'string' && 
-                          storeData.premium.toLowerCase() === 'true');
-        if (isPremium) {
-          hasPremiumAccess = true;
+          fetchedShopName = storeData?.shop_name || 'Store Admin';
+          const isPremium = storeData.premium === true || 
+                           (typeof storeData.premium === 'string' && 
+                            storeData.premium.toLowerCase() === 'true');
+          if (isPremium) {
+            hasPremiumAccess = true;
+          }
         }
 
         // If not premium yet and user_id is present, check associated stores via store_users

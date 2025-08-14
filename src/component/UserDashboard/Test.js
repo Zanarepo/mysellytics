@@ -1,124 +1,64 @@
-import { supabase } from '../../supabaseClient';
 import React, { useState, useEffect } from 'react';
-import {
-  FaMoneyCheckAlt, FaFileInvoiceDollar, FaClipboardList,
-  FaBook, FaBoxes, FaArrowLeft, FaMoneyBillWave, FaExchangeAlt, FaLock
-} from "react-icons/fa";
-import AccountPayable from '../DynamicSales/AccountPayable';
-import AccountReceivables from '../DynamicSales/AccountReceivables';
-import FinancialReports from '../DynamicSales/FinancialReports';
-import GeneralLedger from '../DynamicSales/GeneralLedger';
-import InventoryValuations from '../DynamicSales/InventoryValuations';
-import AllFinancialDashboard from '../DynamicSales/AllFinancialDashboard';
-import Reconciliations from '../DynamicSales/Reconciliations';
+import { supabase } from '../../supabaseClient';
+import { FaClock, FaTasks, FaCalendarAlt, FaArrowLeft, FaLock } from 'react-icons/fa';
+import StoreClocking from './StoreClocking';
+import AdminTasks from './AdminTasks';
+import StaffSchedules from './StaffSchedules';
 
-const financeTools = [
+const opsTools = [
   {
-    key: "financials",
-    label: "Financial Dashboard",
-    icon: <FaMoneyBillWave className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "Visualize all your finances in one place",
-    component: <AllFinancialDashboard />,
+    key: 'clocking',
+    label: 'Time Sheet Manager',
+    icon: <FaClock className="text-xl sm:text-4xl md:text-5xl text-indigo-600 dark:text-indigo-400" />,
+    desc: 'Track employee clock-in and clock-out times.',
+    component: <StoreClocking />,
     isFreemium: true,
   },
   {
-    key: "payables",
-    label: "Account Payable",
-    icon: <FaMoneyCheckAlt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "Track and manage your outstanding payments",
-    component: <AccountPayable />,
+    key: 'tasks',
+    label: 'Assignment Tracker',
+    icon: <FaTasks className="text-xl sm:text-4xl md:text-5xl text-indigo-600 dark:text-indigo-400" />,
+    desc: 'Manage and monitor staff tasks.',
+    component: <AdminTasks />,
     isFreemium: false,
   },
   {
-    key: "receivables",
-    label: "Account Receivables",
-    icon: <FaFileInvoiceDollar className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "Monitor payments owed to your business",
-    component: <AccountReceivables />,
+    key: 'schedules',
+    label: 'Schedule Manager',
+    icon: <FaCalendarAlt className="text-xl sm:text-4xl md:text-5xl text-indigo-600 dark:text-indigo-400" />,
+    desc: 'Organize staff schedules efficiently.',
+    component: <StaffSchedules />,
     isFreemium: false,
-  },
-  {
-    key: "reports",
-    label: "Financial Reports",
-    icon: <FaClipboardList className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "View profit & loss, balance sheet, and cash flow",
-    component: <FinancialReports />,
-    isFreemium: false,
-  },
-  {
-    key: "ledger",
-    label: "General Ledger",
-    icon: <FaBook className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "Access all financial transactions in one place",
-    component: <GeneralLedger />,
-    isFreemium: true,
-  },
-  {
-    key: "valuation",
-    label: "Inventory Valuations",
-    icon: <FaBoxes className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "Evaluate your stock's financial worth over time",
-    component: <InventoryValuations />,
-    isFreemium: false,
-  },
-  {
-    key: "reconciliations",
-    label: "Reconciliations",
-    icon: <FaExchangeAlt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
-    desc: "Audit and reconcile all your financial transactions",
-    component: <Reconciliations />,
-    isFreemium: true,
   },
 ];
 
-export default function Finance() {
-  const [shopName, setShopName] = useState('Store');
+export default function AdminOps() {
+  const [shopName, setShopName] = useState('Store Admin');
   const [activeTool, setActiveTool] = useState('');
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPremium, setIsPremium] = useState(false);
-  const [, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    async function checkAuthorizationAndFetchShopName() {
+    async function checkPremiumAccess() {
       setIsLoading(true);
       setErrorMessage('');
       try {
         const storeId = localStorage.getItem('store_id');
         const userId = localStorage.getItem('user_id');
-        const ownerId = localStorage.getItem('owner_id');
         const userAccessRaw = localStorage.getItem('user_access');
         let hasPremiumAccess = false;
-        let fetchedShopName = 'Store';
+        let fetchedShopName = 'Store Admin';
 
-        if (!storeId || !userId) {
+        // Check if user is authenticated (has store_id or user_id)
+        if (!storeId && !userId) {
+          setErrorMessage('No store or user assigned. Contact your admin.');
           setIsAuthorized(false);
           setIsLoading(false);
           return;
         }
 
-        // Fetch user role from store_users table
-        const { data: userData, error: userError } = await supabase
-          .from('store_users')
-          .select('role')
-          .eq('id', userId)
-          .eq('store_id', storeId)
-          .single();
-
-        if (userError || !userData) {
-          console.error('Error fetching user role:', userError?.message);
-          setIsAuthorized(false);
-          setIsLoading(false);
-          return;
-        }
-
-        // Check if user has required role or is the owner
-        const validRoles = ['account', 'manager', 'admin', 'owner'];
-        const isRoleValid = validRoles.includes(userData.role);
-        const isOwner = userId === ownerId;
-        setIsAuthorized(isRoleValid || isOwner);
-
-        // Fetch shop name and premium status
+        // Fetch store premium status if store_id is present
         if (storeId) {
           const { data: storeData, error: storeError } = await supabase
             .from('stores')
@@ -127,15 +67,18 @@ export default function Finance() {
             .single();
 
           if (storeError) {
-            console.error('Error fetching shop name:', storeError.message);
-          } else if (storeData) {
-            fetchedShopName = storeData.shop_name || fetchedShopName;
-            const isPremiumStore = storeData.premium === true || 
-                                 (typeof storeData.premium === 'string' && 
-                                  storeData.premium.toLowerCase() === 'true');
-            if (isPremiumStore) {
-              hasPremiumAccess = true;
-            }
+            setErrorMessage('Failed to load store permissions.');
+            setIsAuthorized(false);
+            setIsLoading(false);
+            return;
+          }
+
+          fetchedShopName = storeData?.shop_name || 'Store Admin';
+          const isPremium = storeData.premium === true || 
+                           (typeof storeData.premium === 'string' && 
+                            storeData.premium.toLowerCase() === 'true');
+          if (isPremium) {
+            hasPremiumAccess = true;
           }
         }
 
@@ -187,7 +130,7 @@ export default function Finance() {
         }
 
         setShopName(fetchedShopName);
-        setIsPremium(hasPremiumAccess);
+        setIsAuthorized(hasPremiumAccess);
         if (!hasPremiumAccess) {
           setErrorMessage('Some features are available only for premium users. Please upgrade your store’s subscription.');
         }
@@ -200,119 +143,135 @@ export default function Finance() {
       }
     }
 
-    checkAuthorizationAndFetchShopName();
+    checkPremiumAccess();
   }, []);
 
-  const tool = financeTools.find(t => t.key === activeTool);
+  const handleToolClick = (key) => {
+    const tool = opsTools.find((t) => t.key === key);
+    if (!tool.isFreemium && !isAuthorized) {
+      setErrorMessage(`Access Denied: ${tool.label} is a premium feature. Please upgrade your subscription.`);
+      return;
+    }
+    setActiveTool(key);
+    setErrorMessage('');
+  };
 
-  return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 w-full flex flex-col">
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-500"></div>
-        </div>
-      ) : !isAuthorized ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md max-w-md">
-            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">
-              Unauthorized Access
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Sorry, you don’t have permission to access the Finance Dashboard. Please contact your store admin or ensure you have the role of Account, Manager, or Admin.
-            </p>
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto">
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-500"></div>
           </div>
         </div>
-      ) : (
-        <>
-          <header className="text-center mb-4 sm:mb-6 pt-4 sm:pt-6">
-            <h1 className="text-lg sm:text-3xl font-bold text-indigo-800 dark:text-indigo-400">
-              Finance Dashboard for {shopName}
-            </h1>
-            {!activeTool && (
-              <p className="text-gray-600 dark:text-gray-400 mt-2 text-xs sm:text-sm">
-                Manage payables, receivables, reports, and valuations.
-              </p>
-            )}
-          </header>
+      );
+    }
 
-        {!isPremium && (
-               <div className="px-3 sm:px-6 mt-4 flex flex-col sm:flex-row items-center justify-center gap-2 text-center">
-                 <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-xs sm:text-sm font-medium px-2 py-1 rounded-full">
-                   <FaLock className="text-yellow-600 text-xs" /> Want to Access More Features? Upgrade to Premium!
-                 </span>
-                 <a
-                   href="/upgrade"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   className="bg-indigo-600 text-white font-medium text-xs sm:text-sm py-1.5 px-3 rounded-lg hover:bg-indigo-700 transition"
-                 >
-                   Upgrade Now
-                 </a>
-               </div>
-             )}
+    if (activeTool) {
+      const tool = opsTools.find((t) => t.key === activeTool);
+      if (!tool.isFreemium && !isAuthorized) {
+        return (
+          <div className="w-full bg-white dark:bg-gray-900 p-4 max-w-7xl mx-auto text-center text-gray-600 dark:text-gray-400">
+            <FaLock className="text-2xl sm:text-3xl mb-2" />
+            <p>This feature is available only for premium users. Please upgrade your store’s subscription.</p>
+            <a
+              href="/upgrade"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-3 bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition"
+            >
+              Upgrade to Premium
+            </a>
+          </div>
+        );
+      }
+      return (
+        <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto">
+          <div className="px-4 sm:px-6">
+            <button
+              onClick={() => setActiveTool('')}
+              className="flex items-center text-indigo-600 hover:text-indigo-800 mb-3 sm:mb-4 text-xs sm:text-sm md:text-base"
+              aria-label="Back to Operations"
+            >
+              <FaArrowLeft className="mr-2" /> Back to Operations
+            </button>
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold text-indigo-600 dark:text-indigo-400">
+              {tool.label}
+            </h2>
+            <p className="text-indigo-600 dark:text-indigo-400 text-xs sm:text-sm md:text-base mb-4">
+              {tool.desc}
+            </p>
+          </div>
+          <div className="flex-1 w-full">
+            {React.cloneElement(tool.component, { setActiveTool })}
+          </div>
+        </div>
+      );
+    }
 
-          {activeTool ? (
-            <div className="flex-1 flex flex-col w-full">
-              <div className="px-4 sm:px-6">
-                <button
-                  onClick={() => setActiveTool('')}
-                  className="flex items-center text-indigo-600 hover:text-indigo-800 mb-4 text-xs sm:text-base"
-                >
-                  <FaArrowLeft className="mr-2" /> Back to Finance Tools
-                </button>
-                <h2 className="text-lg sm:text-2xl font-semibold text-indigo-800 dark:text-indigo-400">
-                  {tool.label}
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">{tool.desc}</p>
-                {tool.isFreemium || isPremium ? (
-                  <div className="w-full mt-4">
-                    {React.cloneElement(tool.component, { setActiveTool })}
-                  </div>
-                ) : (
-                  <div className="mt-4 text-center text-gray-600 dark:text-gray-400">
-                    <FaLock className="text-2xl sm:text-3xl mb-2" />
-                    <p>This feature is available only for premium users. Please upgrade your store’s subscription.</p>
-                    <a
-                      href="/upgrade"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-3 bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition"
-                    >
-                      Upgrade to Premium
-                    </a>
-                  </div>
-                )}
+    return (
+      <div className="relative flex-1 px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 md:gap-6 max-w-7xl mx-auto overflow-hidden">
+        {opsTools.map((t) => (
+          <div
+            key={t.key}
+            className={`relative flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl shadow p-4 sm:p-6 h-40 sm:h-48 md:h-56 w-full transition ${
+              t.isFreemium || isAuthorized ? 'hover:shadow-lg cursor-pointer' : 'cursor-not-allowed'
+            }`}
+            onClick={() => handleToolClick(t.key)}
+            title={
+              t.isFreemium || isAuthorized ? '' : `Locked: ${t.label}: Upgrade to premium to access this feature`
+            }
+            aria-label={`Select ${t.label}`}
+          >
+            {t.icon}
+            <span className="mt-2 text-xs sm:text-sm md:text-base font-medium text-indigo-600 dark:text-indigo-400">
+              {t.label}
+            </span>
+            <p className="text-indigo-600 dark:text-indigo-400 text-xs sm:text-sm text-center mt-1">
+              {t.desc}
+            </p>
+            {(!t.isFreemium && !isAuthorized) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-200/20 dark:bg-gray-700/20 rounded-xl">
+                <FaLock className="text-red-300 dark:text-red-500 text-lg sm:text-xl" />
               </div>
-            </div>
-          ) : (
-            <div className="relative flex-1 px-4 sm:px-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
-              {financeTools.map(t => (
-                <div
-                  key={t.key}
-                  className={`relative flex flex-col items-center justify-center bg-white dark:bg-gray-800 p-3 sm:p-6 rounded-xl shadow h-36 sm:h-48 transition ${
-                    t.isFreemium || isPremium ? 'hover:shadow-lg cursor-pointer' : 'cursor-not-allowed'
-                  }`}
-                  onClick={t.isFreemium || isPremium ? () => setActiveTool(t.key) : null}
-                  title={t.isFreemium || isPremium ? '' : 'Upgrade to premium to access this feature'}
-                >
-                  {t.icon}
-                  <span className="mt-2 text-xs sm:text-base font-medium text-indigo-800 dark:text-indigo-400">
-                    {t.label}
-                  </span>
-                  <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm text-center mt-1">
-                    {t.desc}
-                  </p>
-                  {!t.isFreemium && !isPremium && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200/20 dark:bg-gray-700/20 rounded-xl">
-                      <FaLock className="text-red-300 dark:text-red-500 text-lg sm:text-xl" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
+      <header className="text-center pt-4 sm:pt-6">
+        <h1 className="text-base sm:text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+          {shopName} Admin Operations
+        </h1>
+        <p className="text-indigo-600 dark:text-indigo-400 mt-1 text-xs sm:text-sm md:text-base">
+          Manage clocking, tasks, and staff schedules in one place.
+        </p>
+      </header>
+      {!isAuthorized && (
+        <div className="px-3 sm:px-6 mt-4 flex flex-col sm:flex-row items-center justify-center gap-2 text-center">
+          <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-xs sm:text-sm font-medium px-2 py-1 rounded-full">
+            <FaLock className="text-yellow-600 text-xs" /> Want to Access More Features? Upgrade to Premium!
+          </span>
+          <a
+            href="/upgrade"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-indigo-600 text-white font-medium text-xs sm:text-sm py-1.5 px-3 rounded-lg hover:bg-indigo-700 transition"
+          >
+            Upgrade Now
+          </a>
+        </div>
       )}
+      {errorMessage && (
+        <div className="text-center text-red-500 dark:text-red-400 mb-4 text-xs sm:text-sm max-w-7xl mx-auto">
+          {errorMessage}
+        </div>
+      )}
+      {renderContent()}
     </div>
   );
 }

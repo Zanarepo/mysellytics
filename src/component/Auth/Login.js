@@ -60,7 +60,7 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const pickAccess = (opt, allAccess) => {
+  const pickAccess = async (opt, allAccess) => {
     const userAccess = {
       store_ids: allAccess.filter((a) => a.storeId).map((a) => a.storeId),
       owner_id: allAccess.find((a) => a.ownerId)?.ownerId || null,
@@ -74,22 +74,14 @@ export default function Login() {
 
     const storeId = opt.storeId || allAccess.find((a) => a.storeId)?.storeId || '3';
     const ownerId = allAccess.find((a) => a.ownerId)?.ownerId || '1';
-    const userId = opt.userId || null; // Store store_users.id for team role
+    const userId = opt.userId || null;
     const adminId = opt.adminId || null;
-    const userEmail = opt.email || email; // Store email for querying
+    const userEmail = opt.email || email;
 
     localStorage.setItem('store_id', storeId);
     localStorage.setItem('owner_id', ownerId);
-    if (userId) {
-      localStorage.setItem('user_id', userId); // Store store_users.id
-    }
-    localStorage.setItem('user_email', userEmail); // Store email
-
-
-
-     if (adminId) {
-      localStorage.setItem('admin_id', adminId); // Store store_users.id
-    }
+    if (userId) localStorage.setItem('user_id', userId);
+    if (adminId) localStorage.setItem('admin_id', adminId);
     localStorage.setItem('user_email', userEmail);
 
     console.log('Set localStorage:', {
@@ -149,31 +141,35 @@ export default function Login() {
     try {
       const hashed = await hashPwd(password);
 
+      // Query stores for owner role and store_owner validation
       const { data: owners = [], error: ownerErr } = await supabase
         .from('stores')
         .select('id, shop_name')
         .eq('email_address', email)
         .eq('password', hashed);
 
+      // Query store_users for team role
       const { data: teamData = [], error: teamErr } = await supabase
         .from('store_users')
         .select('id, role, store_id, email_address, stores(id, shop_name)')
         .eq('email_address', email)
         .eq('password', hashed);
 
+      // Query admins for admin/superadmin role
       const { data: adminData = [], error: adminErr } = await supabase
         .from('admins')
         .select('id, role')
         .eq('email', email)
         .eq('password', hashed);
 
+      // Query store_owners for store_owner role eligibility
       const { data: storeOwnersData = [], error: storeOwnerErr } = await supabase
         .from('store_owners')
         .select('id, full_name')
         .eq('email', email);
 
       if (ownerErr || teamErr || adminErr || storeOwnerErr) {
-        console.error(ownerErr, teamErr, adminErr, storeOwnerErr);
+        console.error('Query errors:', { ownerErr, teamErr, adminErr, storeOwnerErr });
         toast.error('An error occurred. Please try again.', {
           position: 'top-right',
           autoClose: 5000,
@@ -189,6 +185,7 @@ export default function Login() {
 
       const opts = [];
 
+      // Add owner role for stores
       owners.forEach((o) => {
         opts.push({
           type: 'owner',
@@ -197,35 +194,25 @@ export default function Login() {
           role: 'owner',
           screenclipExtensionId: 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
           icon: <FaStore />,
-          email: email, // Include email
+          email: email,
         });
       });
 
+      // Add team role for store_users
       teamData.forEach((u) => {
         opts.push({
           type: 'team',
           label: `${u.role.charAt(0).toUpperCase() + u.role.slice(1)} @ ${u.stores.shop_name}`,
           storeId: u.store_id,
-          userId: u.id, // Include store_users.id
-          email: u.email_address, // Include email_address
+          userId: u.id,
+          email: u.email_address,
           role: u.role,
           screenclipExtensionId: 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
           icon: <FaUsers />,
         });
       });
 
-      storeOwnersData.forEach((so) => {
-        opts.push({
-          type: 'store_owner',
-          label: `Multi-Store Dashboard (${so.full_name})`,
-          ownerId: so.id,
-          role: 'store_owner',
-          screenclipExtensionId: 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
-          icon: <FaUserShield />,
-          email: email, // Include email
-        });
-      });
-
+      // Add admin/superadmin role for admins
       adminData.forEach((a) => {
         opts.push({
           type: a.role === 'superadmin' ? 'superadmin' : 'admin',
@@ -234,14 +221,29 @@ export default function Login() {
           role: a.role,
           screenclipExtensionId: 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
           icon: <FaUserCog />,
-          email: email, // Include email
+          email: email,
         });
       });
+
+      // Add store_owner role if email is in store_owners and password matches in stores
+      if (storeOwnersData.length > 0 && owners.length > 0) {
+        storeOwnersData.forEach((so) => {
+          opts.push({
+            type: 'store_owner',
+            label: `Multi-Store Dashboard (${so.full_name})`,
+            ownerId: so.id,
+            role: 'store_owner',
+            screenclipExtensionId: 'jmjbgcjbgmcfgbgikmbdioggjlhjegpp',
+            icon: <FaUserShield />,
+            email: email,
+          });
+        });
+      }
 
       console.log('Access Options:', opts);
 
       if (opts.length === 0) {
-        toast.error('Invalid credentials or no access.', {
+        toast.error('Invalid email or password.', {
           position: 'top-right',
           autoClose: 5000,
           hideProgressBar: false,
@@ -256,7 +258,7 @@ export default function Login() {
         setAccessOptions(opts);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Login error:', e);
       toast.error('Unexpected error. Please try again.', {
         position: 'top-right',
         autoClose: 5000,
@@ -281,7 +283,6 @@ export default function Login() {
         role="dialog"
         aria-labelledby="dashboard-selection-title"
       >
-        {/* Wavy Top Border */}
         <svg className="absolute top-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
           <path
             d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
@@ -296,7 +297,6 @@ export default function Login() {
           </defs>
         </svg>
 
-        {/* Wavy Bottom Border */}
         <svg className="absolute bottom-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
           <path
             d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
@@ -368,7 +368,6 @@ export default function Login() {
       role="region"
       aria-labelledby="login-form-title"
     >
-      {/* Wavy Top Border */}
       <svg className="absolute top-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
         <path
           d="M0,0 C280,100 720,0 1440,100 L1440,0 Z"
@@ -383,7 +382,6 @@ export default function Login() {
         </defs>
       </svg>
 
-      {/* Wavy Bottom Border */}
       <svg className="absolute bottom-0 w-full" viewBox="0 0 1440 100" preserveAspectRatio="none">
         <path
           d="M0,100 C280,0 720,100 1440,0 L1440,100 Z"
