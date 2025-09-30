@@ -31,6 +31,7 @@ import Test from './component/UserDashboard/Test';
 import Tests from './component/UserDashboard/Tests';
 import ReceiptQRCode from "./component/VariexContents/ReceiptQRCode";
 import ReceiptQRCodeWrapper from "./component/VariexContents/ReceiptQRCodeWrapper";
+import ReceiptModules from "./component/Services/ReceiptModules";
 
 
 const App = () => {
@@ -79,6 +80,7 @@ const App = () => {
           <Route path="/tools" element={<Tools />} />
             <Route path="/test" element={<Test />} />
              <Route path="/tests" element={<Tests />} />
+             <Route path="/rec" element={<ReceiptModules />} />
           <Route path="/qrcodes" element={<ReceiptQRCode />} />
         <Route path="/receipt/:receiptId" element={<ReceiptQRCodeWrapper />} />
         </Routes>

@@ -78,7 +78,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://trackitbe.onrender.com/reset-password', {
+      const response = await fetch('https://sellyticsbe-production.up.railway.app/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword: password }),

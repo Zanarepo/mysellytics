@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { FaStore, FaUsers, FaUserShield, FaUserCog } from "react-icons/fa";
 
@@ -14,8 +14,15 @@ export default function AdminModule() {
     if (id) setStoreId(Number(id));
   }, []);
 
+  useEffect(() => {
+    if (storeId) {
+      fetchUsers();
+      fetchAdmins();
+    }
+  }, [storeId]);
+
   // Fetch store users
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = async () => {
     const { data, error } = await supabase
       .from("store_users")
       .select("id, full_name, email_address")
@@ -26,10 +33,10 @@ export default function AdminModule() {
     } else {
       setUsers(data || []);
     }
-  }, [storeId]);
+  };
 
   // Fetch admins
-  const fetchAdmins = useCallback(async () => {
+  const fetchAdmins = async () => {
     const { data, error } = await supabase
       .from("store_admins")
       .select("admin_id, username, email, role, admin_code, created_at")
@@ -40,14 +47,7 @@ export default function AdminModule() {
     } else {
       setAdmins(data || []);
     }
-  }, [storeId]);
-
-  useEffect(() => {
-    if (storeId) {
-      fetchUsers();
-      fetchAdmins();
-    }
-  }, [storeId, fetchUsers, fetchAdmins]);
+  };
 
   // Add admin
   const addAdmin = async (user) => {
