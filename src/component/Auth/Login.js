@@ -53,8 +53,8 @@ export default function Login() {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = 'Please enter a valid email address.';
     }
-    if (!password || password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters.';
+    if (!password) {
+      newErrors.password = 'Password is required.';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -141,31 +141,31 @@ export default function Login() {
     try {
       const hashed = await hashPwd(password);
 
-      // Query stores for owner role and store_owner validation
+      // Query stores for owner role
       const { data: owners = [], error: ownerErr } = await supabase
         .from('stores')
-        .select('id, shop_name')
+        .select('id, shop_name, email_address, password')
         .eq('email_address', email)
         .eq('password', hashed);
 
       // Query store_users for team role
       const { data: teamData = [], error: teamErr } = await supabase
         .from('store_users')
-        .select('id, role, store_id, email_address, stores(id, shop_name)')
+        .select('id, role, store_id, email_address, password, stores(id, shop_name)')
         .eq('email_address', email)
         .eq('password', hashed);
 
       // Query admins for admin/superadmin role
       const { data: adminData = [], error: adminErr } = await supabase
         .from('admins')
-        .select('id, role')
+        .select('id, role, email, password')
         .eq('email', email)
         .eq('password', hashed);
 
       // Query store_owners for store_owner role eligibility
       const { data: storeOwnersData = [], error: storeOwnerErr } = await supabase
         .from('store_owners')
-        .select('id, full_name')
+        .select('id, full_name, email')
         .eq('email', email);
 
       if (ownerErr || teamErr || adminErr || storeOwnerErr) {
@@ -273,6 +273,7 @@ export default function Login() {
     }
   };
 
+  // The rest of the component (JSX) remains unchanged
   if (accessOptions) {
     return (
       <motion.section
