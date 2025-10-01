@@ -27,6 +27,7 @@ import DynamicSuppliersTracker from '../Ops/DynamicSuppliersTracker';
 import LatestReceipts from '../VariexContents/LatestReceipts';
 import DashboardAccess from '../Ops/DashboardAccess';
 import GadgetsDynamicProducts from './GadgetsDynamicProducts';
+import StockTransfer from './StockTransfer';
 
 const tools = [
   {
@@ -99,6 +100,14 @@ const tools = [
     desc: 'Manage your customers.',
     component: <Customers />,
   },
+  {
+    key: 'stock transfer',
+    label: 'Customer Manager',
+    icon: <FaUsers className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
+    desc: 'Manage your customers.',
+    component: <StockTransfer />,
+  },
+ 
 ];
 
 // Mapping for common variations in allowed_features
@@ -111,6 +120,7 @@ const featureKeyMapping = {
   'suppliers': 'Suppliers',
   'supplier': 'Suppliers',
   'sales summary': 'Sales Summary',
+  
 };
 
 export default function DynamicDashboard() {

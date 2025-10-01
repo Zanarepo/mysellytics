@@ -51,7 +51,7 @@ const tools = [
     icon: <FaReceipt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Easily Transfer Stock from one store to another.',
     component: <StockTransfer />,
-    isFreemium: true,
+    isFreemium: false,
   },
   {
     key: 'inventory',
@@ -67,7 +67,7 @@ const tools = [
     icon: <FaReceipt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Monitor store expenses.',
     component: <UpdatedVariexReceipts />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'returns',
@@ -83,7 +83,7 @@ const tools = [
     icon: <FaRegMoneyBillAlt className="text-2xl sm:text-5xl sm:text-6xl text-indigo-600" />,
     desc: 'Keep track of your store’s spending.',
     component: <ExpenseTracker />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'unpaid_supplies',

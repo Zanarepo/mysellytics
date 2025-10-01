@@ -23,11 +23,12 @@ class ToastErrorBoundary extends Component {
 
 // Role-to-feature mapping
 const roleFeatureMap = {
-  account: ['expenses', 'debts', 'receipts', 'sales summary'],
-  sales: ['sales', 'products', 'inventory', 'receipts', 'returns'],
-  'store manager': ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
+  account: ['sales', 'expenses', 'Products & Pricing Tracker' , 'Sales Summary', 'unpaid supplies', 'debts', 'customers', 'Suppliers', 'financials', 'receipts'],
+  sale: ['sales', 'products & pricing', 'inventory', 'Sales Summary','receipts', 'returns', 'customers',  'Suppliers'],
+  'store manager': ['sales',  'inventory', 'receipts', 'returns', 'expenses', 'debts', 'customers', 'Suppliers', 'Stock Transfer' ,'Products & Pricing Tracker'],
   marketing: ['customers'],
-  admin: ['sales', 'products', 'inventory', 'receipts', 'returns', 'expenses', 'unpaid supplies', 'debts', 'customers', 'suppliers'],
+  admin: ['sales', 'products', 'inventory', 'receipts', 'returns', 'Sales Summary' ,'expenses', 'Stock Transfer', 'unpaid supplies', 'debts', 'customers', 'suppliers', 'financials', 'Products & Pricing Tracker'],
+  others: [   'Products & Pricing Tracker', 'sales', 'Stock Transfer'],
 };
 
 // Available features for manual override
@@ -43,7 +44,9 @@ const availableFeatures = [
   'customers',
   'Suppliers',
   'Sales Summary',
-  'Financials'
+  'Financials',
+  'Stock Transfer'
+  
 ];
 
 export default function StoreAdminDashboard() {
@@ -342,10 +345,11 @@ export default function StoreAdminDashboard() {
                       >
                         <option value="">Select Role</option>
                         <option value="account">Account</option>
-                        <option value="sales">Sales</option>
+                        <option value="sale">Sales</option>
                         <option value="store manager">Store Manager</option>
                         <option value="marketing">Marketing</option>
                         <option value="admin">Admin</option>
+                        <option value="others">Others</option>
                       </select>
                     </div>
                     <div>

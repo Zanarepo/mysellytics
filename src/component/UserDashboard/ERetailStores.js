@@ -54,7 +54,7 @@ const tools = [
     icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'Easily Transfer Stock from one store to another.',
     component: <StockTransfer />,
-    isFreemium: true,
+    isFreemium: false,
   },
 
 
@@ -64,7 +64,7 @@ const tools = [
     icon: <FaTasks className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'Keep an eye on how much goods you have sold and what is left in your store.',
     component: <DynamicInventory />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'receipts',
@@ -80,7 +80,7 @@ const tools = [
     icon: <FaUndoAlt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'Track returned items from customers.',
     component: <DynamicReturnedItems />,
-    isFreemium: true,
+    isFreemium: false,
   },
   {
     key: 'expenses',
@@ -88,7 +88,7 @@ const tools = [
     icon: <FaRegMoneyBillAlt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'Keep track of your stores spending.',
     component: <ExpenseTracker />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'unpaid_supplies',
@@ -96,7 +96,7 @@ const tools = [
     icon: <FaBoxOpen className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'See who took goods on credit and hasn’t paid yet',
     component: <GadgetsUnpaidSupplies />,
-    isFreemium: true,
+    isFreemium: false,
   },
   {
     key: 'debts',
@@ -120,7 +120,7 @@ const tools = [
     icon: <FaChartLine className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'View a summary of your sales performance.',
     component: <VsalesSummary />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'customers',
@@ -128,7 +128,7 @@ const tools = [
     icon: <FaUsers className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: 'Manage your customers.',
     component: <Customers />,
-    isFreemium: true,
+    isFreemium: false,
   },
 ];
 

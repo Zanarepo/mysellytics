@@ -50,7 +50,7 @@ const tools = [
       icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
       desc: 'Easily Transfer Stock from one store to another.',
       component: <StockTransfer />,
-      isFreemium: true,
+      isFreemium: false,
     },
   
   {
@@ -67,7 +67,7 @@ const tools = [
     icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Monitor and track sales.',
     component: <DynamicReceipts />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'returns',

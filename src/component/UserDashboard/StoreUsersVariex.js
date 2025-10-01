@@ -68,7 +68,7 @@ const tools = [
     icon: <FaReceipt className="text-2xl sm:text-5xl text-indigo-600" />,
     desc: 'Monitor store expenses.',
     component: <StoreUsersLatestReceipts />,
-    isFreemium: false,
+    isFreemium: true,
   },
   {
     key: 'returns',
