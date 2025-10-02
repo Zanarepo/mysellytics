@@ -67,7 +67,7 @@ const financeTools = [
     icon: <FaExchangeAlt className="text-2xl sm:text-5xl text-indigo-600 dark:text-indigo-400" />,
     desc: "Audit and reconcile all your financial transactions",
     component: <Reconciliations />,
-    isFreemium: true,
+    isFreemium: false,
   },
 ];
 
