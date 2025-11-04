@@ -2,7 +2,7 @@ name: Weekly Report Automation (Test)
 
 on:
   schedule:
-    # Run every 1 minutes (UTC)
+    # Run every 40 minutes (UTC)
      - cron: "* * * * *"
   workflow_dispatch:
 
