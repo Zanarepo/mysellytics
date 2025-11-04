@@ -2,21 +2,24 @@ name: Weekly Report Automation (Test)
 
 on:
   schedule:
-    # Run every 3 minutes for testing
+    # Run every 3 minutes (UTC)
     - cron: "*/3 * * * *"
-  workflow_dispatch: # allows manual trigger
+  workflow_dispatch:
 
 jobs:
   run-weekly-report:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Log current time
+        run: echo "GitHub Action triggered at $(date -u)"
+
       - name: Call Supabase Edge Function
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          echo "Triggering Supabase Edge Function at $(date)"
+          echo "Triggering Supabase Edge Function at $(date -u)"
           curl -X POST "${SUPABASE_URL}/functions/v1/weekly_report" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
