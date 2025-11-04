@@ -17,7 +17,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "Triggering Supabase Edge Function at $(date)"
-          curl -X POST "${SUPABASE_URL}/functions/v1/weekly-report" \
+          curl -X POST "${SUPABASE_URL}/functions/v1/weekly_report" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
           -d '{}'
