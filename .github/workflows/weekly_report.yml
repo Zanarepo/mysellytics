@@ -3,7 +3,7 @@ name: Weekly Report Automation (Test)
 on:
   schedule:
     # Run every 3 minutes (UTC)
-    - cron: "*/3 * * * *"
+     - cron: "* * * * *"
   workflow_dispatch:
 
 jobs:
