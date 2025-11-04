@@ -1,9 +1,10 @@
-name: Weekly Report Automation
+name: Weekly Report Automation (Test)
 
 on:
   schedule:
-    - cron: "0 8 * * 1" # every Monday at 8 AM (UTC)
-  workflow_dispatch: # allows you to trigger it manually from GitHub Actions tab
+    # Run every 3 minutes for testing
+    - cron: "*/3 * * * *"
+  workflow_dispatch: # allows manual trigger
 
 jobs:
   run-weekly-report:
@@ -15,6 +16,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
+          echo "Triggering Supabase Edge Function at $(date)"
           curl -X POST "${SUPABASE_URL}/functions/v1/weekly-report" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
